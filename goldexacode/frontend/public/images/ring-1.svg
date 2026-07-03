@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff9e6"/>
+      <stop offset="1" stop-color="#d4a843"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" rx="28" fill="url(#g)"/>
+  <circle cx="200" cy="145" r="62" fill="#fff" opacity="0.85"/>
+  <path d="M160 145c0-35 22-62 40-62s40 27 40 62-22 62-40 62-40-27-40-62Z" fill="none" stroke="#b8941f" stroke-width="12"/>
+  <circle cx="200" cy="145" r="18" fill="#ffd633"/>
+  <text x="200" y="245" text-anchor="middle" font-family="Tahoma" font-size="22" fill="#0a1628" font-weight="700">گلدکسا</text>
+</svg>

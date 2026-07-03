@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="28" fill="#fff9e6"/>
+  <circle cx="200" cy="145" r="70" fill="none" stroke="#d4a843" stroke-width="16"/>
+  <circle cx="200" cy="145" r="36" fill="#ffd633"/>
+  <text x="200" y="245" text-anchor="middle" font-family="Tahoma" font-size="22" fill="#0a1628" font-weight="700">طلای ۲۴ عیار</text>
+</svg>

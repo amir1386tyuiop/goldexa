@@ -1,0 +1,16 @@
+import { Module } from '@nestjs/common'
+import { TypeOrmModule } from '@nestjs/typeorm'
+import { PaymentsController } from './payments.controller'
+import { PaymentsService } from './payments.service'
+import { ZarinpalService } from './zarinpal.service'
+import { OrderTrackingEvent } from './order-tracking-event.entity'
+import { PaymentTransaction } from './payment-transaction.entity'
+import { Order } from '../orders/order.entity'
+
+@Module({
+  imports: [TypeOrmModule.forFeature([PaymentTransaction, OrderTrackingEvent, Order])],
+  controllers: [PaymentsController],
+  providers: [PaymentsService, ZarinpalService],
+  exports: [PaymentsService],
+})
+export class PaymentsModule {}
