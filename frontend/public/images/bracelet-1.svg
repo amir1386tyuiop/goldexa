@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="28" fill="#fff9e6"/>
+  <path d="M95 155c20-55 50-55 70 0s50 55 70 0 50-55 70 0 50 55 70 0" fill="none" stroke="#d4a843" stroke-width="12" stroke-linecap="round"/>
+  <text x="200" y="245" text-anchor="middle" font-family="Tahoma" font-size="22" fill="#0a1628" font-weight="700">دستبند</text>
+</svg>

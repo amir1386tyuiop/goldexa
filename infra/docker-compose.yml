@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: goldeksa-postgres
+    environment:
+      POSTGRES_DB: goldeksa
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: goldeksa-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: goldeksa-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: goldeksa-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: goldeksa
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL_CODE: ${OPENROUTER_MODEL_CODE:-cohere/north-mini-code}
+      OPENROUTER_MODEL_ASSISTANT: ${OPENROUTER_MODEL_ASSISTANT:-nex-agi/nex-n2-pro:free}
+      OPENROUTER_MODEL_ARCHITECTURE: ${OPENROUTER_MODEL_ARCHITECTURE:-nvidia/nemotron-3-ultra-550b-a55b}
+      OPENROUTER_MODEL_KYC_DOCUMENT: ${OPENROUTER_MODEL_KYC_DOCUMENT:-nvidia/llama-nemotron-rerank-vl-1b-v2:free}
+      OPENROUTER_MODEL_SAFETY_CHECK: ${OPENROUTER_MODEL_SAFETY_CHECK:-nvidia/nemotron-3.5-content-safety:free}
+      OPENROUTER_MODEL_MARKETING_IMAGE: ${OPENROUTER_MODEL_MARKETING_IMAGE:-recraft/recraft-v4.1-pro}
+      OPENROUTER_MODEL_VECTOR_ASSET: ${OPENROUTER_MODEL_VECTOR_ASSET:-recraft/recraft-v4.1-vector}
+      OPENROUTER_MODEL_PRODUCT_IMAGE: ${OPENROUTER_MODEL_PRODUCT_IMAGE:-x-ai/grok-imagine-image-quality}
+      OPENROUTER_MODEL_IMAGE_WORKFLOW: ${OPENROUTER_MODEL_IMAGE_WORKFLOW:-sourceful/riverflow-v2.5-pro}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: goldeksa-frontend
+    ports:
+      - "5174:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
+  redis-data:

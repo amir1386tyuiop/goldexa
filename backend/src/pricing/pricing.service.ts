@@ -1,0 +1,206 @@
+import { Injectable } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { LaborCostRule } from './labor-cost-rule.entity'
+import { PricingRule } from './pricing-rule.entity'
+import { PricingSpread } from './pricing-spread.entity'
+import { TaxRule } from './tax-rule.entity'
+import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
+import { GoldPriceType } from '../gold-pricing/gold-price.entity'
+import {
+  CreateLaborCostRuleDto,
+  CreatePricingRuleDto,
+  CreatePricingSpreadDto,
+  CreateTaxRuleDto,
+} from './create-pricing.dto'
+
+@Injectable()
+export class PricingService {
+  constructor(
+    @InjectRepository(PricingRule)
+    private ruleRepository: Repository<PricingRule>,
+    @InjectRepository(PricingSpread)
+    private spreadRepository: Repository<PricingSpread>,
+    @InjectRepository(TaxRule)
+    private taxRepository: Repository<TaxRule>,
+    @InjectRepository(LaborCostRule)
+    private laborRepository: Repository<LaborCostRule>,
+    private readonly goldPricing: GoldPricingService,
+  ) {}
+
+  async findRules(): Promise<PricingRule[]> {
+    return this.ruleRepository.findBy({ isActive: true })
+  }
+
+  async createRule(data: CreatePricingRuleDto): Promise<PricingRule> {
+    return this.ruleRepository.save(
+      this.ruleRepository.create({
+        ...data,
+        description: data.description ?? null,
+        laborRate: data.laborRate ?? 0,
+        profitRate: data.profitRate ?? 0,
+        taxRate: data.taxRate ?? 9,
+        isActive: data.isActive ?? true,
+      }),
+    )
+  }
+
+  async findSpreads(): Promise<PricingSpread[]> {
+    return this.spreadRepository.findBy({ isActive: true })
+  }
+
+  async createSpread(data: CreatePricingSpreadDto): Promise<PricingSpread> {
+    return this.spreadRepository.save(
+      this.spreadRepository.create({
+        ...data,
+        isActive: data.isActive ?? true,
+      }),
+    )
+  }
+
+  async findTaxRules(): Promise<TaxRule[]> {
+    return this.taxRepository.findBy({ isActive: true })
+  }
+
+  async createTaxRule(data: CreateTaxRuleDto): Promise<TaxRule> {
+    return this.taxRepository.save(
+      this.taxRepository.create({
+        ...data,
+        productCategory: data.productCategory ?? null,
+        isActive: data.isActive ?? true,
+      }),
+    )
+  }
+
+  async findLaborRules(): Promise<LaborCostRule[]> {
+    return this.laborRepository.findBy({ isActive: true })
+  }
+
+  async createLaborRule(data: CreateLaborCostRuleDto): Promise<LaborCostRule> {
+    return this.laborRepository.save(
+      this.laborRepository.create({
+        ...data,
+        isActive: data.isActive ?? true,
+      }),
+    )
+  }
+
+  /** Live 18k gold price per gram, sourced only from the pricing domain. */
+  async getGoldPricePerGram(): Promise<number> {
+    const price = await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18)
+    return Number(price?.value ?? 0)
+  }
+
+  /**
+   * Final jewelry price using the Iranian retail formula:
+   *   rawGold = weight × dayPricePerGram
+   *   labor   = explicit labor rule, otherwise laborRate% of rawGold (اجرت)
+   *   profit  = profitRate% of (rawGold + labor)                      (سود)
+   *   vat     = taxRate% of (labor + profit)  ← VAT applies ONLY to    (مالیات ارزش افزوده)
+   *             labor + profit, NEVER to the gold value itself.
+   *   total   = rawGold + labor + profit + vat
+   * `rawGoldPrice` is optional; when omitted the live price is used so a
+   * client can never inject an arbitrary gold price.
+   */
+  async calculate(category: string, goldWeight: number, rawGoldPrice?: number) {
+    const weight = Number(goldWeight)
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw new Error('وزن طلا نامعتبر است')
+    }
+
+    const [rule, spreadRule, taxRule, laborRule] = await Promise.all([
+      this.ruleRepository.findOne({ where: { isActive: true }, order: { createdAt: 'DESC' } }),
+      this.spreadRepository.findOneBy({ productCategory: category, isActive: true }),
+      this.taxRepository.findOneBy({ productCategory: category, isActive: true }),
+      this.laborRepository.findOneBy({ productCategory: category, isActive: true }),
+    ])
+
+    const pricePerGram =
+      rawGoldPrice && Number(rawGoldPrice) > 0 ? Number(rawGoldPrice) : await this.getGoldPricePerGram()
+    if (!pricePerGram) {
+      throw new Error('قیمت لحظه‌ای طلا در دسترس نیست')
+    }
+
+    const rawGold = pricePerGram * weight
+
+    // اجرت: قاعده‌ی مطلق (پایه + هر گرم) در اولویت، وگرنه درصدی از ارزش طلا
+    const labor = laborRule
+      ? Number(laborRule.baseLabor) + Number(laborRule.perGramLabor) * weight
+      : rule
+        ? (rawGold * Number(rule.laborRate)) / 100
+        : 0
+
+    // سود: درصدی از (طلا + اجرت)
+    const profit = rule ? ((rawGold + labor) * Number(rule.profitRate)) / 100 : 0
+
+    // مالیات ارزش افزوده: فقط روی اجرت + سود (طبق قانون طلای ایران)
+    const taxRate = Number(taxRule?.taxRate ?? rule?.taxRate ?? 9)
+    const tax = ((labor + profit) * taxRate) / 100
+
+    // اسپرد خرید/فروش، صرفاً اطلاعاتی (در قیمت خرده‌فروشی لحاظ نمی‌شود)
+    const spreadPercent = spreadRule ? Number(spreadRule.spreadPercent) : 0
+
+    const total = rawGold + labor + profit + tax
+
+    return {
+      category,
+      pricePerGram,
+      goldWeight: weight,
+      rawGold: Math.round(rawGold),
+      labor: Math.round(labor),
+      profit: Math.round(profit),
+      taxRate,
+      tax: Math.round(tax),
+      spreadPercent,
+      total: Math.round(total),
+    }
+  }
+
+  // --- 5-minute price reservation (قفل/رزرو قیمت) ---
+  private readonly quotes = new Map<
+    string,
+    { breakdown: Awaited<ReturnType<PricingService['calculate']>>; expiresAt: number }
+  >()
+  private static readonly QUOTE_TTL_MS = 5 * 60 * 1000
+
+  /**
+   * Locks a calculated price for 5 minutes so the customer can complete payment
+   * at the quoted amount even if the live gold price moves in the meantime.
+   */
+  async createQuote(category: string, goldWeight: number) {
+    const breakdown = await this.calculate(category, goldWeight)
+    const id = `Q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const expiresAt = Date.now() + PricingService.QUOTE_TTL_MS
+    this.quotes.set(id, { breakdown, expiresAt })
+    this.pruneExpiredQuotes()
+    return { quoteId: id, ...breakdown, expiresAt: new Date(expiresAt).toISOString(), ttlSeconds: PricingService.QUOTE_TTL_MS / 1000 }
+  }
+
+  /** Returns a reserved quote if it is still valid, otherwise marks it expired. */
+  getQuote(quoteId: string) {
+    const entry = this.quotes.get(quoteId)
+    if (!entry) {
+      return { quoteId, valid: false, reason: 'not_found' as const }
+    }
+    if (Date.now() > entry.expiresAt) {
+      this.quotes.delete(quoteId)
+      return { quoteId, valid: false, reason: 'expired' as const }
+    }
+    return {
+      quoteId,
+      valid: true,
+      ...entry.breakdown,
+      expiresAt: new Date(entry.expiresAt).toISOString(),
+      remainingSeconds: Math.max(0, Math.round((entry.expiresAt - Date.now()) / 1000)),
+    }
+  }
+
+  private pruneExpiredQuotes() {
+    const now = Date.now()
+    for (const [id, entry] of this.quotes) {
+      if (now > entry.expiresAt) {
+        this.quotes.delete(id)
+      }
+    }
+  }
+}

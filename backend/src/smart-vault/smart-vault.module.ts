@@ -1,0 +1,15 @@
+import { Module } from '@nestjs/common'
+import { TypeOrmModule } from '@nestjs/typeorm'
+import { SmartVaultAsset } from './smart-vault-asset.entity'
+import { AssetValuationSnapshot } from './asset-valuation-snapshot.entity'
+import { PriceAlert } from './price-alert.entity'
+import { SmartVaultController } from './smart-vault.controller'
+import { SmartVaultService } from './smart-vault.service'
+
+@Module({
+  imports: [TypeOrmModule.forFeature([SmartVaultAsset, AssetValuationSnapshot, PriceAlert])],
+  controllers: [SmartVaultController],
+  providers: [SmartVaultService],
+  exports: [SmartVaultService],
+})
+export class SmartVaultModule {}
