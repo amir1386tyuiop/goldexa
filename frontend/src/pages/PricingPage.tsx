@@ -1,110 +1,23 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Clock } from 'lucide-react'
+import { Activity, Clock3, RefreshCw, ShieldCheck, TrendingDown, TrendingUp } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { GoldPrice } from '@/types'
 import { formatPrice } from '@/utils/helpers'
 
-const priceLabels: Record<GoldPrice['type'], string> = {
-  mizaneh: 'مظنه طلا',
-  coin: 'سکه',
-  ounce: 'انس جهانی',
-  gold18: 'طلای ۱۸ عیار',
-}
+const labels: Record<GoldPrice['type'], string> = { mizaneh: 'مظنه طلا', coin: 'سکه', ounce: 'انس جهانی', gold18: 'طلای ۱۸ عیار' }
 
 export function PricingPage() {
-  const { data: prices = [], refetch } = useQuery({
-    queryKey: ['gold-prices'],
-    queryFn: api.getGoldPrices,
-    refetchInterval: 60000,
-  })
-  const [selectedPrice, setSelectedPrice] = useState<GoldPrice | null>(prices[0] || null)
+  const { data: prices = [], isLoading, isError, dataUpdatedAt, refetch, isFetching } = useQuery({ queryKey: ['gold-prices'], queryFn: api.getGoldPrices, refetchInterval: 60000 })
+  const [selected, setSelected] = useState<GoldPrice | null>(null)
+  useEffect(() => { if (!selected && prices[0]) setSelected(prices[0]) }, [prices, selected])
 
-  useEffect(() => {
-    if (!selectedPrice && prices.length) {
-      setSelectedPrice(prices[0])
-    }
-  }, [prices, selectedPrice])
-
-  return (
-    <div className="pt-24 pb-16">
-      <div className="container mx-auto px-4">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm text-gold-600 font-bold mb-2">قیمت‌گذاری شفاف و لحظه‌ای</p>
-            <h1 className="text-3xl font-black text-navy-900">قیمت‌های طلا</h1>
-            <p className="text-muted-foreground mt-2">
-              قیمت‌های پایه از موتور قیمت‌گذاری گلدکسا خوانده می‌شود و برای محاسبه محصول، کیف پول و سفارش استفاده می‌شود.
-            </p>
-          </div>
-          <button onClick={() => refetch()} className="btn btn-outline">به‌روزرسانی قیمت‌ها</button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {prices.map((price) => (
-            <button
-              key={price.type}
-              onClick={() => setSelectedPrice(price)}
-              className={`card p-5 text-right transition ${
-                selectedPrice?.type === price.type ? 'border-gold-400 ring-2 ring-gold-200' : 'hover:border-gold-300'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">{priceLabels[price.type]}</p>
-                {price.change >= 0 ? (
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                ) : (
-                  <TrendingDown className="h-5 w-5 text-red-600" />
-                )}
-              </div>
-              <p className="mt-4 text-2xl font-black text-navy-900">{formatPrice(price.value)} تومان</p>
-              <p className={`mt-2 text-sm ${price.change >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                {price.change >= 0 ? '+' : ''}{formatPrice(price.change)} تومان ({price.changePercent}٪)
-              </p>
-            </button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-          <div className="card p-6 lg:col-span-2">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">نمای قیمت انتخاب‌شده</p>
-                <h2 className="text-2xl font-black text-navy-900 mt-1">{selectedPrice ? priceLabels[selectedPrice.type] : 'انتخاب نشده'}</h2>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-gold-50 flex items-center justify-center text-gold-600">
-                <Clock className="h-6 w-6" />
-              </div>
-            </div>
-
-            {selectedPrice && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-                <div className="rounded-2xl bg-navy-900 text-white p-5">
-                  <p className="text-sm text-gray-300">قیمت فعلی</p>
-                  <p className="text-2xl font-black mt-2">{formatPrice(selectedPrice.value)} تومان</p>
-                </div>
-                <div className="rounded-2xl bg-gray-50 p-5">
-                  <p className="text-sm text-muted-foreground">تغییر ریالی</p>
-                  <p className="text-2xl font-black mt-2">{formatPrice(selectedPrice.change)} تومان</p>
-                </div>
-                <div className="rounded-2xl bg-gray-50 p-5">
-                  <p className="text-sm text-muted-foreground">تغییر درصدی</p>
-                  <p className="text-2xl font-black mt-2">{selectedPrice.changePercent}٪</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="card p-6">
-            <h3 className="font-black text-navy-900 mb-4">قانون MVP</h3>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex gap-3"><span className="text-gold-600">◆</span> قیمت محصول براساس وزن، عیار، اجرت، سود، مالیات و اسپرد محاسبه می‌شود.</li>
-              <li className="flex gap-3"><span className="text-gold-600">◆</span> کیف پول و سفارش باید با آخرین قیمت معتبر محاسبه شوند.</li>
-              <li className="flex gap-3"><span className="text-gold-600">◆</span> تاریخچه قیمت برای شفافیت و گزارش‌گیری مالی نگهداری می‌شود.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <div className="page-shell py-28 pb-16">
+    <div className="mb-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between"><div><p className="eyebrow flex items-center gap-2"><Activity className="h-4 w-4" />بازار لحظه‌ای</p><h1 className="mt-3 text-4xl font-black sm:text-5xl">قیمت‌های طلا</h1><p className="mt-3 max-w-2xl leading-8 text-stone-600">قیمت‌های معتبر برای تصمیم‌گیری، محاسبه محصول و مدیریت دارایی.</p></div><button disabled={isFetching} onClick={() => refetch()} className="btn btn-outline gap-2 self-start px-4 md:self-auto"><RefreshCw className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />به‌روزرسانی</button></div>
+    {isError && <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">دریافت قیمت‌ها با خطا روبه‌رو شد. دوباره تلاش کنید.</div>}
+    {isLoading ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1,2,3,4].map((item) => <div key={item} className="h-40 animate-pulse rounded-3xl bg-stone-200" />)}</div> : prices.length === 0 ? <div className="card p-10 text-center text-stone-600">قیمت فعالی برای نمایش وجود ندارد.</div> : <>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{prices.map((price) => { const up = price.change >= 0; return <button key={price.type} onClick={() => setSelected(price)} aria-pressed={selected?.type === price.type} className={`card cursor-pointer p-5 text-right transition hover:-translate-y-1 hover:shadow-lg ${selected?.type === price.type ? 'border-amber-700 ring-2 ring-amber-200' : ''}`}><div className="flex items-center justify-between"><span className="text-sm text-stone-600">{labels[price.type]}</span>{up ? <TrendingUp className="h-5 w-5 text-emerald-700" /> : <TrendingDown className="h-5 w-5 text-red-700" />}</div><strong className="mt-5 block text-2xl font-black">{formatPrice(price.value)} <small className="text-sm font-medium text-stone-500">تومان</small></strong><span className={`mt-2 block text-sm font-semibold ${up ? 'text-emerald-700' : 'text-red-700'}`}>{up ? '+' : ''}{formatPrice(price.change)} ({price.changePercent}٪)</span></button> })}</div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]"><section className="card p-6 sm:p-8"><div className="flex items-start justify-between"><div><p className="text-sm text-stone-500">نمای منتخب</p><h2 className="mt-2 text-2xl font-black">{selected ? labels[selected.type] : 'انتخاب نشده'}</h2></div><span className="rounded-2xl bg-amber-100 p-4 text-amber-800"><Clock3 className="h-6 w-6" /></span></div>{selected && <div className="mt-8 grid gap-4 sm:grid-cols-3"><div className="rounded-2xl bg-stone-950 p-5 text-white"><p className="text-sm text-stone-400">قیمت فعلی</p><strong className="mt-2 block text-xl text-amber-300">{formatPrice(selected.value)}</strong></div><div className="rounded-2xl bg-stone-100 p-5"><p className="text-sm text-stone-500">تغییر ریالی</p><strong className="mt-2 block text-xl">{formatPrice(selected.change)}</strong></div><div className="rounded-2xl bg-stone-100 p-5"><p className="text-sm text-stone-500">تغییر درصدی</p><strong className="mt-2 block text-xl">{selected.changePercent}٪</strong></div></div>}<p className="mt-6 flex items-center gap-2 text-xs text-stone-500"><span className="h-2 w-2 rounded-full bg-emerald-500" />آخرین بروزرسانی: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('fa-IR') : 'در حال دریافت'}</p></section><aside className="rounded-3xl bg-amber-100 p-7"><ShieldCheck className="h-8 w-8 text-amber-800" /><h3 className="mt-5 text-xl font-black">قیمت قابل اتکا</h3><p className="mt-3 leading-8 text-stone-700">محاسبات سفارش و کیف پول باید با آخرین quote معتبر انجام شوند؛ قیمت نمایشی به‌تنهایی مبنای نهایی معامله نیست.</p></aside></div>
+    </>}
+  </div>
 }
