@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, Repository } from 'typeorm'
+import { QueryFailedError } from 'typeorm'
 import { Order, OrderStatus } from '../orders/order.entity'
 import { OrderTrackingEvent } from './order-tracking-event.entity'
 import { PaymentTransaction, PaymentTransactionStatus } from './payment-transaction.entity'
@@ -17,6 +18,9 @@ import {
 
 @Injectable()
 export class PaymentsService {
+  private readonly requestInFlight = new Map<string, Promise<unknown>>()
+  private readonly verificationInFlight = new Map<string, Promise<unknown>>()
+
   constructor(
     @InjectRepository(PaymentTransaction)
     private transactionRepository: Repository<PaymentTransaction>,
@@ -35,52 +39,123 @@ export class PaymentsService {
    * the same idempotencyKey returns the existing transaction instead of
    * creating a second charge.
    */
-  async requestPayment(data: RequestPaymentDto) {
+  async requestPayment(data: RequestPaymentDto, authenticatedUserId?: string) {
+    if (authenticatedUserId && data.userId !== authenticatedUserId) {
+      throw new ForbiddenException('کاربر پرداخت با کاربر واردشده مطابقت ندارد')
+    }
+
+    if (!data.idempotencyKey) {
+      return this.requestPaymentInternal(data, authenticatedUserId)
+    }
+
+    const inFlight = this.requestInFlight.get(data.idempotencyKey)
+    if (inFlight) {
+      return inFlight
+    }
+
+    const operation = this.requestPaymentInternal(data, authenticatedUserId)
+    this.requestInFlight.set(data.idempotencyKey, operation)
+    try {
+      return await operation
+    } finally {
+      if (this.requestInFlight.get(data.idempotencyKey) === operation) {
+        this.requestInFlight.delete(data.idempotencyKey)
+      }
+    }
+  }
+
+  private async requestPaymentInternal(data: RequestPaymentDto, authenticatedUserId?: string) {
     const amount = Number(data.amount)
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('مبلغ پرداخت نامعتبر است')
     }
 
+    const userId = authenticatedUserId ?? data.userId
+    let authoritativeAmount = amount
+    if (data.orderId) {
+      const order = await this.orderRepository.findOneBy({ id: data.orderId })
+      if (!order) {
+        throw new NotFoundException('سفارش یافت نشد')
+      }
+      if (order.userId !== userId) {
+        throw new ForbiddenException('این سفارش متعلق به کاربر واردشده نیست')
+      }
+      authoritativeAmount = Number(order.totalAmount)
+      if (!Number.isFinite(authoritativeAmount) || authoritativeAmount <= 0) {
+        throw new BadRequestException('مبلغ سفارش نامعتبر است')
+      }
+      if (amount !== authoritativeAmount) {
+        throw new BadRequestException('مبلغ پرداخت با مبلغ سفارش مطابقت ندارد')
+      }
+    }
+
     if (data.idempotencyKey) {
       const existing = await this.transactionRepository.findOneBy({ idempotencyKey: data.idempotencyKey })
       if (existing) {
-        const sandbox = String(this.config.get('ZARINPAL_SANDBOX') ?? 'true').toLowerCase() !== 'false'
-        const startBase = sandbox ? 'https://sandbox.zarinpal.com' : 'https://www.zarinpal.com'
-        return {
-          transaction: existing,
-          authority: existing.authority,
-          paymentUrl: existing.authority ? `${startBase}/pg/StartPay/${existing.authority}` : null,
-          reused: true,
-        }
+        return this.paymentResponse(existing, true)
       }
+    }
+
+    // Reserve the idempotency key before calling the gateway. The partial
+    // unique index on payment_transactions makes this safe across instances.
+    let transaction: PaymentTransaction
+    try {
+      transaction = await this.transactionRepository.save(
+        this.transactionRepository.create({
+          orderId: data.orderId ?? null,
+          userId,
+          amount: authoritativeAmount,
+          paymentMethod: 'zarinpal',
+          status: PaymentTransactionStatus.INITIATED,
+          authority: null,
+          idempotencyKey: data.idempotencyKey ?? null,
+          referenceId: null,
+          trackingCode: null,
+          paidAt: null,
+        }),
+      )
+    } catch (error) {
+      if (!this.isUniqueViolation(error) || !data.idempotencyKey) {
+        throw error
+      }
+      const existing = await this.transactionRepository.findOneBy({ idempotencyKey: data.idempotencyKey })
+      if (!existing) {
+        throw error
+      }
+      return this.paymentResponse(existing, true)
     }
 
     const callbackUrl =
       data.callbackUrl || `${this.config.get('APP_BASE_URL') || 'http://localhost:3001'}/payments/zarinpal/callback`
 
     const gateway = await this.zarinpal.requestPayment({
-      amount,
+      amount: authoritativeAmount,
       description: data.description || `پرداخت سفارش ${data.orderId ?? ''}`.trim(),
       callbackUrl,
       mobile: data.mobile,
     })
 
-    const transaction = await this.transactionRepository.save(
-      this.transactionRepository.create({
-        orderId: data.orderId ?? null,
-        userId: data.userId,
-        amount,
-        paymentMethod: 'zarinpal',
-        status: PaymentTransactionStatus.PENDING,
-        authority: gateway.authority,
-        idempotencyKey: data.idempotencyKey ?? null,
-        referenceId: null,
-        trackingCode: null,
-        paidAt: null,
-      }),
-    )
+    transaction.authority = gateway.authority
+    transaction.status = PaymentTransactionStatus.PENDING
+    transaction = await this.transactionRepository.save(transaction)
 
     return { transaction, authority: gateway.authority, paymentUrl: gateway.paymentUrl, mock: gateway.mock, reused: false }
+  }
+
+  private paymentResponse(transaction: PaymentTransaction, reused: boolean) {
+    const sandbox = String(this.config.get('ZARINPAL_SANDBOX') ?? 'true').toLowerCase() !== 'false'
+    const startBase = sandbox ? 'https://sandbox.zarinpal.com' : 'https://www.zarinpal.com'
+    return {
+      transaction,
+      authority: transaction.authority,
+      paymentUrl: transaction.authority ? `${startBase}/pg/StartPay/${transaction.authority}` : null,
+      pending: transaction.status === PaymentTransactionStatus.INITIATED && !transaction.authority,
+      reused,
+    }
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return error instanceof QueryFailedError && (error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23505'
   }
 
   /**
@@ -88,6 +163,23 @@ export class PaymentsService {
    * returned as-is without re-crediting or re-marking the order.
    */
   async verifyPayment(data: VerifyPaymentDto) {
+    const inFlight = this.verificationInFlight.get(data.authority)
+    if (inFlight) {
+      return inFlight
+    }
+
+    const operation = this.verifyPaymentInternal(data)
+    this.verificationInFlight.set(data.authority, operation)
+    try {
+      return await operation
+    } finally {
+      if (this.verificationInFlight.get(data.authority) === operation) {
+        this.verificationInFlight.delete(data.authority)
+      }
+    }
+  }
+
+  private async verifyPaymentInternal(data: VerifyPaymentDto) {
     const transaction = await this.transactionRepository.findOneBy({ authority: data.authority })
     if (!transaction) {
       throw new NotFoundException('تراکنش پرداخت یافت نشد')
@@ -98,28 +190,43 @@ export class PaymentsService {
     }
 
     if (data.status && data.status.toUpperCase() !== 'OK') {
-      transaction.status = PaymentTransactionStatus.FAILED
-      await this.transactionRepository.save(transaction)
-      return { status: 'failed', transaction }
+      return this.markFailed(data.authority)
     }
 
     const result = await this.zarinpal.verifyPayment({ authority: data.authority, amount: Number(transaction.amount) })
 
     if (!result.success) {
-      transaction.status = PaymentTransactionStatus.FAILED
-      await this.transactionRepository.save(transaction)
-      return { status: 'failed', code: result.code, transaction }
+      const failed = await this.markFailed(data.authority)
+      return { ...failed, code: result.code }
     }
 
+    let paidTransaction: PaymentTransaction
+    let alreadyVerified = false
     await this.dataSource.transaction(async (manager) => {
-      transaction.status = PaymentTransactionStatus.PAID
-      transaction.referenceId = result.refId
-      transaction.trackingCode = transaction.trackingCode ?? result.refId
-      transaction.paidAt = new Date()
-      await manager.save(transaction)
+      const locked = await manager.findOne(PaymentTransaction, {
+        where: { authority: data.authority },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!locked) {
+        throw new NotFoundException('تراکنش پرداخت یافت نشد')
+      }
+      if (locked.status === PaymentTransactionStatus.PAID) {
+        paidTransaction = locked
+        alreadyVerified = true
+        return
+      }
 
-      if (transaction.orderId) {
-        const order = await manager.findOne(Order, { where: { id: transaction.orderId } })
+      locked.status = PaymentTransactionStatus.PAID
+      locked.referenceId = result.refId
+      locked.trackingCode = locked.trackingCode ?? result.refId
+      locked.paidAt = locked.paidAt ?? new Date()
+      paidTransaction = await manager.save(locked)
+
+      if (locked.orderId) {
+        const order = await manager.findOne(Order, {
+          where: { id: locked.orderId },
+          lock: { mode: 'pessimistic_write' },
+        })
         if (order && order.status !== OrderStatus.PAID) {
           order.status = OrderStatus.PAID
           await manager.save(order)
@@ -127,15 +234,40 @@ export class PaymentsService {
       }
     })
 
+    if (alreadyVerified) {
+      return { status: 'paid', alreadyVerified: true, transaction: paidTransaction }
+    }
+
     await this.audit.record({
-      userId: transaction.userId,
+      userId: paidTransaction.userId,
       action: 'PAYMENT_VERIFIED',
       entityType: 'payment_transaction',
-      entityId: transaction.id,
-      metadata: { amount: Number(transaction.amount), orderId: transaction.orderId, refId: result.refId },
+      entityId: paidTransaction.id,
+      metadata: { amount: Number(paidTransaction.amount), orderId: paidTransaction.orderId, refId: result.refId },
     })
 
-    return { status: 'paid', refId: result.refId, mock: result.mock, transaction }
+    return { status: 'paid', refId: result.refId, mock: result.mock, transaction: paidTransaction }
+  }
+
+  private async markFailed(authority: string) {
+    return this.dataSource.transaction(async (manager) => {
+      const locked = await manager.findOne(PaymentTransaction, {
+        where: { authority },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!locked) {
+        throw new NotFoundException('تراکنش پرداخت یافت نشد')
+      }
+      if (locked.status === PaymentTransactionStatus.PAID) {
+        return { status: 'paid' as const, alreadyVerified: true, transaction: locked }
+      }
+      if (locked.status === PaymentTransactionStatus.FAILED) {
+        return { status: 'failed' as const, transaction: locked }
+      }
+      locked.status = PaymentTransactionStatus.FAILED
+      const saved = await manager.save(locked)
+      return { status: 'failed' as const, transaction: saved }
+    })
   }
 
   async findTransactions(): Promise<PaymentTransaction[]> {

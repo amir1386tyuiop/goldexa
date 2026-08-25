@@ -1,0 +1,52 @@
+name: goldexa-e2e
+
+# Isolated E2E stack. This file intentionally has no seed service and never
+# points at the development/production database.
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: goldeksa_e2e
+      POSTGRES_USER: goldeksa_e2e
+      POSTGRES_PASSWORD: goldeksa_e2e_only
+    ports:
+      - '55432:5432'
+    volumes:
+      - goldexa-e2e-postgres:/var/lib/postgresql/data
+      - ../../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U goldeksa_e2e -d goldeksa_e2e']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: test
+      PORT: 3001
+      FRONTEND_URL: http://localhost:5174
+      APP_BASE_URL: http://localhost:3011
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: goldeksa_e2e
+      DB_PASSWORD: goldeksa_e2e_only
+      DB_DATABASE: goldeksa_e2e
+      CACHE_DRIVER: memory
+      JWT_SECRET: e2e-only-secret-at-least-32-characters-long
+      JWT_EXPIRES_IN: 1h
+      RETURN_OTP_IN_RESPONSE: 'true'
+      ZARINPAL_MERCHANT_ID: ''
+      ZARINPAL_SANDBOX: 'true'
+      GOLD_PRICE_SOURCE: mock
+      AI_ENGINE_ENABLED: 'false'
+    ports:
+      - '3011:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  goldexa-e2e-postgres:

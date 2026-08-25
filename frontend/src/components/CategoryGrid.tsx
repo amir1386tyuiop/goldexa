@@ -1,4 +1,5 @@
-import { products } from '@/data/mockData'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/api/client'
 
 const categories = [
   { id: 'ring', name: 'انگشتر', icon: '💍', count: 42 },
@@ -10,6 +11,11 @@ const categories = [
 ]
 
 export function CategoryGrid() {
+  const { data: products = [] } = useQuery({
+    queryKey: ['category-product-counts'],
+    queryFn: () => api.getProducts(),
+  })
+
   return (
     <section className="py-12">
       <div className="container mx-auto px-4">

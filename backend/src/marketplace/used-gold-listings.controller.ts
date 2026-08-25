@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common'
+import type { Request } from 'express'
+import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
+import { AdminGuard } from '../common/guards/admin.guard'
 import {
   CreateUsedGoldListingDto,
   ReviewUsedGoldListingDto,
@@ -17,8 +20,9 @@ export class UsedGoldListingsController {
   }
 
   @Get('user/:userId')
-  async findByUser(@Param('userId') userId: string) {
-    return this.listingsService.findByUser(userId)
+  @UseGuards(JwtAuthGuard)
+  async findByUser(@Param('userId') userId: string, @Req() req: Request & { user: JwtUser }) {
+    return this.listingsService.findByUser(req.user.role === 'admin' ? userId : req.user.sub)
   }
 
   @Get(':id')
@@ -27,16 +31,19 @@ export class UsedGoldListingsController {
   }
 
   @Post()
-  async create(@Body() body: CreateUsedGoldListingDto) {
-    return this.listingsService.createListing(body)
+  @UseGuards(JwtAuthGuard)
+  async create(@Body() body: CreateUsedGoldListingDto, @Req() req: Request & { user: JwtUser }) {
+    return this.listingsService.createListing({ ...body, sellerId: req.user.sub })
   }
 
   @Patch(':id/review')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async review(@Param('id') id: string, @Body() body: ReviewUsedGoldListingDto) {
     return this.listingsService.reviewListing(id, body)
   }
 
   @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async updateStatus(@Param('id') id: string, @Body() body: UpdateUsedGoldListingStatusDto) {
     return this.listingsService.updateStatus(id, body)
   }

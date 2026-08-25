@@ -25,9 +25,16 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('برای این عملیات باید وارد حساب شوید')
     }
     try {
-      request.user = this.jwtService.verify<JwtUser>(header.slice(7))
+      const user = this.jwtService.verify<JwtUser>(header.slice(7))
+      if (!user?.sub || typeof user.sub !== 'string' || !user.role) {
+        throw new UnauthorizedException('توکن نامعتبر است')
+      }
+      request.user = user
       return true
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error
+      }
       throw new UnauthorizedException('توکن نامعتبر یا منقضی شده است')
     }
   }

@@ -1,8 +1,8 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
 
 export class CreateCartDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   userId: string
 }
 
@@ -15,8 +15,8 @@ export class AddCartItemDto {
   @IsNotEmpty()
   productId: string
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   name: string
 
   @IsOptional()
@@ -24,6 +24,7 @@ export class AddCartItemDto {
   @Min(1)
   quantity?: number
 
+  @IsOptional()
   @IsNumber()
   unitPrice: number
 

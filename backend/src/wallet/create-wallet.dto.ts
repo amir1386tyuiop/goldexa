@@ -1,18 +1,14 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator'
 import { WalletTransactionType } from './wallet-transaction.entity'
 
 export class CreateWalletDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   userId: string
-
-  @IsOptional()
-  @IsNumber()
-  goldBalanceGrams?: number
 }
 
 export class WalletDepositDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   userId: string
 
@@ -26,7 +22,7 @@ export class WalletDepositDto {
 }
 
 export class WalletPaymentDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   userId: string
 
@@ -44,7 +40,7 @@ export class WalletPaymentDto {
 }
 
 export class WalletGoldBuyDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   userId: string
 
@@ -62,7 +58,7 @@ export class WalletGoldBuyDto {
 }
 
 export class WalletGoldSellDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   userId: string
 
@@ -80,11 +76,12 @@ export class WalletGoldSellDto {
 }
 
 export class WalletTransactionDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   userId: string
 
   @IsNotEmpty()
+  @IsEnum(WalletTransactionType)
   type: WalletTransactionType
 
   @IsNotEmpty()

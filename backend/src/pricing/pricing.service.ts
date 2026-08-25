@@ -7,6 +7,7 @@ import { PricingSpread } from './pricing-spread.entity'
 import { TaxRule } from './tax-rule.entity'
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 import { GoldPriceType } from '../gold-pricing/gold-price.entity'
+import { CacheService } from '../common/cache.service'
 import {
   CreateLaborCostRuleDto,
   CreatePricingRuleDto,
@@ -26,6 +27,7 @@ export class PricingService {
     @InjectRepository(LaborCostRule)
     private laborRepository: Repository<LaborCostRule>,
     private readonly goldPricing: GoldPricingService,
+    private readonly cache: CacheService,
   ) {}
 
   async findRules(): Promise<PricingRule[]> {
@@ -99,10 +101,10 @@ export class PricingService {
    *   vat     = taxRate% of (labor + profit)  ← VAT applies ONLY to    (مالیات ارزش افزوده)
    *             labor + profit, NEVER to the gold value itself.
    *   total   = rawGold + labor + profit + vat
-   * `rawGoldPrice` is optional; when omitted the live price is used so a
-   * client can never inject an arbitrary gold price.
+   * The gold price is always loaded from GoldPricingService. A caller cannot
+   * inject an arbitrary price into the final calculation.
    */
-  async calculate(category: string, goldWeight: number, rawGoldPrice?: number) {
+  async calculate(category: string, goldWeight: number) {
     const weight = Number(goldWeight)
     if (!Number.isFinite(weight) || weight <= 0) {
       throw new Error('وزن طلا نامعتبر است')
@@ -115,8 +117,7 @@ export class PricingService {
       this.laborRepository.findOneBy({ productCategory: category, isActive: true }),
     ])
 
-    const pricePerGram =
-      rawGoldPrice && Number(rawGoldPrice) > 0 ? Number(rawGoldPrice) : await this.getGoldPricePerGram()
+    const pricePerGram = await this.getGoldPricePerGram()
     if (!pricePerGram) {
       throw new Error('قیمت لحظه‌ای طلا در دسترس نیست')
     }
@@ -157,11 +158,12 @@ export class PricingService {
   }
 
   // --- 5-minute price reservation (قفل/رزرو قیمت) ---
-  private readonly quotes = new Map<
-    string,
-    { breakdown: Awaited<ReturnType<PricingService['calculate']>>; expiresAt: number }
-  >()
-  private static readonly QUOTE_TTL_MS = 5 * 60 * 1000
+  private static readonly QUOTE_TTL_SECONDS = 5 * 60
+  private static readonly QUOTE_NAMESPACE = 'pricing:quote'
+
+  private quoteCacheKey(quoteId: string): string {
+    return `${PricingService.QUOTE_NAMESPACE}:${quoteId}`
+  }
 
   /**
    * Locks a calculated price for 5 minutes so the customer can complete payment
@@ -170,20 +172,27 @@ export class PricingService {
   async createQuote(category: string, goldWeight: number) {
     const breakdown = await this.calculate(category, goldWeight)
     const id = `Q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const expiresAt = Date.now() + PricingService.QUOTE_TTL_MS
-    this.quotes.set(id, { breakdown, expiresAt })
-    this.pruneExpiredQuotes()
-    return { quoteId: id, ...breakdown, expiresAt: new Date(expiresAt).toISOString(), ttlSeconds: PricingService.QUOTE_TTL_MS / 1000 }
+    const expiresAt = Date.now() + PricingService.QUOTE_TTL_SECONDS * 1000
+    await this.cache.set(this.quoteCacheKey(id), { breakdown, expiresAt }, PricingService.QUOTE_TTL_SECONDS)
+    return {
+      quoteId: id,
+      ...breakdown,
+      expiresAt: new Date(expiresAt).toISOString(),
+      ttlSeconds: PricingService.QUOTE_TTL_SECONDS,
+    }
   }
 
   /** Returns a reserved quote if it is still valid, otherwise marks it expired. */
-  getQuote(quoteId: string) {
-    const entry = this.quotes.get(quoteId)
+  async getQuote(quoteId: string) {
+    const entry = await this.cache.get<{
+      breakdown: Awaited<ReturnType<PricingService['calculate']>>
+      expiresAt: number
+    }>(this.quoteCacheKey(quoteId))
     if (!entry) {
       return { quoteId, valid: false, reason: 'not_found' as const }
     }
-    if (Date.now() > entry.expiresAt) {
-      this.quotes.delete(quoteId)
+    if (Date.now() >= entry.expiresAt) {
+      await this.cache.del(this.quoteCacheKey(quoteId))
       return { quoteId, valid: false, reason: 'expired' as const }
     }
     return {
@@ -192,15 +201,6 @@ export class PricingService {
       ...entry.breakdown,
       expiresAt: new Date(entry.expiresAt).toISOString(),
       remainingSeconds: Math.max(0, Math.round((entry.expiresAt - Date.now()) / 1000)),
-    }
-  }
-
-  private pruneExpiredQuotes() {
-    const now = Date.now()
-    for (const [id, entry] of this.quotes) {
-      if (now > entry.expiresAt) {
-        this.quotes.delete(id)
-      }
     }
   }
 }

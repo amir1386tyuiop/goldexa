@@ -4,20 +4,14 @@ import { Package, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { formatPrice, getStatusText } from '@/utils/helpers'
 import type { Order } from '@/types'
-
-function getAuthenticatedUser() {
-  try {
-    return JSON.parse(localStorage.getItem('goldeksa_auth') || 'null') as { user?: { id?: string } } | null
-  } catch {
-    return null
-  }
-}
+import { getStoredAuth } from '@/auth'
 
 export function OrdersPage() {
-  const userId = getAuthenticatedUser()?.user?.id || '11111111-1111-1111-1111-111111111111'
+  const userId = getStoredAuth()?.user.id || ''
   const { data: orders = [] } = useQuery({
     queryKey: ['orders', 'user', userId],
     queryFn: () => api.getOrdersByUser(userId),
+    enabled: Boolean(userId),
   })
 
   const activeOrders = useMemo(() => orders.filter((order) => ['pending', 'paid', 'processing'].includes(order.status)), [orders])

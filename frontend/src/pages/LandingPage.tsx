@@ -69,7 +69,7 @@ export function LandingPage() {
       </div>
 
       <header className="container mx-auto flex items-center justify-between px-4 py-5">
-        <Link to="/" className="group flex items-center gap-3">
+          <Link to="/home" className="group flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 text-white text-2xl font-black shadow-gold transition group-hover:scale-105">
             ◆
           </div>
@@ -105,8 +105,8 @@ export function LandingPage() {
             </p>
 
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Link to="/shop" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gold-500 px-7 py-4 font-black text-white shadow-gold transition hover:-translate-y-1 hover:bg-gold-600">
-                شروع خرید از فروشگاه
+              <Link to="/home" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gold-500 px-7 py-4 font-black text-white shadow-gold transition hover:-translate-y-1 hover:bg-gold-600">
+                ورود به فروشگاه
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <Link to="/pricing" className="inline-flex items-center justify-center rounded-2xl border border-border bg-white px-7 py-4 font-black text-navy-900 shadow-sm transition hover:-translate-y-1 hover:bg-gold-50">

@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { AdminGuard } from '../common/guards/admin.guard'
 import { CatalogService } from './catalog.service'
 import {
   CreateInventoryDto,
@@ -20,6 +22,7 @@ export class CatalogController {
   }
 
   @Post('categories')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createCategory(@Body() body: CreateProductCategoryDto) {
     return this.catalogService.createCategory(body)
   }
@@ -30,6 +33,7 @@ export class CatalogController {
   }
 
   @Post('occasions')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createOccasion(@Body() body: CreateOccasionCategoryDto) {
     return this.catalogService.createOccasion(body)
   }
@@ -40,6 +44,7 @@ export class CatalogController {
   }
 
   @Post('products/media')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createMedia(@Body() body: CreateProductMediaDto) {
     return this.catalogService.createMedia(body)
   }
@@ -50,6 +55,7 @@ export class CatalogController {
   }
 
   @Post('stones')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createStone(@Body() body: CreateStoneDto) {
     return this.catalogService.createStone(body)
   }
@@ -60,6 +66,7 @@ export class CatalogController {
   }
 
   @Post('products/stones')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createProductStone(@Body() body: CreateProductStoneDto) {
     return this.catalogService.createProductStone(body)
   }
@@ -70,11 +77,13 @@ export class CatalogController {
   }
 
   @Post('inventory')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async upsertInventory(@Body() body: CreateInventoryDto) {
     return this.catalogService.upsertInventory(body.productId, body)
   }
 
   @Patch('inventory/:id/stock')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async updateStock(@Param('id') id: string, @Body() body: { stock: number }) {
     return this.catalogService.updateInventoryStock(id, body.stock)
   }
@@ -85,6 +94,7 @@ export class CatalogController {
   }
 
   @Post('sellers')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createSeller(@Body() body: CreateSellerProfileDto) {
     return this.catalogService.createSellerProfile(body)
   }

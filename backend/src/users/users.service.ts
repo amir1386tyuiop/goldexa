@@ -100,7 +100,16 @@ export class UsersService {
   }
 
   async addAddress(userId: string, data: Partial<UserAddress>): Promise<UserAddress> {
-    return this.addressRepository.save(this.addressRepository.create({ ...data, userId }))
+    return this.addressRepository.save(
+      this.addressRepository.create({
+        province: data.province,
+        city: data.city,
+        street: data.street,
+        postal_code: data.postal_code,
+        isDefault: data.isDefault,
+        userId,
+      }),
+    )
   }
 
   async updateAddress(userId: string, addressId: string, data: Partial<UserAddress>): Promise<UserAddress> {
@@ -108,7 +117,13 @@ export class UsersService {
     if (!address) {
       throw new NotFoundException('آدرس یافت نشد')
     }
-    Object.assign(address, { ...data, id: address.id, userId })
+    Object.assign(address, {
+      province: data.province ?? address.province,
+      city: data.city ?? address.city,
+      street: data.street ?? address.street,
+      postal_code: data.postal_code ?? address.postal_code,
+      isDefault: data.isDefault ?? address.isDefault,
+    })
     return this.addressRepository.save(address)
   }
 
@@ -125,7 +140,15 @@ export class UsersService {
   }
 
   async addBankAccount(userId: string, data: Partial<UserBankAccount>): Promise<UserBankAccount> {
-    return this.bankAccountRepository.save(this.bankAccountRepository.create({ ...data, userId }))
+    return this.bankAccountRepository.save(
+      this.bankAccountRepository.create({
+        bankName: data.bankName,
+        accountNumberHash: data.accountNumberHash,
+        accountHolder: data.accountHolder,
+        isDefault: data.isDefault,
+        userId,
+      }),
+    )
   }
 
   async findPublicProfile(userId: string): Promise<PublicProfile | null> {

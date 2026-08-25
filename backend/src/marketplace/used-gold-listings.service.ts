@@ -24,7 +24,12 @@ export class UsedGoldListingsService {
   ) {}
 
   async findAll(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
-    const where = status ? { status } : undefined
+    const publicStatuses = [UsedGoldListingStatus.APPROVED, UsedGoldListingStatus.ACTIVE]
+    const where = status && publicStatuses.includes(status)
+      ? { status }
+      : status
+        ? { status: UsedGoldListingStatus.ACTIVE }
+        : { status: UsedGoldListingStatus.ACTIVE }
 
     return this.listingRepository.find({
       where,

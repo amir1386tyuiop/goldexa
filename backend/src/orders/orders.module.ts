@@ -10,9 +10,13 @@ import { Invoice } from './invoice.entity'
 import { OrderStatusHistory } from './order-status-history.entity'
 import { Refund } from './refund.entity'
 import { Shipment } from './shipment.entity'
+import { WalletModule } from '../wallet/wallet.module'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, Product, User, OrderCancellation, Invoice, OrderStatusHistory, Refund, Shipment])],
+  imports: [
+    TypeOrmModule.forFeature([Order, Product, User, OrderCancellation, Invoice, OrderStatusHistory, Refund, Shipment]),
+    WalletModule,
+  ],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

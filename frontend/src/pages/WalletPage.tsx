@@ -4,26 +4,21 @@ import { ArrowDownUp, Coins, CreditCard, History, ShieldCheck } from 'lucide-rea
 import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { WalletTransaction } from '@/types'
-
-function getAuthenticatedUser() {
-  try {
-    return JSON.parse(localStorage.getItem('goldeksa_auth') || 'null') as { user?: { id?: string } } | null
-  } catch {
-    return null
-  }
-}
+import { getStoredAuth } from '@/auth'
 
 export function WalletPage() {
-  const userId = getAuthenticatedUser()?.user?.id || '11111111-1111-1111-1111-111111111111'
+  const userId = getStoredAuth()?.user.id || ''
   const [activeTab, setActiveTab] = useState<'summary' | 'transactions'>('summary')
   const { data: wallet } = useQuery({
     queryKey: ['wallet', userId],
     queryFn: () => api.getWallet(userId),
+    enabled: Boolean(userId),
     refetchInterval: 30000,
   })
   const { data: transactions = [] } = useQuery({
     queryKey: ['wallet-transactions', userId],
     queryFn: () => api.getWalletTransactions(userId),
+    enabled: Boolean(userId),
   })
 
   const goldBalance = wallet?.goldBalanceGrams ?? 0

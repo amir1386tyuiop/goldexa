@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { UserRole } from '@/types'
 import { Lock, Smartphone, ShieldCheck, UserCheck } from 'lucide-react'
+import type { Location } from 'react-router-dom'
 
 const testRoles: { label: string; role: UserRole; phone: string; description: string }[] = [
   { label: 'خریدار تستی', role: 'buyer', phone: '09120000001', description: 'داشبورد خرید و صندوقچه' },
@@ -16,6 +17,7 @@ const testRoles: { label: string; role: UserRole; phone: string; description: st
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [role, setRole] = useState<UserRole>('buyer')
   const [phone, setPhone] = useState(testRoles[0]?.phone || '')
   const [otp, setOtp] = useState('')
@@ -24,6 +26,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const selectedRole = testRoles.find((item) => item.role === role)
+  const redirectLocation = (location.state as { from?: Location } | null)?.from
 
   useEffect(() => {
     const matched = testRoles.find((item) => item.role === role)
@@ -53,9 +56,11 @@ export function LoginPage() {
     setLoading(true)
 
     try {
-      const response = await api.loginWithOtp(phone, otp, role)
-      localStorage.setItem('goldeksa_auth', JSON.stringify(response))
-      navigate(role === 'admin' ? '/admin' : '/dashboard')
+      await api.loginWithOtp(phone, otp, role)
+      const destination = redirectLocation?.pathname
+        ? `${redirectLocation.pathname}${redirectLocation.search}${redirectLocation.hash}`
+        : role === 'admin' ? '/admin' : '/dashboard'
+      navigate(destination, { replace: true })
     } catch (error) {
       setError((error as { message?: string })?.message || 'کد OTP یا نقش انتخاب‌شده معتبر نیست.')
     } finally {

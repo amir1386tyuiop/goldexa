@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
@@ -27,6 +27,10 @@ export class EscrowService {
   }
 
   async createPayment(data: CreateEscrowPaymentDto): Promise<EscrowPayment> {
+    if (data.buyerId === data.sellerId) {
+      throw new BadRequestException('خریدار و فروشنده نمی‌توانند یک کاربر باشند')
+    }
+
     return this.escrowRepository.save(
       this.escrowRepository.create({
         ...data,
@@ -37,7 +41,8 @@ export class EscrowService {
         authority: data.authority ?? null,
         paymentUrl: data.paymentUrl ?? null,
         trackingCode: data.trackingCode ?? null,
-        status: EscrowPaymentStatus.HELD,
+        // Funds are not considered held until the payment provider confirms them.
+        status: EscrowPaymentStatus.INITIATED,
       }),
     )
   }
@@ -52,7 +57,20 @@ export class EscrowService {
       throw new NotFoundException('پرداخت امانی یافت نشد')
     }
 
-    payment.status = data.status as EscrowPaymentStatus
+    const transitions: Record<EscrowPaymentStatus, EscrowPaymentStatus[]> = {
+      [EscrowPaymentStatus.INITIATED]: [EscrowPaymentStatus.HELD, EscrowPaymentStatus.CANCELLED],
+      [EscrowPaymentStatus.HELD]: [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.DISPUTED],
+      [EscrowPaymentStatus.DISPUTED]: [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.CANCELLED],
+      [EscrowPaymentStatus.RELEASED]: [],
+      [EscrowPaymentStatus.REFUNDED]: [],
+      [EscrowPaymentStatus.CANCELLED]: [],
+    }
+    const nextStatus = data.status as EscrowPaymentStatus
+    if (!transitions[payment.status].includes(nextStatus)) {
+      throw new BadRequestException(`انتقال وضعیت escrow از ${payment.status} به ${nextStatus} مجاز نیست`)
+    }
+
+    payment.status = nextStatus
     payment.trackingCode = data.trackingCode ?? payment.trackingCode
     return this.escrowRepository.save(payment)
   }

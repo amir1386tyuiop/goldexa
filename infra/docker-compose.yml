@@ -1,89 +1,152 @@
-version: '3.8'
+name: ${COMPOSE_PROJECT_NAME:-goldexa}
+
+# Production-like stack. Provide all required values through .env, an external
+# secrets manager, or the deployment environment. Do not mount database/schema.sql
+# or database/seed.sql here: schema.sql contains development fixtures. The target
+# database must be provisioned by the deployment process before migrations run.
 
 services:
   postgres:
     image: postgres:15-alpine
     container_name: goldeksa-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: goldeksa
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5433:5432"
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
     container_name: goldeksa-redis
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: goldeksa-rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?RABBITMQ_DEFAULT_USER must be set}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS must be set}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
-  backend:
+  backend-migrate:
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
-    container_name: goldeksa-backend
+    container_name: goldeksa-backend-migrate
+    restart: "no"
     environment:
       NODE_ENV: production
-      PORT: 3001
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      DB_DATABASE: goldeksa
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL_CODE: ${OPENROUTER_MODEL_CODE:-cohere/north-mini-code}
-      OPENROUTER_MODEL_ASSISTANT: ${OPENROUTER_MODEL_ASSISTANT:-nex-agi/nex-n2-pro:free}
-      OPENROUTER_MODEL_ARCHITECTURE: ${OPENROUTER_MODEL_ARCHITECTURE:-nvidia/nemotron-3-ultra-550b-a55b}
-      OPENROUTER_MODEL_KYC_DOCUMENT: ${OPENROUTER_MODEL_KYC_DOCUMENT:-nvidia/llama-nemotron-rerank-vl-1b-v2:free}
-      OPENROUTER_MODEL_SAFETY_CHECK: ${OPENROUTER_MODEL_SAFETY_CHECK:-nvidia/nemotron-3.5-content-safety:free}
-      OPENROUTER_MODEL_MARKETING_IMAGE: ${OPENROUTER_MODEL_MARKETING_IMAGE:-recraft/recraft-v4.1-pro}
-      OPENROUTER_MODEL_VECTOR_ASSET: ${OPENROUTER_MODEL_VECTOR_ASSET:-recraft/recraft-v4.1-vector}
-      OPENROUTER_MODEL_PRODUCT_IMAGE: ${OPENROUTER_MODEL_PRODUCT_IMAGE:-x-ai/grok-imagine-image-quality}
-      OPENROUTER_MODEL_IMAGE_WORKFLOW: ${OPENROUTER_MODEL_IMAGE_WORKFLOW:-sourceful/riverflow-v2.5-pro}
-    ports:
-      - "3001:3001"
+      DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      DB_DATABASE: ${POSTGRES_DB:?POSTGRES_DB must be set}
+    command: ["node", "node_modules/typeorm/cli.js", "-d", "dist/data-source.js", "migration:run"]
     depends_on:
       postgres:
         condition: service_healthy
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: goldeksa-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL must be set}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL must be set}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      DB_DATABASE: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:?RABBITMQ_DEFAULT_USER must be set}:${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS must be set}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      GOLD_PRICE_SOURCE: ${GOLD_PRICE_SOURCE:-tgju}
+      AI_ENGINE_ENABLED: ${AI_ENGINE_ENABLED:-false}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    expose:
+      - "3001"
+    volumes:
+      - backend-uploads:/app/uploads
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
       redis:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: Dockerfile
     container_name: goldeksa-frontend
+    restart: unless-stopped
     ports:
-      - "5174:80"
+      - "${PUBLISH_HOST:-127.0.0.1}:${FRONTEND_HOST_PORT:-5174}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ | grep -q '<!doctype html' || wget -qO- http://127.0.0.1/ | grep -q '<html'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile
+    container_name: goldeksa-ai-service
+    restart: unless-stopped
+    expose:
+      - "8000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 volumes:
   postgres-data:
   redis-data:
+  backend-uploads:

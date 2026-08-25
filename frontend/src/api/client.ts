@@ -54,6 +54,7 @@ import type {
   ProductCategoryMaster,
   ProductMedia,
   ProductStone,
+  ProductCategory,
   Product,
   Promotion,
   PublicProfile,
@@ -113,6 +114,95 @@ function authHeaders(): Record<string, string> {
   const token = payload?.accessToken || payload?.refreshToken || payload?.token
 
   return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export interface PaginatedProducts {
+  items: Product[]
+  total: number
+  pages: number
+  page: number
+}
+
+export interface GoldPricingStatus {
+  source: string
+  lastFetchAt: string | null
+  refreshIntervalSeconds: number
+  cacheTtlSeconds: number
+  cacheDriver: string
+}
+
+export interface ProductsHomeFeed {
+  newProducts: Product[]
+  featured: Product[]
+  discounted: Product[]
+}
+
+type ProductCategoryValue = ProductCategory
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function toStringValue(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : value === undefined || value === null ? fallback : String(value)
+}
+
+function toNullableString(value: unknown): string | null | undefined {
+  if (value === null) return null
+  return typeof value === 'string' ? value : undefined
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : undefined
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') return value === 'true' || value === '1'
+  if (typeof value === 'number') return value !== 0
+  return fallback
+}
+
+function toProductCategory(value: unknown): ProductCategoryValue {
+  const category = toStringValue(value).toLowerCase()
+  return ['ring', 'necklace', 'bracelet', 'earring', 'pendant', 'custom'].includes(category)
+    ? category as ProductCategoryValue
+    : 'custom'
+}
+
+function normalizeImages(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function normalizeSeller(value: unknown): Product['seller'] {
+  if (!isRecord(value)) return undefined
+  return {
+    id: toStringValue(value.id),
+    name: toStringValue(value.name, 'فروشنده'),
+    rating: toNumber(value.rating),
+    location: toStringValue(value.location),
+  }
+}
+
+async function fetchProductsPaginated(params?: Record<string, string>): Promise<PaginatedProducts> {
+  const query = params
+    ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value))).toString()}`
+    : ''
+  const headers: Record<string, string> = { ...authHeaders() }
+  const response = await fetch(`${API_BASE}/products${query}`, { headers })
+  const data = await response.json().catch(() => [])
+  if (!response.ok) {
+    throw new ApiError(response.status, (data as { message?: string })?.message || 'درخواست با خطا مواجه شد')
+  }
+  const items = Array.isArray(data) ? data.map((item) => normalizeProduct(item as Record<string, unknown>)) : []
+  return {
+    items,
+    total: Number(response.headers.get('X-Total-Count') || items.length),
+    pages: Number(response.headers.get('X-Total-Pages') || 1),
+    page: Number(response.headers.get('X-Page') || 1),
+  }
 }
 
 export class ApiError extends Error {
@@ -448,6 +538,8 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
   }
 
   if (!data || typeof data !== 'object') return data
+
+  if (path.includes('/products/home')) return normalizeProductsHomeFeed(data as Record<string, unknown>)
 
   if (path.includes('gold-pricing')) return normalizeGoldPrice(data as Record<string, unknown>)
   if (path.includes('products')) return normalizeProduct(data as Record<string, unknown>)
@@ -1219,21 +1311,51 @@ function normalizeGoldPrice(value: Record<string, unknown>) {
   }
 }
 
-function normalizeProduct(value: Record<string, unknown>) {
+function normalizeProductsHomeFeed(value: Record<string, unknown>): ProductsHomeFeed {
+  const normalizeCollection = (items: unknown): Product[] =>
+    Array.isArray(items)
+      ? items.filter(isRecord).map(normalizeProduct)
+      : []
+
   return {
-    ...value,
+    newProducts: normalizeCollection(value.newProducts ?? value.new_products),
+    featured: normalizeCollection(value.featured),
+    discounted: normalizeCollection(value.discounted),
+  }
+}
+
+export function normalizeProduct(value: Record<string, unknown>): Product {
+  const discountValue = value.discount ?? value.discount_percent
+  const normalizedDiscount = discountValue === null
+    ? null
+    : toOptionalNumber(discountValue)
+
+  return {
+    id: toStringValue(value.id ?? value.productId ?? value.product_id),
+    name: toStringValue(value.name ?? value.title, 'محصول بدون نام'),
+    category: toProductCategory(value.category ?? value.category_slug),
+    description: toStringValue(value.description),
     weight: toNumber(value.weight),
-    karat: toNumber(value.karat) as 18 | 24,
+    karat: toNumber(value.karat) === 24 ? 24 : 18,
     labor: toNumber(value.labor),
     profit: toNumber(value.profit),
     tax: toNumber(value.tax),
-    basePrice: toNumber(value.basePrice),
-    finalPrice: toNumber(value.finalPrice),
+    basePrice: toNumber(value.basePrice ?? value.base_price),
+    finalPrice: toNumber(value.finalPrice ?? value.final_price),
     stock: toNumber(value.stock),
-    discount: value.discount === null ? null : toNumber(value.discount),
-    images: Array.isArray(value.images) ? value.images : [],
-    sellerName: value.sellerName || value.seller_name || undefined,
-    sellerLocation: value.sellerLocation || value.seller_location || undefined,
+    images: normalizeImages(value.images),
+    video: typeof value.video === 'string' ? value.video : undefined,
+    sellerName: toStringValue(value.sellerName ?? value.seller_name) || undefined,
+    sellerLocation: toStringValue(value.sellerLocation ?? value.seller_location) || undefined,
+    stones: Array.isArray(value.stones) ? value.stones : undefined,
+    dimensions: value.dimensions,
+    metalColor: toNullableString(value.metalColor ?? value.metal_color),
+    lockType: toNullableString(value.lockType ?? value.lock_type),
+    seller: normalizeSeller(value.seller),
+    isNew: toBoolean(value.isNew ?? value.is_new),
+    isFeatured: toBoolean(value.isFeatured ?? value.is_featured),
+    discount: normalizedDiscount,
+    createdAt: toStringValue(value.createdAt ?? value.created_at),
   }
 }
 
@@ -1551,6 +1673,15 @@ export const api = {
   refreshToken: (refreshTokenValue: string) => refreshToken(refreshTokenValue),
   registerUser: (body: { name: string; phone: string; email?: string; role?: UserRole }) => registerUser(body),
   getGoldPrices: () => request<GoldPrice[]>('/gold-pricing'),
+  getGoldPricingStatus: () => request<GoldPricingStatus>('/gold-pricing/status'),
+  getProductsPaginated: (params?: Record<string, string>) => fetchProductsPaginated(params),
+  getProductsHome: () => request<ProductsHomeFeed>('/products/home'),
+  getProductSuggestions: (category?: string, limit = 8) => {
+    const params = new URLSearchParams()
+    if (category) params.set('category', category)
+    params.set('limit', String(limit))
+    return request<Product[]>(`/products/suggestions?${params.toString()}`)
+  },
   getProducts: (params?: Record<string, string>) => {
     const query = params
       ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => Boolean(value))).toString()}`

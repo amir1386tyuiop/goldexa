@@ -3,6 +3,8 @@ import { AuthService } from './auth.service'
 import { LoginDto, RefreshTokenDto, RequestOtpDto, AssignRoleDto, AssignPermissionDto } from './auth.dto'
 import { RoleService } from './role.service'
 import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { AdminGuard } from '../common/guards/admin.guard'
 
 @Controller('auth')
 @UseGuards(RateLimitGuard)
@@ -38,16 +40,19 @@ export class AuthController {
   }
 
   @Post('roles/sync')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async syncRoles() {
     return this.roleService.upsertAdminPermissions()
   }
 
   @Post('roles/assign')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async assignRole(@Body() body: AssignRoleDto) {
     return this.roleService.assignRole(body.userId, body.roleName)
   }
 
   @Post('roles/permission/assign')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async assignPermission(@Body() body: AssignPermissionDto) {
     return this.roleService.assignPermission(body.roleName, body.permissionCode)
   }

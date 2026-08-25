@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsObject, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsObject, IsOptional, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class CreateOrderItemDto {
@@ -36,7 +36,7 @@ export enum PaymentMethodBody {
 }
 
 export class CreateOrderDto {
-  @IsNotEmpty()
+  @IsOptional()
   userId: string
 
   @IsArray()

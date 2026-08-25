@@ -3,24 +3,10 @@ import { ShoppingCart, User, Menu, X, Gavel, Wand2, ShieldCheck, LogOut, Wallet,
 import { Link, useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/store'
 import { cn } from '@/lib/utils'
-
-type AuthPayload = {
-  user?: {
-    name?: string
-    role?: string
-  }
-}
-
-function getAuthenticatedUser() {
-  try {
-    return JSON.parse(localStorage.getItem('goldeksa_auth') || 'null') as AuthPayload | null
-  } catch {
-    return null
-  }
-}
+import { clearStoredAuth, getStoredAuth } from '@/auth'
 
 const navItems = [
-  { label: 'صفحه اصلی', path: '/', icon: <Home className="h-4 w-4" /> },
+  { label: 'صفحه اصلی', path: '/home', icon: <Home className="h-4 w-4" /> },
   { label: 'داشبورد', path: '/dashboard', icon: <Activity className="h-4 w-4" /> },
   { label: 'قیمت لحظه‌ای', path: '/pricing', icon: <TrendingUp className="h-4 w-4" /> },
   { label: 'سفارشات', path: '/orders', icon: <PackageCheck className="h-4 w-4" /> },
@@ -43,10 +29,10 @@ export function Navbar() {
   const cartCount = useStore((state) => state.getCartCount())
   const isCartOpen = useStore((state) => state.isCartOpen)
   const toggleCart = useStore((state) => state.toggleCart)
-  const currentUser = getAuthenticatedUser()?.user
+  const currentUser = getStoredAuth()?.user
 
   function handleLogout() {
-    localStorage.removeItem('goldeksa_auth')
+    clearStoredAuth()
     navigate('/')
   }
 
@@ -57,7 +43,7 @@ export function Navbar() {
           <button className="lg:hidden" onClick={() => setMenuOpen((value) => !value)}>
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
-          <div className="flex items-center gap-2 cursor-pointer">
+          <Link to="/home" className="flex items-center gap-2 cursor-pointer">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 text-white font-bold text-xl">
               ◆
             </div>
@@ -65,7 +51,7 @@ export function Navbar() {
               <h1 className="text-xl font-bold text-navy-900">گلدکسا</h1>
               <p className="text-xs text-gold-600 -mt-1">پلتفرم جامع طلا</p>
             </div>
-          </div>
+          </Link>
         </div>
 
         <nav className="hidden lg:flex items-center gap-1">
@@ -121,7 +107,7 @@ export function Navbar() {
                 خروج
               </button>
               <Link
-              to="/login"
+              to="/dashboard"
                 className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 transition-all"
               >
                 <User className="h-4 w-4" />

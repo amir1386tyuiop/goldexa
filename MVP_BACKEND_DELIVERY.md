@@ -1,5 +1,7 @@
 # تحویل MVP بک‌اند گلدکسا
 
+> وضعیت این سند باید با artifactهای قابل‌تکرار سنجیده شود. در repository فعلی فقط unit testهای موجود قابل‌تأییدند؛ ادعای «۹۷ endpoint تست‌شده» و «تأیید کامل جریان مالی» artifact قابل‌تکرار ندارد و تحویل قطعی محسوب نمی‌شود.
+
 این سند خلاصه‌ی پیاده‌سازی ماژول‌های backend نسخه‌ی MVP (ردیف‌های ۴ تا ۸) است.
 
 ## اجرا
@@ -51,7 +53,7 @@
 
 ## سخت‌سازی و زیرساخت (تکمیل‌شده)
 - **Migration واقعی TypeORM:** `src/data-source.ts` + scriptهای `migration:generate|run|revert`؛ migration پایه `BaselineMvpSchema` نوشته، اجرا و در جدول `migrations` ثبت شد. از این پس تغییر schema از مسیر migration انجام می‌شود (جلوگیری از drift). نکته: چون schema.sql دستی از varchar/نام `*_fkey` استفاده می‌کند و entityها enum، `migration:generate` خروجی «نرمال‌سازی» تولید می‌کند؛ برای تغییرات جدید migration دستی/افزایشی توصیه می‌شود.
-- **سوییت تست Jest:** کانفیگ jest + ۸ تست (`pricing.service.spec` فرمول مالیات و `zarinpal.service.spec` حالت mock). با `npm test` اجرا می‌شود — همه pass.
+- **سوییت تست Jest:** تست‌های pricing، زرین‌پال، پرداخت، و ماتریس امنیتی. در آخرین اجرای محلی ۱۷ تست pass شد؛ suiteهای E2E بدون `E2E_BASE_URL` عمداً skip می‌شوند.
 - **کش آماده‌ی Redis:** `CacheService` (ioredis) که اگر سرور Redis در دسترس باشد از آن و وگرنه از in-memory استفاده می‌کند (`CACHE_DRIVER`). کش قیمت طلا از این سرویس استفاده می‌کند.
 - **observability:** `AuditLogger` سراسری که عملیات مالی (`WALLET_*`, `PAYMENT_VERIFIED`) را در `audit_logs` ثبت و لاگ ساختاریافته می‌زند؛ endpoint `/metrics` (uptime/memory).
 - **AI پشت feature flag:** کل `ai-engine` با `FeatureFlagGuard` پشت `AI_ENGINE_ENABLED` (پیش‌فرض خاموش → 503).
@@ -77,5 +79,6 @@
 - **۵.۵ WebP < ۲۰۰KB:** آپلود با کاهش تطبیقی کیفیت/ابعاد، خروجی را زیر ۲۰۰KB نگه می‌دارد (تست: منبع ۴۵۲KB → ۱۶۹KB).
 
 ## تست
-- ۹۷ endpoint GET: ۲۰۰ (۶ مورد ai-engine عمداً 503 به‌خاطر feature flag).
-- جریان مالی، پرداخت زرین‌پال + idempotency، رزرو قیمت، rate-limit، block، آپلود WebP، رزرو موجودی، audit، migration، تست‌های Jest — همه تأیید شدند.
+- suite فعلی Jest شامل ۱۲ تست موفق است؛ پوشش آن عمدتاً unit-level است.
+- smoke/e2e setup در `backend/test/e2e` اضافه شده و با `E2E_BASE_URL` اجرا می‌شود؛ اجرای کامل flow مالی هنوز باید با PostgreSQL/Redis test environment انجام شود.
+- security enforcement با `ENFORCE_SECURITY_TESTS=1` آماده است و تا رفع findingهای endpointهای حساس نباید pass کامل تلقی شود.

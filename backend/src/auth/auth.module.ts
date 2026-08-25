@@ -11,6 +11,8 @@ import { RolePermissionMapping } from './role-permission-mapping.entity'
 import { RoleService } from './role.service'
 import { UserRoleMapping } from './user-role-mapping.entity'
 import { RateLimitGuard } from '../common/rate-limit.guard'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { AdminGuard } from '../common/guards/admin.guard'
 
 @Module({
   imports: [
@@ -21,6 +23,6 @@ import { RateLimitGuard } from '../common/rate-limit.guard'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, RoleService, RateLimitGuard],
+  providers: [AuthService, RoleService, RateLimitGuard, JwtAuthGuard, AdminGuard],
 })
 export class AuthModule {}

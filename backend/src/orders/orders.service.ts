@@ -10,6 +10,8 @@ import { OrderStatusHistory } from './order-status-history.entity'
 import { Refund } from './refund.entity'
 import { Shipment } from './shipment.entity'
 import { CreateOrderDto } from './create-order.dto'
+import { WalletService } from '../wallet/wallet.service'
+import { randomUUID } from 'crypto'
 
 @Injectable()
 export class OrdersService {
@@ -30,22 +32,36 @@ export class OrdersService {
     private refundRepository: Repository<Refund>,
     @InjectRepository(OrderCancellation)
     private cancellationRepository: Repository<OrderCancellation>,
+    private readonly walletService: WalletService,
   ) {}
 
-  async findAll(): Promise<Order[]> {
-    return this.orderRepository.find({ order: { createdAt: 'DESC' } })
+  async findAll(userId: string, isAdmin = false): Promise<Order[]> {
+    return this.orderRepository.find({
+      where: isAdmin ? {} : { userId },
+      order: { createdAt: 'DESC' },
+    })
   }
 
-  async findOne(id: string): Promise<Order | null> {
-    return this.orderRepository.findOneBy({ id })
+  private async findOwnedOrder(id: string, userId: string, isAdmin = false): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: isAdmin ? { id } : { id, userId },
+    })
+    if (!order) {
+      throw new NotFoundException('سفارش یافت نشد')
+    }
+    return order
+  }
+
+  async findOne(id: string, userId: string, isAdmin = false): Promise<Order> {
+    return this.findOwnedOrder(id, userId, isAdmin)
   }
 
   async findByUser(userId: string): Promise<Order[]> {
     return this.orderRepository.findBy({ userId })
   }
 
-  async createOrder(data: CreateOrderDto): Promise<Order> {
-    const user = await this.userRepository.findOneBy({ id: data.userId })
+  async createOrder(data: CreateOrderDto, userId: string): Promise<Order> {
+    const user = await this.userRepository.findOneBy({ id: userId })
 
     if (!user) {
       throw new NotFoundException('کاربر یافت نشد')
@@ -58,7 +74,10 @@ export class OrdersService {
     try {
       const itemsWithProducts = await Promise.all(
         data.items.map(async (item) => {
-          const product = await queryRunner.manager.findOne(Product, { where: { id: item.productId } })
+          const product = await queryRunner.manager.findOne(Product, {
+            where: { id: item.productId },
+            lock: { mode: 'pessimistic_write' },
+          })
 
           if (!product) {
             throw new NotFoundException(`محصول ${item.productId} یافت نشد`)
@@ -87,8 +106,8 @@ export class OrdersService {
       )
 
       const order = queryRunner.manager.create(Order, {
-        orderNumber: `GX-${Date.now()}`,
-        userId: data.userId,
+        orderNumber: `GX-${randomUUID().replace(/-/g, '').slice(0, 24)}`,
+        userId,
         items: itemsWithProducts,
         totalAmount,
         shippingCost: data.shippingCost,
@@ -98,6 +117,13 @@ export class OrdersService {
       })
 
       const savedOrder = await queryRunner.manager.save(order)
+
+      if (savedOrder.paymentMethod === PaymentMethod.WALLET) {
+        await this.walletService.payOrderWithWallet(userId, savedOrder.id, totalAmount, queryRunner.manager)
+        savedOrder.status = OrderStatus.PAID
+        await queryRunner.manager.save(savedOrder)
+      }
+
       await queryRunner.commitTransaction()
       return savedOrder
     } catch (error) {
@@ -108,19 +134,40 @@ export class OrdersService {
     }
   }
 
-  async addStatusHistory(orderId: string, status: string, note?: string | null): Promise<OrderStatusHistory> {
+  async addStatusHistory(
+    orderId: string,
+    status: string,
+    note: string | null | undefined,
+    userId: string,
+    isAdmin = false,
+  ): Promise<OrderStatusHistory> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.orderStatusHistoryRepository.save(
       this.orderStatusHistoryRepository.create({ orderId, status, note: note ?? null }),
     )
   }
 
-  async createShipment(orderId: string, carrier?: string | null, trackingCode?: string | null): Promise<Shipment> {
+  async createShipment(
+    orderId: string,
+    carrier: string | null | undefined,
+    trackingCode: string | null | undefined,
+    userId: string,
+    isAdmin = false,
+  ): Promise<Shipment> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.shipmentRepository.save(
       this.shipmentRepository.create({ orderId, carrier: carrier ?? null, trackingCode: trackingCode ?? null }),
     )
   }
 
-  async createInvoice(orderId: string, totalAmount: number, pdfUrl?: string | null): Promise<Invoice> {
+  async createInvoice(
+    orderId: string,
+    totalAmount: number,
+    pdfUrl: string | null | undefined,
+    userId: string,
+    isAdmin = false,
+  ): Promise<Invoice> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.invoiceRepository.save(
       this.invoiceRepository.create({
         orderId,
@@ -131,39 +178,47 @@ export class OrdersService {
     )
   }
 
-  async requestRefund(orderId: string, amount: number, reason: string): Promise<Refund> {
+  async requestRefund(orderId: string, amount: number, reason: string, userId: string, isAdmin = false): Promise<Refund> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.refundRepository.save(this.refundRepository.create({ orderId, amount, reason, status: 'pending' }))
   }
 
-  async requestCancellation(orderId: string, reason: string): Promise<OrderCancellation> {
+  async requestCancellation(orderId: string, reason: string, userId: string, isAdmin = false): Promise<OrderCancellation> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.cancellationRepository.save(
       this.cancellationRepository.create({ orderId, reason, status: 'pending' }),
     )
   }
 
-  async findStatusHistory(orderId: string): Promise<OrderStatusHistory[]> {
+  async findStatusHistory(orderId: string, userId: string, isAdmin = false): Promise<OrderStatusHistory[]> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.orderStatusHistoryRepository.findBy({ orderId })
   }
 
-  async findShipments(orderId: string): Promise<Shipment[]> {
+  async findShipments(orderId: string, userId: string, isAdmin = false): Promise<Shipment[]> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.shipmentRepository.findBy({ orderId })
   }
 
-  async findInvoices(orderId: string): Promise<Invoice[]> {
+  async findInvoices(orderId: string, userId: string, isAdmin = false): Promise<Invoice[]> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.invoiceRepository.findBy({ orderId })
   }
 
-  async findRefunds(orderId: string): Promise<Refund[]> {
+  async findRefunds(orderId: string, userId: string, isAdmin = false): Promise<Refund[]> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.refundRepository.findBy({ orderId })
   }
 
-  async findCancellations(orderId: string): Promise<OrderCancellation[]> {
+  async findCancellations(orderId: string, userId: string, isAdmin = false): Promise<OrderCancellation[]> {
+    await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.cancellationRepository.findBy({ orderId })
   }
 
-  async updateStatus(id: string, status: OrderStatus): Promise<Order | null> {
-    await this.orderRepository.update(id, { status })
-    await this.addStatusHistory(id, status)
-    return this.orderRepository.findOneBy({ id })
+  async updateStatus(id: string, status: OrderStatus, userId: string, isAdmin = false): Promise<Order> {
+    const order = await this.findOwnedOrder(id, userId, isAdmin)
+    await this.orderRepository.update(order.id, { status })
+    await this.addStatusHistory(order.id, status, null, userId, isAdmin)
+    return this.findOwnedOrder(order.id, userId, isAdmin)
   }
 }

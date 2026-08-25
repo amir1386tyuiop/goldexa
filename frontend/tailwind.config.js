@@ -72,6 +72,10 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      boxShadow: {
+        gold: "0 10px 40px -10px rgba(212, 168, 67, 0.45)",
+        soft: "0 4px 24px -4px rgba(10, 22, 40, 0.08)",
+      },
       fontFamily: {
         vazir: ["Vazirmatn", "Tahoma", "system-ui", "sans-serif"],
       },

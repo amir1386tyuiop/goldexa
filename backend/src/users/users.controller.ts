@@ -47,8 +47,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id)
+  async findOne(@Param('id') _id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.usersService.findOne(req.user.sub)
   }
 
   // Privileged: only an admin may change a user's level or role (no self-promotion).
@@ -67,7 +67,11 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Post(':id/otp-sessions')
-  async createOtpSession(@Param('id') id: string, @Body() body: { phone: string; codeHash: string; expiresAt: Date }) {
+  async createOtpSession(
+    @Param('id') _id: string,
+    @Req() _req: Request & { user: JwtUser },
+    @Body() body: { phone: string; codeHash: string; expiresAt: Date },
+  ) {
     return this.usersService.createOtpSession(body.phone, body.codeHash, body.expiresAt)
   }
 
@@ -81,68 +85,85 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Get(':id/kyc')
-  async getKyc(@Param('id') id: string) {
-    return this.usersService.findKyc(id)
+  async getKyc(@Param('id') _id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.usersService.findKyc(req.user.sub)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Get(':id/profile')
-  async getProfile(@Param('id') id: string) {
-    return this.usersService.findProfile(id)
+  async getProfile(@Param('id') _id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.usersService.findProfile(req.user.sub)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Patch(':id/profile')
-  async updateProfile(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.usersService.upsertProfile(id, body)
+  async updateProfile(
+    @Param('id') _id: string,
+    @Req() req: Request & { user: JwtUser },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.usersService.upsertProfile(req.user.sub, body)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Get(':id/addresses')
-  async getAddresses(@Param('id') id: string) {
-    return this.usersService.findAddresses(id)
+  async getAddresses(@Param('id') _id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.usersService.findAddresses(req.user.sub)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Post(':id/addresses')
-  async addAddress(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.usersService.addAddress(id, body)
+  async addAddress(
+    @Param('id') _id: string,
+    @Req() req: Request & { user: JwtUser },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.usersService.addAddress(req.user.sub, body)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Patch(':id/addresses/:addressId')
   async updateAddress(
-    @Param('id') id: string,
+    @Param('id') _id: string,
     @Param('addressId') addressId: string,
+    @Req() req: Request & { user: JwtUser },
     @Body() body: Record<string, unknown>,
   ) {
-    return this.usersService.updateAddress(id, addressId, body)
+    return this.usersService.updateAddress(req.user.sub, addressId, body)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Delete(':id/addresses/:addressId')
-  async removeAddress(@Param('id') id: string, @Param('addressId') addressId: string) {
-    return this.usersService.removeAddress(id, addressId)
+  async removeAddress(
+    @Param('id') _id: string,
+    @Param('addressId') addressId: string,
+    @Req() req: Request & { user: JwtUser },
+  ) {
+    return this.usersService.removeAddress(req.user.sub, addressId)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Get(':id/bank-accounts')
-  async getBankAccounts(@Param('id') id: string) {
-    return this.usersService.findBankAccounts(id)
+  async getBankAccounts(@Param('id') _id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.usersService.findBankAccounts(req.user.sub)
   }
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Post(':id/bank-accounts')
-  async addBankAccount(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.usersService.addBankAccount(id, body)
+  async addBankAccount(
+    @Param('id') _id: string,
+    @Req() req: Request & { user: JwtUser },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.usersService.addBankAccount(req.user.sub, body)
   }
 
   // Public profile is public by design (community pages).
@@ -154,7 +175,11 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('id')
   @Patch(':id/public-profile')
-  async updatePublicProfile(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.usersService.upsertPublicProfile(id, body)
+  async updatePublicProfile(
+    @Param('id') _id: string,
+    @Req() req: Request & { user: JwtUser },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.usersService.upsertPublicProfile(req.user.sub, body)
   }
 }

@@ -101,7 +101,7 @@ export class AuthService {
     const payload = this.jwtService.verify<{ sub: string; role: string }>(data.refreshToken)
     const user = await this.userRepository.findOneBy({ id: payload.sub })
 
-    if (!user) {
+    if (!user || user.isBlocked) {
       throw new UnauthorizedException('توکن نامعتبر است')
     }
 

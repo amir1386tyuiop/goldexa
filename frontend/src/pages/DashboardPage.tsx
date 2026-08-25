@@ -18,45 +18,11 @@ import {
 } from 'lucide-react'
 import { api } from '@/api/client'
 import { formatPrice, getStatusText } from '@/utils/helpers'
-import type { AuthTokenPayload, Order, User as UserType } from '@/types'
+import type { Order, User as UserType } from '@/types'
+import { getStoredAuth } from '@/auth'
 
-const defaultUserId = '11111111-1111-1111-1111-111111111111'
-
-function getAuthenticatedUser(): UserType | null {
-  const raw = localStorage.getItem('goldeksa_auth')
-  if (!raw) return null
-
-  try {
-    return (JSON.parse(raw) as AuthTokenPayload).user || null
-  } catch {
-    return null
-  }
-}
-
-const authenticatedUser = getAuthenticatedUser()
-const dashboardUserId = authenticatedUser?.id || defaultUserId
-
-const defaultUser: UserType = authenticatedUser || {
-  id: defaultUserId,
-  name: 'داود احمدی',
-  phone: '09120000001',
-  email: 'davood@goldeksa.test',
-  role: 'buyer',
-  level: 'gold',
-  addresses: [
-    {
-      id: 'a1',
-      title: 'خانه',
-      province: 'اصفهان',
-      city: 'اصفهان',
-      street: 'خیابان چهارباغ، پلاک ۱۲',
-      postalCode: '81467',
-      isDefault: true,
-    },
-  ],
-  orders: [],
-  createdAt: '2026-01-15',
-}
+const authenticatedUser = getStoredAuth()?.user
+const dashboardUserId = authenticatedUser?.id || ''
 
 const menuItems = [
   { id: 'profile', icon: <User className="h-5 w-5" />, label: 'پروفایل' },
@@ -88,22 +54,23 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
 
-  const { data: currentUser = defaultUser } = useQuery({
+  const { data: currentUser, isLoading: isUserLoading } = useQuery<UserType>({
     queryKey: ['user', dashboardUserId],
     queryFn: () => api.getUser(dashboardUserId),
-    initialData: defaultUser,
+    enabled: Boolean(dashboardUserId),
   })
 
   const { data: userOrders = [] } = useQuery({
     queryKey: ['orders', 'user', dashboardUserId],
     queryFn: () => api.getOrdersByUser(dashboardUserId),
+    enabled: Boolean(dashboardUserId),
     initialData: [],
   })
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet', dashboardUserId],
     queryFn: () => api.getWallet(dashboardUserId),
-    initialData: null,
+    enabled: Boolean(dashboardUserId),
   })
 
   const { data: goldPrices = [] } = useQuery({
@@ -115,15 +82,19 @@ export function DashboardPage() {
   const { data: walletTransactions = [] } = useQuery({
     queryKey: ['wallet-transactions', dashboardUserId],
     queryFn: () => api.getWalletTransactions(dashboardUserId),
-    initialData: [],
+    enabled: Boolean(dashboardUserId),
   })
 
   const orders = useMemo(() => {
-    const normalizedOrders = userOrders.length ? userOrders : currentUser.orders
+    const normalizedOrders = userOrders.length ? userOrders : currentUser?.orders ?? []
     return normalizedOrders.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
-  }, [currentUser.orders, userOrders])
+  }, [currentUser?.orders, userOrders])
+
+  if (isUserLoading || !currentUser) {
+    return <div className="container mx-auto px-4 pt-28 pb-16 text-center text-muted-foreground">در حال دریافت اطلاعات حساب...</div>
+  }
 
   const activeOrders = orders.filter((order) =>
     ['pending', 'paid', 'processing'].includes(order.status)
@@ -186,7 +157,7 @@ export function DashboardPage() {
             {activeTab === 'profile' && <ProfilePanel user={currentUser} />}
             {activeTab === 'orders' && <OrdersPanel orders={orders} />}
             {activeTab === 'addresses' && <AddressesPanel addresses={currentUser.addresses} />}
-            {activeTab === 'wallet' && <WalletPanel wallet={wallet} />}
+            {activeTab === 'wallet' && <WalletPanel wallet={wallet ?? null} />}
             {activeTab === 'activity' && <ActivityPanel transactions={walletTransactions} />}
             {activeTab === 'favorites' && <FavoritesPanel />}
             {activeTab === 'notifications' && <NotificationsPanel />}

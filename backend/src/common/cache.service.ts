@@ -10,6 +10,7 @@ import { Redis } from 'ioredis'
 @Injectable()
 export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('Cache')
+  private readonly namespace = this.normaliseNamespace(process.env.CACHE_NAMESPACE ?? 'goldexa')
   private client: Redis | null = null
   private redisReady = false
   private readonly memory = new Map<string, { value: string; expiresAt: number }>()
@@ -52,18 +53,24 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     return this.redisReady ? 'redis' : 'memory'
   }
 
+  /** The configured key namespace, exposed for diagnostics and tests. */
+  get keyNamespace(): string {
+    return this.namespace
+  }
+
   async get<T>(key: string): Promise<T | null> {
     let raw: string | null = null
+    const namespacedKey = this.keyFor(key)
     if (this.redisReady && this.client) {
       try {
-        raw = await this.client.get(key)
+        raw = await this.client.get(namespacedKey)
       } catch {
-        raw = null
+        // Redis is an acceleration/distribution layer, not a reason to crash
+        // the request. Read the expiring local fallback when Redis is down.
+        raw = this.getFromMemory(namespacedKey)
       }
     } else {
-      const entry = this.memory.get(key)
-      if (entry && entry.expiresAt > Date.now()) raw = entry.value
-      else if (entry) this.memory.delete(key)
+      raw = this.getFromMemory(namespacedKey)
     }
     if (raw == null) return null
     try {
@@ -75,26 +82,50 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
     const raw = JSON.stringify(value)
+    const namespacedKey = this.keyFor(key)
+    const ttl = Math.max(1, Math.ceil(ttlSeconds))
     if (this.redisReady && this.client) {
       try {
-        await this.client.set(key, raw, 'EX', Math.max(1, ttlSeconds))
+        await this.client.set(namespacedKey, raw, 'EX', ttl)
         return
       } catch {
-        /* fall through to memory */
+        // Keep a bounded, expiring fallback for local development and a
+        // graceful degradation path during a short Redis outage.
       }
     }
-    this.memory.set(key, { value: raw, expiresAt: Date.now() + ttlSeconds * 1000 })
+    this.memory.set(namespacedKey, { value: raw, expiresAt: Date.now() + ttl * 1000 })
   }
 
   async del(key: string): Promise<void> {
+    const namespacedKey = this.keyFor(key)
     if (this.redisReady && this.client) {
       try {
-        await this.client.del(key)
+        await this.client.del(namespacedKey)
+        this.memory.delete(namespacedKey)
         return
       } catch {
         /* fall through */
       }
     }
-    this.memory.delete(key)
+    this.memory.delete(namespacedKey)
+  }
+
+  private keyFor(key: string): string {
+    return `${this.namespace}:${key.replace(/^:+/, '')}`
+  }
+
+  private normaliseNamespace(namespace: string): string {
+    const value = namespace.trim().replace(/[^a-zA-Z0-9:_-]/g, '-')
+    return value || 'goldexa'
+  }
+
+  private getFromMemory(key: string): string | null {
+    const entry = this.memory.get(key)
+    if (!entry) return null
+    if (entry.expiresAt <= Date.now()) {
+      this.memory.delete(key)
+      return null
+    }
+    return entry.value
   }
 }

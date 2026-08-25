@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm'
 
 export enum PaymentTransactionStatus {
   INITIATED = 'initiated',
@@ -9,6 +9,10 @@ export enum PaymentTransactionStatus {
 }
 
 @Entity('payment_transactions')
+@Index('idx_payment_idempotency_unique', ['idempotencyKey'], {
+  unique: true,
+  where: '"idempotency_key" IS NOT NULL',
+})
 export class PaymentTransaction {
   @PrimaryGeneratedColumn('uuid')
   id: string

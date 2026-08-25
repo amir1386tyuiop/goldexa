@@ -16,6 +16,19 @@ import {
   WalletTransactionDto,
 } from './create-wallet.dto'
 
+type LedgerParams = {
+  userId: string
+  type: WalletTransactionType
+  rialDelta: number
+  goldDelta?: number
+  orderId?: string | null
+  escrowId?: string | null
+  description?: string | null
+}
+
+const MAX_RIAL_DELTA = Number('9999999999999.99')
+const MAX_GOLD_DELTA = Number('9999999999999.9999')
+
 /**
  * Wallet ledger rules (financial core):
  * - Every mutation runs inside a single DB transaction with a pessimistic
@@ -46,12 +59,7 @@ export class WalletService {
 
   async create(data: CreateWalletDto): Promise<Wallet> {
     await this.ensureWallet(data.userId)
-    const wallet = await this.findByUser(data.userId)
-    if (wallet && data.goldBalanceGrams && Number(wallet.goldBalanceGrams) === 0) {
-      wallet.goldBalanceGrams = data.goldBalanceGrams
-      return this.walletRepository.save(wallet)
-    }
-    return wallet as Wallet
+    return (await this.findByUser(data.userId)) as Wallet
   }
 
   /** Idempotently makes sure a wallet row exists (unique on user_id). */
@@ -86,53 +94,83 @@ export class WalletService {
    * Atomically applies a signed rial/gold delta and appends a ledger row.
    * The wallet row is locked for the duration so balances can't race.
    */
-  private async applyLedger(params: {
-    userId: string
-    type: WalletTransactionType
-    rialDelta: number
-    goldDelta?: number
-    orderId?: string | null
-    escrowId?: string | null
-    description?: string | null
-  }): Promise<WalletTransaction> {
+  private validateDelta(params: LedgerParams): void {
+    if (!Number.isFinite(params.rialDelta) || !Number.isFinite(params.goldDelta ?? 0)) {
+      throw new BadRequestException('مبلغ تراکنش نامعتبر است')
+    }
+    if (params.rialDelta === 0 && (params.goldDelta ?? 0) === 0) {
+      throw new BadRequestException('تراکنش نمی‌تواند صفر باشد')
+    }
+    if (Math.abs(params.rialDelta) > MAX_RIAL_DELTA || Math.abs(params.goldDelta ?? 0) > MAX_GOLD_DELTA) {
+      throw new BadRequestException('مبلغ تراکنش بیش از حد مجاز است')
+    }
+  }
+
+  /**
+   * Applies a ledger entry using the caller's transaction manager. This is
+   * deliberately separate from the HTTP-facing methods: order checkout can
+   * debit the wallet and reserve inventory in one database transaction.
+   */
+  private async applyLedgerInManager(manager: EntityManager, params: LedgerParams): Promise<WalletTransaction> {
+    this.validateDelta(params)
+
+    const wallet = await manager.findOne(Wallet, {
+      where: { userId: params.userId },
+      lock: { mode: 'pessimistic_write' },
+    })
+    if (!wallet) {
+      throw new BadRequestException('کیف پول یافت نشد')
+    }
+    if (!wallet.isActive) {
+      throw new BadRequestException('کیف پول فعال نیست')
+    }
+
+    // The wallet row lock serializes payments for the same user. Checking the
+    // order reference while holding that lock makes retries idempotent without
+    // ever charging the same order twice.
+    if ((params.type === WalletTransactionType.PAYMENT || params.type === WalletTransactionType.REFUND) && params.orderId) {
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId: params.userId, orderId: params.orderId, type: params.type },
+      })
+      if (existing) {
+        if (Number(existing.amount) !== params.rialDelta || Number(existing.amountGrams ?? 0) !== (params.goldDelta ?? 0)) {
+          throw new BadRequestException('تراکنش تکراری با مبلغ متفاوت است')
+        }
+        return existing
+      }
+    }
+
+    const newBalance = Number(wallet.balance) + params.rialDelta
+    const newGold = Number(wallet.goldBalanceGrams) + (params.goldDelta ?? 0)
+
+    if (newBalance < 0) {
+      throw new BadRequestException('موجودی ریالی کیف پول کافی نیست')
+    }
+    if (newGold < 0) {
+      throw new BadRequestException('موجودی طلای کیف پول کافی نیست')
+    }
+
+    wallet.balance = newBalance
+    wallet.goldBalanceGrams = newGold
+    await manager.save(wallet)
+
+    const tx = manager.create(WalletTransaction, {
+      walletId: wallet.id,
+      userId: params.userId,
+      type: params.type,
+      amount: params.rialDelta,
+      amountGrams: params.goldDelta ?? 0,
+      orderId: params.orderId ?? null,
+      escrowId: params.escrowId ?? null,
+      description: params.description ?? null,
+    })
+    return manager.save(tx)
+  }
+
+  private async applyLedger(params: LedgerParams): Promise<WalletTransaction> {
     await this.ensureWallet(params.userId)
 
-    const transaction = await this.dataSource.transaction(async (manager: EntityManager) => {
-      const wallet = await manager.findOne(Wallet, {
-        where: { userId: params.userId },
-        lock: { mode: 'pessimistic_write' },
-      })
-      if (!wallet) {
-        throw new BadRequestException('کیف پول یافت نشد')
-      }
-
-      const newBalance = Number(wallet.balance) + params.rialDelta
-      const newGold = Number(wallet.goldBalanceGrams) + (params.goldDelta ?? 0)
-
-      if (newBalance < 0) {
-        throw new BadRequestException('موجودی ریالی کیف پول کافی نیست')
-      }
-      if (newGold < 0) {
-        throw new BadRequestException('موجودی طلای کیف پول کافی نیست')
-      }
-
-      wallet.balance = newBalance
-      wallet.goldBalanceGrams = newGold
-      await manager.save(wallet)
-
-      const tx = manager.create(WalletTransaction, {
-        walletId: wallet.id,
-        userId: params.userId,
-        type: params.type,
-        amount: params.rialDelta,
-        amountGrams: params.goldDelta ?? 0,
-        orderId: params.orderId ?? null,
-        escrowId: params.escrowId ?? null,
-        description: params.description ?? null,
-      })
-      return manager.save(tx)
-    })
-
+    const transaction = await this.dataSource.transaction((manager) => this.applyLedgerInManager(manager, params))
     await this.audit.record({
       userId: params.userId,
       action: `WALLET_${params.type.toUpperCase()}`,
@@ -140,7 +178,6 @@ export class WalletService {
       entityId: transaction.id,
       metadata: { rialDelta: params.rialDelta, goldDelta: params.goldDelta ?? 0, orderId: params.orderId ?? null },
     })
-
     return transaction
   }
 
@@ -157,12 +194,64 @@ export class WalletService {
   }
 
   async payment(data: WalletPaymentDto): Promise<WalletTransaction> {
+    if (!data.orderId) {
+      throw new BadRequestException('شناسه سفارش برای پرداخت الزامی است')
+    }
+    if (!Number.isFinite(Number(data.amount)) || Number(data.amount) <= 0) {
+      throw new BadRequestException('مبلغ پرداخت باید بیشتر از صفر باشد')
+    }
     return this.applyLedger({
       userId: data.userId,
       type: WalletTransactionType.PAYMENT,
       rialDelta: -Math.abs(Number(data.amount)),
       orderId: data.orderId ?? null,
       description: data.description ?? 'پرداخت از کیف پول',
+    })
+  }
+
+  /** Internal checkout primitive. The manager must belong to an open transaction. */
+  async payOrderWithWallet(
+    userId: string,
+    orderId: string,
+    amount: number,
+    manager: EntityManager,
+  ): Promise<WalletTransaction> {
+    if (!orderId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات پرداخت کیف پول نامعتبر است')
+    }
+    const transaction = await this.applyLedgerInManager(manager, {
+      userId,
+      type: WalletTransactionType.PAYMENT,
+      rialDelta: -Math.abs(amount),
+      orderId,
+      description: 'پرداخت سفارش از کیف پول',
+    })
+    await this.audit.record({
+      userId,
+      action: 'WALLET_PAYMENT',
+      entityType: 'wallet_transaction',
+      entityId: transaction.id,
+      metadata: { rialDelta: -Math.abs(amount), orderId },
+    })
+    return transaction
+  }
+
+  /** Internal refund primitive; duplicate refunds for one order are idempotent. */
+  async refundOrderToWallet(
+    userId: string,
+    orderId: string,
+    amount: number,
+    manager: EntityManager,
+  ): Promise<WalletTransaction> {
+    if (!orderId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات بازپرداخت کیف پول نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId,
+      type: WalletTransactionType.REFUND,
+      rialDelta: Math.abs(amount),
+      orderId,
+      description: 'بازپرداخت سفارش به کیف پول',
     })
   }
 
@@ -210,6 +299,9 @@ export class WalletService {
 
   /** Generic ledger entry used by other modules (refund, escrow, ...). */
   async createTransaction(data: WalletTransactionDto): Promise<WalletTransaction> {
+    if (data.type === WalletTransactionType.DEPOSIT || data.type === WalletTransactionType.PAYMENT) {
+      throw new BadRequestException('برای این نوع تراکنش باید از عملیات اختصاصی استفاده شود')
+    }
     return this.applyLedger({
       userId: data.userId,
       type: data.type,

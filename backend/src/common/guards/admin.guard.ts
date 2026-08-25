@@ -13,7 +13,7 @@ export class AdminGuard implements CanActivate {
     if (!request.user) {
       throw new UnauthorizedException('برای این عملیات باید وارد حساب شوید')
     }
-    if (request.user.role !== 'admin') {
+    if (request.user.role !== 'admin' && !request.user.roleNames?.includes('admin')) {
       throw new ForbiddenException('این عملیات فقط برای مدیر مجاز است')
     }
     return true

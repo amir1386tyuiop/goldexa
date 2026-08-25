@@ -24,14 +24,6 @@ export class CreateAuctionDto {
   @IsString()
   productId?: string | null
 
-  @IsNotEmpty()
-  @IsString()
-  sellerId: string
-
-  @IsNotEmpty()
-  @IsString()
-  sellerName: string
-
   @IsNumber()
   @Min(0)
   startingPrice: number
@@ -88,24 +80,6 @@ export class CreateAuctionDto {
   @Min(0)
   shippingCost?: number
 
-  @IsOptional()
-  @IsEnum(AuctionQualityStatus)
-  qualityStatus?: AuctionQualityStatus
-
-  @IsOptional()
-  qualityBadge?: boolean
-
-  @IsOptional()
-  isFeatured?: boolean
-
-  @IsOptional()
-  @IsString()
-  expertName?: string | null
-
-  @IsOptional()
-  @IsString()
-  expertNotes?: string | null
-
   @IsDateString()
   startsAt: string
 
@@ -118,41 +92,12 @@ export class CreateAuctionDto {
 }
 
 export class PlaceBidDto {
-  @IsNotEmpty()
-  @IsString()
-  bidderId: string
-
-  @IsNotEmpty()
-  @IsString()
-  bidderName: string
-
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   amount: number
 }
 
 export class SettleAuctionDto {
-  @IsOptional()
-  @IsString()
-  winnerId?: string | null
-
-  @IsOptional()
-  @IsString()
-  winnerName?: string | null
-
-  @IsNumber()
-  @Min(0)
-  amount: number
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  commissionRate?: number
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  commissionAmount?: number
 }
 
 export class UpdateAuctionReviewDto {

@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MoreThan, Not, Repository } from 'typeorm'
 import { Cart } from './cart.entity'
 import { CartItem } from './cart-item.entity'
 import { Product } from '../products/product.entity'
 import { AddCartItemDto, CreateCartDto } from './create-cart.dto'
+import { JwtUser } from '../common/guards/jwt-auth.guard'
 
 @Injectable()
 export class CartService {
@@ -60,11 +61,12 @@ export class CartService {
     }
   }
 
-  async addItem(data: AddCartItemDto): Promise<CartItem> {
+  async addItem(data: AddCartItemDto, user: JwtUser): Promise<CartItem> {
     const cart = await this.cartRepository.findOneBy({ id: data.cartId })
     if (!cart) {
       throw new NotFoundException('سبد خرید یافت نشد')
     }
+    this.assertOwner(cart.userId, user)
 
     const quantity = Math.max(1, data.quantity || 1)
     await this.assertStockAvailable(data.productId, quantity)
@@ -83,11 +85,12 @@ export class CartService {
     return this.itemRepository.save(item)
   }
 
-  async updateQuantity(id: string, quantity: number): Promise<CartItem | null> {
-    const item = await this.itemRepository.findOneBy({ id })
+  async updateQuantity(id: string, quantity: number, user: JwtUser): Promise<CartItem | null> {
+    const item = await this.itemRepository.findOne({ where: { id }, relations: ['cart'] })
     if (!item) {
       throw new NotFoundException('آیتم سبد خرید یافت نشد')
     }
+    this.assertOwner(item.cart.userId, user)
     if (quantity <= 0) {
       throw new BadRequestException('تعداد باید بزرگ‌تر از صفر باشد')
     }
@@ -101,11 +104,23 @@ export class CartService {
     return this.itemRepository.save(item)
   }
 
-  async removeItem(id: string): Promise<void> {
+  async removeItem(id: string, user: JwtUser): Promise<void> {
+    const item = await this.itemRepository.findOne({ where: { id }, relations: ['cart'] })
+    if (!item) throw new NotFoundException('آیتم سبد خرید یافت نشد')
+    this.assertOwner(item.cart.userId, user)
     await this.itemRepository.delete(id)
   }
 
-  async clear(cartId: string): Promise<void> {
+  async clear(cartId: string, user: JwtUser): Promise<void> {
+    const cart = await this.cartRepository.findOneBy({ id: cartId })
+    if (!cart) throw new NotFoundException('سبد خرید یافت نشد')
+    this.assertOwner(cart.userId, user)
     await this.itemRepository.delete({ cartId })
+  }
+
+  private assertOwner(ownerId: string, user: JwtUser) {
+    if (user.role !== 'admin' && !user.roleNames?.includes('admin') && ownerId !== user.sub) {
+      throw new ForbiddenException('دسترسی به سبد خرید کاربر دیگر مجاز نیست')
+    }
   }
 }

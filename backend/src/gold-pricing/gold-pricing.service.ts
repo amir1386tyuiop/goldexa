@@ -178,7 +178,7 @@ export class GoldPricingService implements OnModuleInit {
     const { data } = await axios.get(url, { timeout: 8000 })
     const current = (data?.current ?? data) as Record<string, { p?: string; d?: string; dp?: string }>
 
-    const toNum = (raw?: string) => Number(String(raw ?? '0').replace(/[^0-9.\-]/g, '')) || 0
+    const toNum = (raw?: string) => Number(String(raw ?? '0').replace(/[^0-9.-]/g, '')) || 0
     const map: { key: string; type: GoldPriceType }[] = [
       { key: 'geram18', type: GoldPriceType.GOLD_18 },
       { key: 'mesghal', type: GoldPriceType.MIZANEH },

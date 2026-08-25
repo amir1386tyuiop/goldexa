@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { PricingService } from './pricing.service'
+import { AdminGuard } from '../common/guards/admin.guard'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import {
   CreateLaborCostRuleDto,
   CreatePricingRuleDto,
@@ -24,6 +26,7 @@ export class PricingController {
   }
 
   @Post('rules')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createRule(@Body() body: CreatePricingRuleDto) {
     return this.pricingService.createRule(body)
   }
@@ -34,6 +37,7 @@ export class PricingController {
   }
 
   @Post('spreads')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createSpread(@Body() body: CreatePricingSpreadDto) {
     return this.pricingService.createSpread(body)
   }
@@ -44,6 +48,7 @@ export class PricingController {
   }
 
   @Post('tax')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createTaxRule(@Body() body: CreateTaxRuleDto) {
     return this.pricingService.createTaxRule(body)
   }
@@ -54,6 +59,7 @@ export class PricingController {
   }
 
   @Post('labor')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createLaborRule(@Body() body: CreateLaborCostRuleDto) {
     return this.pricingService.createLaborRule(body)
   }
@@ -62,21 +68,16 @@ export class PricingController {
   async calculateGet(
     @Param('category') category: string,
     @Query('goldWeight') goldWeight?: string,
-    @Query('rawGoldPrice') rawGoldPrice?: string,
   ) {
-    return this.pricingService.calculate(
-      category,
-      Number(goldWeight) || 1,
-      rawGoldPrice ? Number(rawGoldPrice) : undefined,
-    )
+    return this.pricingService.calculate(category, Number(goldWeight) || 1)
   }
 
   @Post('calculate/:category')
   async calculate(
     @Param('category') category: string,
-    @Body() body: { goldWeight: number; rawGoldPrice?: number },
+    @Body() body: { goldWeight: number },
   ) {
-    return this.pricingService.calculate(category, body.goldWeight, body.rawGoldPrice)
+    return this.pricingService.calculate(category, body.goldWeight)
   }
 
   // 5-minute price reservation

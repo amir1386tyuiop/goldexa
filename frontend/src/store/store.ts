@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-import { products, goldPrices } from '../data/mockData'
-import type { Product, GoldPrice } from '../types'
+import type { Product } from '../types'
 
 interface StoreCartItem {
   product: Product
@@ -9,8 +8,6 @@ interface StoreCartItem {
 }
 
 interface StoreState {
-  products: Product[]
-  goldPrices: GoldPrice[]
   cart: StoreCartItem[]
   isCartOpen: boolean
   toast: { message: string; type: 'success' | 'error' } | null
@@ -25,8 +22,6 @@ interface StoreState {
 }
 
 export const useStore = create<StoreState>((set, get) => ({
-  products,
-  goldPrices,
   cart: [],
   isCartOpen: false,
   toast: null,

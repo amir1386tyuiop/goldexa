@@ -23,9 +23,10 @@ import {
   Wand2,
   Bell,
 } from 'lucide-react'
-import { dashboardStats, tasks } from '@/data/mockData'
+import { tasks } from '@/data/mockData'
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getPriorityText, getStatusText, getTaskStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
+import { isMockDataEnabled } from '@/config'
 import { AiEnginePanel } from './AiEnginePage'
 import type { Auction, Order, PaymentTransaction, Product, Role, SystemSetting, User, Permission } from '@/types'
 
@@ -70,15 +71,15 @@ const menuItems = [
   { id: 'settings', icon: <SlidersHorizontal className="h-5 w-5" />, label: 'تنظیمات' },
 ]
 
-const fallbackStats: AdminStats = {
-  totalUsers: dashboardStats.totalUsers,
-  totalOrders: dashboardStats.totalOrders,
-  totalProducts: dashboardStats.activeProducts,
+const emptyStats: AdminStats = {
+  totalUsers: 0,
+  totalOrders: 0,
+  totalProducts: 0,
   totalAuctions: 0,
   activeAuctions: 0,
-  todayOrders: dashboardStats.todayOrders,
-  totalRevenue: dashboardStats.totalRevenue,
-  todayRevenue: dashboardStats.todayRevenue,
+  todayOrders: 0,
+  totalRevenue: 0,
+  todayRevenue: 0,
   auctionRevenue: 0,
   totalPaymentTransactions: 0,
   totalCategories: 0,
@@ -96,10 +97,9 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [search, setSearch] = useState('')
 
-  const { data: stats = fallbackStats } = useQuery<AdminStats>({
+  const { data: stats = emptyStats } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
     queryFn: api.getAdminStats,
-    initialData: fallbackStats,
   })
 
   const { data: adminUsers = [] } = useQuery<User[]>({
@@ -191,7 +191,7 @@ export function AdminPage() {
                 <div className="card p-6 mb-6">
                   <h2 className="text-xl font-bold mb-4">وضعیت تسک‌های MVP</h2>
                   <div className="space-y-3">
-                    {tasks.map((task) => (
+                    {(isMockDataEnabled ? tasks : []).map((task) => (
                       <div
                         key={task.id}
                         className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl bg-gray-50"

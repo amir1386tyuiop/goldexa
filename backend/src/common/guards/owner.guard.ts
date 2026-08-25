@@ -1,4 +1,12 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, SetMetadata, UnauthorizedException } from '@nestjs/common'
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  SetMetadata,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { JwtUser } from './jwt-auth.guard'
 
@@ -32,12 +40,17 @@ export class OwnerGuard implements CanActivate {
     if (!user) {
       throw new UnauthorizedException('برای این عملیات باید وارد حساب شوید')
     }
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.roleNames?.includes('admin')) {
       return true
     }
 
-    const target = request.params?.[field] ?? (request.body?.[field] as string | undefined)
-    if (target && target !== user.sub) {
+    const targets = [request.params?.[field], request.body?.[field] as string | undefined].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    )
+    if (!targets.length) {
+      throw new BadRequestException('شناسه مالک برای این عملیات الزامی است')
+    }
+    if (targets.some((target) => target !== user.sub)) {
       throw new ForbiddenException('دسترسی به داده‌های کاربر دیگر مجاز نیست')
     }
     return true

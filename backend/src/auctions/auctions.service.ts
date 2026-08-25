@@ -4,6 +4,7 @@ import { IsNull, Not, Repository } from 'typeorm'
 import {
   Auction,
   AuctionPaymentStatus,
+  AuctionQualityStatus,
   AuctionStatus,
   BidIncrementType,
 } from './auction.entity'
@@ -13,7 +14,6 @@ import { User } from '../users/user.entity'
 import {
   CreateAuctionDto,
   PlaceBidDto,
-  SettleAuctionDto,
   UpdateAuctionReviewDto,
 } from './create-auction.dto'
 
@@ -59,6 +59,10 @@ export class AuctionsService {
   }
 
   async findByUser(userId: string): Promise<Auction[]> {
+    if (!userId) {
+      throw new BadRequestException('شناسه کاربر الزامی است')
+    }
+
     await this.syncStatuses()
 
     return this.auctionRepository
@@ -76,7 +80,11 @@ export class AuctionsService {
     })
   }
 
-  async createAuction(data: CreateAuctionDto): Promise<Auction> {
+  async createAuction(data: CreateAuctionDto, sellerId: string): Promise<Auction> {
+    if (!sellerId) {
+      throw new BadRequestException('فروشنده معتبر نیست')
+    }
+
     if (data.productId) {
       const product = await this.productRepository.findOneBy({ id: data.productId })
 
@@ -89,7 +97,7 @@ export class AuctionsService {
       }
     }
 
-    const seller = await this.userRepository.findOneBy({ id: data.sellerId })
+    const seller = await this.userRepository.findOneBy({ id: sellerId })
 
     if (!seller) {
       throw new NotFoundException('فروشنده مزایده یافت نشد')
@@ -103,23 +111,17 @@ export class AuctionsService {
     }
 
     const durationDays = data.durationDays ?? this.getDurationDays(startsAt, endsAt)
-    const now = new Date()
-    const status =
-      now < startsAt
-        ? AuctionStatus.SCHEDULED
-        : now >= endsAt
-          ? AuctionStatus.ENDED
-          : AuctionStatus.ACTIVE
-
     const minimumBidIncrement =
       data.bidIncrementType === BidIncrementType.PERCENT
         ? (data.startingPrice * (data.bidIncrementPercent ?? 0)) / 100
         : data.minimumBidIncrement
 
     const auction = this.auctionRepository.create({
-      ...data,
       startsAt,
       endsAt,
+      productId: data.productId ?? null,
+      sellerId,
+      sellerName: seller.name,
       durationDays,
       currentPrice: data.startingPrice,
       reservePrice: data.reservePrice ?? null,
@@ -134,10 +136,11 @@ export class AuctionsService {
       commissionAmount: 0,
       shippingMethod: data.shippingMethod,
       shippingCost: data.shippingCost ?? 0,
-      qualityStatus: data.qualityStatus,
-      expertName: data.expertName ?? null,
-      expertNotes: data.expertNotes ?? null,
-      status,
+      qualityStatus: AuctionQualityStatus.NOT_SENT,
+      expertName: null,
+      expertNotes: null,
+      // New auctions must pass review before they can accept bids.
+      status: AuctionStatus.PENDING_REVIEW,
       bidCount: 0,
       paymentStatus: AuctionPaymentStatus.UNPAID,
       reserveMet: false,
@@ -146,7 +149,7 @@ export class AuctionsService {
     return this.auctionRepository.save(auction)
   }
 
-  async placeBid(id: string, data: PlaceBidDto): Promise<Auction> {
+  async placeBid(id: string, data: PlaceBidDto, bidderId: string): Promise<Auction> {
     await this.syncStatuses()
 
     const auction = await this.auctionRepository.findOneBy({ id })
@@ -159,7 +162,7 @@ export class AuctionsService {
       throw new BadRequestException('مزایده در حال حاضر برای ثبت پیشنهاد فعال نیست')
     }
 
-    const bidder = await this.userRepository.findOneBy({ id: data.bidderId })
+    const bidder = await this.userRepository.findOneBy({ id: bidderId })
 
     if (!bidder) {
       throw new NotFoundException('کاربر پیشنهاددهنده یافت نشد')
@@ -167,8 +170,12 @@ export class AuctionsService {
 
     const minimumAmount = this.getMinimumBidAmount(auction)
 
-    if (data.amount < minimumAmount) {
+    if (!Number.isFinite(data.amount) || data.amount < minimumAmount) {
       throw new BadRequestException(`حداقل مبلغ پیشنهاد ${minimumAmount.toLocaleString('fa-IR')} تومان است`)
+    }
+
+    if (auction.sellerId === bidderId) {
+      throw new BadRequestException('فروشنده نمی‌تواند روی مزایده خودش پیشنهاد ثبت کند')
     }
 
     await this.auctionBidRepository.update(
@@ -189,8 +196,8 @@ export class AuctionsService {
 
     const bid = this.auctionBidRepository.create({
       auctionId: id,
-      bidderId: data.bidderId,
-      bidderName: data.bidderName,
+      bidderId,
+      bidderName: bidder.name,
       amount: data.amount,
       isWinning: true,
     })
@@ -199,20 +206,20 @@ export class AuctionsService {
 
     auction.currentPrice = data.amount
     auction.bidCount += 1
-    if (auction.winningBidderId && auction.winningBidderId !== data.bidderId) {
+    if (auction.winningBidderId && auction.winningBidderId !== bidderId) {
       auction.secondWinnerId = auction.winningBidderId
       auction.secondWinnerName = auction.winningBidderName
       auction.secondWinnerAmount = auction.winningAmount
     }
-    auction.winningBidderId = data.bidderId
-    auction.winningBidderName = data.bidderName
+    auction.winningBidderId = bidderId
+    auction.winningBidderName = bidder.name
     auction.winningAmount = data.amount
     auction.reserveMet = !auction.reservePrice || data.amount >= auction.reservePrice
 
     return this.auctionRepository.save(auction)
   }
 
-  async settleAuction(id: string, data: SettleAuctionDto): Promise<Auction> {
+  async settleAuction(id: string): Promise<Auction> {
     await this.syncStatuses()
 
     const auction = await this.auctionRepository.findOneBy({ id })
@@ -221,51 +228,85 @@ export class AuctionsService {
       throw new NotFoundException('مزایده یافت نشد')
     }
 
-    if (
-      ![
-        AuctionStatus.ENDED,
-        AuctionStatus.AWAITING_PAYMENT,
-        AuctionStatus.FAILED,
-        AuctionStatus.CANCELLED,
-      ].includes(auction.status)
-    ) {
+    if (![AuctionStatus.ENDED, AuctionStatus.AWAITING_PAYMENT].includes(auction.status)) {
       throw new BadRequestException('برای تسویه، مزایده باید به پایان رسیده باشد')
     }
 
-    if (data.winnerId && data.winnerName) {
-      auction.winningBidderId = data.winnerId
-      auction.winningBidderName = data.winnerName
-      auction.winningAmount = data.amount
+    const amount = Number(auction.winningAmount ?? 0)
+    if (amount <= 0 || !auction.winningBidderId || !auction.reserveMet) {
+      auction.paymentStatus = AuctionPaymentStatus.REFUNDED
+      auction.status = AuctionStatus.FAILED
+      auction.winningBidderId = null
+      auction.winningBidderName = null
+      auction.winningAmount = null
+      return this.auctionRepository.save(auction)
     }
 
     auction.paymentStatus =
-      data.amount > 0 ? AuctionPaymentStatus.SETTLED : AuctionPaymentStatus.REFUNDED
-    auction.commissionRate = data.commissionRate ?? auction.commissionRate
-    auction.commissionAmount = data.commissionAmount ?? (data.amount * auction.commissionRate) / 100
-    auction.status = data.amount > 0 ? AuctionStatus.COMPLETED : AuctionStatus.FAILED
+      AuctionPaymentStatus.SETTLED
+    auction.commissionAmount = (amount * Number(auction.commissionRate ?? 0)) / 100
+    auction.status = AuctionStatus.COMPLETED
 
     return this.auctionRepository.save(auction)
   }
 
   async updateReview(id: string, data: UpdateAuctionReviewDto): Promise<Auction | null> {
+    const auction = await this.auctionRepository.findOneBy({ id })
+    if (!auction) {
+      throw new NotFoundException('مزایده یافت نشد')
+    }
+    if (![AuctionStatus.PENDING_REVIEW, AuctionStatus.SCHEDULED].includes(auction.status)) {
+      throw new BadRequestException('وضعیت فعلی مزایده قابل بازبینی نیست')
+    }
+
     await this.auctionRepository.update(id, {
       qualityStatus: data.qualityStatus,
       expertName: data.expertName ?? null,
       expertNotes: data.expertNotes ?? null,
       qualityBadge: data.qualityStatus === 'approved',
+      status: data.qualityStatus === 'approved' ? AuctionStatus.SCHEDULED : AuctionStatus.CANCELLED,
     })
 
     return this.auctionRepository.findOneBy({ id })
   }
 
   async updateStatus(id: string, status: AuctionStatus): Promise<Auction | null> {
+    const auction = await this.auctionRepository.findOneBy({ id })
+    if (!auction) {
+      throw new NotFoundException('مزایده یافت نشد')
+    }
+    if (!this.isAllowedTransition(auction.status, status)) {
+      throw new BadRequestException(`تغییر وضعیت از ${auction.status} به ${status} مجاز نیست`)
+    }
     await this.auctionRepository.update(id, { status })
     return this.auctionRepository.findOneBy({ id })
   }
 
   async cancelAuction(id: string): Promise<Auction | null> {
+    const auction = await this.auctionRepository.findOneBy({ id })
+    if (!auction) {
+      throw new NotFoundException('مزایده یافت نشد')
+    }
+    if ([AuctionStatus.COMPLETED, AuctionStatus.CANCELLED].includes(auction.status)) {
+      throw new BadRequestException('مزایده در وضعیت قابل لغو نیست')
+    }
     await this.auctionRepository.update(id, { status: AuctionStatus.CANCELLED })
     return this.auctionRepository.findOneBy({ id })
+  }
+
+  private isAllowedTransition(from: AuctionStatus, to: AuctionStatus): boolean {
+    const transitions: Record<AuctionStatus, AuctionStatus[]> = {
+      [AuctionStatus.PENDING_REVIEW]: [AuctionStatus.SCHEDULED, AuctionStatus.CANCELLED],
+      [AuctionStatus.SCHEDULED]: [AuctionStatus.ACTIVE, AuctionStatus.CANCELLED],
+      [AuctionStatus.ACTIVE]: [AuctionStatus.EXTENDED, AuctionStatus.ENDED, AuctionStatus.CANCELLED],
+      [AuctionStatus.EXTENDED]: [AuctionStatus.ENDED, AuctionStatus.CANCELLED],
+      [AuctionStatus.ENDED]: [AuctionStatus.AWAITING_PAYMENT, AuctionStatus.FAILED],
+      [AuctionStatus.AWAITING_PAYMENT]: [AuctionStatus.COMPLETED, AuctionStatus.FAILED],
+      [AuctionStatus.COMPLETED]: [],
+      [AuctionStatus.CANCELLED]: [],
+      [AuctionStatus.FAILED]: [],
+    }
+    return from === to || transitions[from].includes(to)
   }
 
   private async syncStatuses() {
