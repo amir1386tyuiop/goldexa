@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Heart, Plus, Star } from 'lucide-react'
+import { Plus, Star } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { formatPrice, getCategoryName } from '@/utils/helpers'
 import { useStore } from '@/store/store'
@@ -21,8 +21,8 @@ export function ProductCard({ product }: ProductCardProps) {
   }
 
   return (
-    <Link to={`/product/${product.id}`} className="group block animate-fade-in">
-      <article className="card overflow-hidden border-border/80 transition-all duration-300 hover:-translate-y-1.5 hover:border-gold-300 hover:shadow-gold">
+    <article className="card group overflow-hidden border-border/80 transition-all duration-300 hover:-translate-y-1 hover:border-gold-300 hover:shadow-gold">
+      <Link to={`/product/${product.id}`} className="block animate-fade-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
         <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-gold-50 via-white to-navy-50">
           <img
             src={product.images[0] || '/images/ring-1.svg'}
@@ -41,20 +41,13 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.discount}% تخفیف
             </span>
           ) : null}
-          <button
-            type="button"
-            className="absolute bottom-3 left-3 rounded-full bg-white/90 p-2 text-navy-900 opacity-0 shadow backdrop-blur transition group-hover:opacity-100"
-            aria-label="علاقه‌مندی"
-          >
-            <Heart className="h-4 w-4" />
-          </button>
         </div>
 
         <div className="p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-xs font-bold text-gold-600">{getCategoryName(product.category)}</p>
             <p className="flex items-center gap-0.5 text-xs text-amber-600">
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <Star aria-hidden="true" className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
               ۵.۰
             </p>
           </div>
@@ -66,16 +59,18 @@ export function ProductCard({ product }: ProductCardProps) {
             <span className="text-xl font-black text-navy-900">{formatPrice(product.finalPrice)}</span>
             <span className="text-xs text-muted-foreground">تومان</span>
           </div>
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-900 py-2.5 text-sm font-bold text-white transition hover:bg-gold-600"
-          >
-            <Plus className="h-4 w-4" />
-            افزودن به سبد
-          </button>
         </div>
-      </article>
-    </Link>
+      </Link>
+      <div className="px-4 pb-4">
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-navy-900 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-gold-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Plus aria-hidden="true" className="h-4 w-4" />
+          افزودن به سبد
+        </button>
+      </div>
+    </article>
   )
 }

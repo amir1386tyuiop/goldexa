@@ -5,12 +5,12 @@ import { CheckCircle, ShieldCheck, Star, TrendingUp } from 'lucide-react'
 import { api, type CreateEscrowPaymentInput, type CreateMarketplaceRatingInput, type CreateOrderTrackingEventInput, type CreatePaymentTransactionInput } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { EscrowPayment, MarketplaceRating, OrderTrackingEvent, PaymentTransaction } from '@/types'
-
-const defaultUserId = '11111111-1111-1111-1111-111111111111'
+import { getStoredAuth } from '@/auth'
 
 export function EscrowPage() {
   const [activeTab, setActiveTab] = useState<'escrow' | 'ratings' | 'payments' | 'tracking'>('escrow')
   const [orderId, setOrderId] = useState('')
+  const auth = getStoredAuth()
 
   const { data: escrows = [] } = useQuery<EscrowPayment[]>({
     queryKey: ['escrow-payments'],
@@ -19,9 +19,10 @@ export function EscrowPage() {
   })
 
   const { data: ratings = [] } = useQuery<MarketplaceRating[]>({
-    queryKey: ['marketplace-ratings', defaultUserId],
-    queryFn: () => api.getMarketplaceRatings(defaultUserId),
+    queryKey: ['marketplace-ratings', auth?.user.id],
+    queryFn: () => api.getMarketplaceRatings(auth!.user.id),
     initialData: [],
+    enabled: Boolean(auth),
   })
 
   const { data: payments = [] } = useQuery<PaymentTransaction[]>({
@@ -34,13 +35,13 @@ export function EscrowPage() {
     queryKey: ['order-tracking', orderId],
     queryFn: () => (orderId ? api.getOrderTracking(orderId) : Promise.resolve([])),
     initialData: [],
-    enabled: Boolean(orderId),
+    enabled: Boolean(orderId && auth),
   })
 
   const createEscrow = () => {
     const body: CreateEscrowPaymentInput = {
-      buyerId: defaultUserId,
-      sellerId: defaultUserId,
+      buyerId: auth?.user.id || '',
+      sellerId: '',
       amount: 35000000,
       fee: 1050000,
       trackingCode: `ESC-${Date.now()}`,
@@ -50,8 +51,8 @@ export function EscrowPage() {
 
   const createRating = () => {
     const body: CreateMarketplaceRatingInput = {
-      reviewerId: defaultUserId,
-      revieweeId: defaultUserId,
+      reviewerId: auth?.user.id || '',
+      revieweeId: '',
       rating: 5,
       body: 'تجربه خوب از معامله امن',
       category: 'seller',
@@ -61,7 +62,7 @@ export function EscrowPage() {
 
   const createPayment = () => {
     const body: CreatePaymentTransactionInput = {
-      userId: defaultUserId,
+      userId: auth?.user.id || '',
       amount: 35000000,
       paymentMethod: 'zarinpal',
       trackingCode: `PAY-${Date.now()}`,

@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Package, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock3, Loader2, Package, RefreshCw, XCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { formatPrice, getStatusText } from '@/utils/helpers'
 import type { Order } from '@/types'
@@ -8,83 +7,18 @@ import { getStoredAuth } from '@/auth'
 
 export function OrdersPage() {
   const userId = getStoredAuth()?.user.id || ''
-  const { data: orders = [] } = useQuery({
-    queryKey: ['orders', 'user', userId],
-    queryFn: () => api.getOrdersByUser(userId),
-    enabled: Boolean(userId),
-  })
+  const query = useQuery({ queryKey: ['orders', 'user', userId], queryFn: () => api.getOrdersByUser(userId), enabled: Boolean(userId) })
+  const orders = query.data ?? []
+  const active = orders.filter((item) => ['pending', 'paid', 'processing', 'shipped'].includes(item.status))
+  const completed = orders.filter((item) => item.status === 'delivered')
 
-  const activeOrders = useMemo(() => orders.filter((order) => ['pending', 'paid', 'processing'].includes(order.status)), [orders])
-  const completedOrders = useMemo(() => orders.filter((order) => ['delivered', 'paid'].includes(order.status)), [orders])
+  if (!userId) return <State title="ورود لازم است" description="برای مشاهده سفارش‌ها ابتدا وارد حساب کاربری شوید." />
+  if (query.isLoading) return <Loading />
+  if (query.isError) return <State title="دریافت سفارش‌ها ناموفق بود" description="لطفاً اتصال را بررسی و دوباره تلاش کنید." action={<button className="btn btn-outline" onClick={() => void query.refetch()}><RefreshCw className="h-4 w-4" aria-hidden="true" />تلاش دوباره</button>} />
 
-  return (
-    <div className="pt-24 pb-16">
-      <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <p className="text-sm text-gold-600 font-bold mb-2">چرخه سفارش</p>
-          <h1 className="text-3xl font-black text-navy-900">سفارشات من</h1>
-          <p className="text-muted-foreground mt-2">پیگیری سفارش از ثبت تا پرداخت، پردازش، ارسال و تکمیل.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <OrderStat title="سفارشات فعال" value={activeOrders.length} />
-          <OrderStat title="سفارشات تکمیل‌شده" value={completedOrders.length} />
-          <OrderStat title="مجموع خرید" value={formatPrice(orders.reduce((sum, order) => sum + order.totalAmount, 0))} suffix="تومان" />
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <Package className="h-6 w-6 text-gold-600" />
-            <h2 className="text-xl font-black text-navy-900">لیست سفارشات</h2>
-          </div>
-
-          <div className="space-y-4">
-            {orders.length ? orders.map((order) => <OrderRow key={order.id} order={order} />) : (
-              <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">سفارشی ثبت نشده است</div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <main className="bg-stone-50 pb-16 pt-24"><div className="container mx-auto px-4"><header className="mb-8"><p className="text-sm font-semibold text-amber-700">چرخه سفارش</p><h1 className="mt-2 text-3xl font-black tracking-tight text-stone-950">سفارش‌های من</h1><p className="mt-2 max-w-2xl text-sm leading-7 text-stone-600">پیگیری سفارش از ثبت تا پرداخت، پردازش، ارسال و تکمیل.</p></header><section className="mb-6 grid gap-4 md:grid-cols-3" aria-label="خلاصه سفارش‌ها"><Stat title="سفارش‌های فعال" value={active.length} /><Stat title="تکمیل‌شده" value={completed.length} /><Stat title="مجموع خرید" value={`${formatPrice(orders.reduce((sum, item) => sum + item.totalAmount, 0))} تومان`} /></section><section className="card p-5 sm:p-7" aria-labelledby="orders-title"><div className="mb-6 flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-amber-700"><Package className="h-5 w-5" aria-hidden="true" /></span><div><h2 id="orders-title" className="text-xl font-black text-stone-950">فهرست سفارش‌ها</h2><p className="mt-1 text-sm text-stone-600">{orders.length} سفارش ثبت‌شده</p></div></div>{orders.length ? <div className="space-y-4">{orders.map((order) => <OrderCard key={order.id} order={order} />)}</div> : <div className="rounded-2xl border border-dashed border-stone-300 p-12 text-center"><Package className="mx-auto h-10 w-10 text-stone-400" aria-hidden="true" /><h3 className="mt-4 font-bold">هنوز سفارشی ثبت نشده است</h3><p className="mt-2 text-sm text-stone-600">پس از اولین خرید، وضعیت سفارش و جزئیات آن اینجا نمایش داده می‌شود.</p></div>}</section></div></main>
 }
-
-function OrderStat({ title, value, suffix }: { title: string; value: number | string; suffix?: string }) {
-  return (
-    <div className="card p-5">
-      <p className="text-sm text-muted-foreground">{title}</p>
-      <p className="text-2xl font-black text-navy-900 mt-2">
-        {value} {suffix}
-      </p>
-    </div>
-  )
-}
-
-function OrderRow({ order }: { order: Order }) {
-  const icon = order.status === 'delivered' ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <Clock className="h-5 w-5 text-gold-600" />
-
-  return (
-    <div className="rounded-2xl border border-border p-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gold-50 flex items-center justify-center">{icon}</div>
-          <div>
-            <p className="font-black text-navy-900">{order.orderNumber || order.id}</p>
-            <p className="text-sm text-muted-foreground mt-1">{getStatusText(order.status)} • {order.items.length} قلم کالا</p>
-          </div>
-        </div>
-        <div className="text-left">
-          <p className="font-black text-navy-900">{formatPrice(order.totalAmount)} تومان</p>
-          <p className="text-xs text-muted-foreground mt-1">{order.createdAt}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <AlertCircle className="h-4 w-4 text-gold-600" />
-          <span>وضعیت فعلی: {getStatusText(order.status)}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
+function Stat({ title, value }: { title: string; value: string | number }) { return <div className="card p-5"><p className="text-sm text-stone-600">{title}</p><p className="mt-2 text-2xl font-black text-stone-950">{value}</p></div> }
+function OrderCard({ order }: { order: Order }) { const status = order.status; const icon = status === 'delivered' ? <CheckCircle2 className="h-5 w-5 text-emerald-700" aria-hidden="true" /> : status === 'cancelled' ? <XCircle className="h-5 w-5 text-red-700" aria-hidden="true" /> : <Clock3 className="h-5 w-5 text-amber-700" aria-hidden="true" />; return <article className="rounded-2xl border border-stone-200 p-4 sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-stone-100">{icon}</span><div><p className="font-black text-stone-950">{order.orderNumber || `#${order.id.slice(0, 8)}`}</p><p className="mt-1 text-sm text-stone-600">{getStatusText(status)} · {order.items.length} قلم کالا</p></div></div><div className="text-right sm:text-left"><p className="font-black text-stone-950">{formatPrice(order.totalAmount)} تومان</p><time className="mt-1 block text-xs text-stone-500" dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('fa-IR')}</time></div></div><div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-stone-100 p-3 text-sm text-stone-700"><AlertCircle className="h-4 w-4 text-amber-700" aria-hidden="true" />وضعیت فعلی: {getStatusText(status)}{order.trackingCode && <span className="mr-auto font-semibold">رهگیری: {order.trackingCode}</span>}</div></article> }
+function Loading() { return <div className="container mx-auto px-4 pb-16 pt-32"><div className="card flex min-h-64 items-center justify-center gap-3" role="status"><Loader2 className="h-8 w-8 animate-spin text-amber-700" aria-hidden="true" />در حال دریافت سفارش‌ها…</div></div> }
+function State({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) { return <div className="container mx-auto px-4 pb-16 pt-32"><div className="card mx-auto flex max-w-xl flex-col items-center gap-4 p-8 text-center"><Package className="h-10 w-10 text-amber-700" aria-hidden="true" /><h1 className="text-2xl font-black">{title}</h1><p className="text-sm leading-7 text-stone-600">{description}</p>{action}</div></div> }

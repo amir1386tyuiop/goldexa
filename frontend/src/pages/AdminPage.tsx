@@ -97,7 +97,7 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [search, setSearch] = useState('')
 
-  const { data: stats = emptyStats } = useQuery<AdminStats>({
+  const { data: stats = emptyStats, isLoading: statsLoading, isError: statsError } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
     queryFn: api.getAdminStats,
   })
@@ -161,8 +161,14 @@ export function AdminPage() {
   }, [adminProducts, search])
 
   return (
-    <div className="pt-20 pb-16">
+    <div className="min-h-screen bg-slate-50/70 pb-16 pt-20">
       <div className="container mx-auto px-4">
+        <header className="mb-6 rounded-3xl bg-navy-900 p-6 text-white shadow-lg shadow-navy-900/10">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div><p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-gold-300">Goldexa control room</p><h1 className="text-2xl font-black md:text-3xl">مرکز مدیریت پلتفرم</h1><p className="mt-2 text-sm text-slate-300">نظارت بر سفارش‌ها، پرداخت‌ها، مزایده‌ها و سلامت عملیات</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-slate-200" role="status">داده‌ها از API مدیریت خوانده می‌شوند</div>
+          </div>
+        </header>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <aside className="card p-5 h-fit lg:col-span-1 bg-navy-900 text-white">
             <h2 className="text-gold-300 font-bold mb-4 text-sm">پنل مدیریت</h2>
@@ -171,7 +177,9 @@ export function AdminPage() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full text-right px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 ${
+                  type="button"
+                  aria-pressed={activeTab === item.id}
+                  className={`w-full text-right px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 ${
                     activeTab === item.id
                       ? 'bg-gold-500/20 text-gold-300'
                       : 'text-gray-300 hover:bg-white/10'
@@ -185,6 +193,8 @@ export function AdminPage() {
           </aside>
 
           <main className="lg:col-span-4">
+            {statsLoading ? <div role="status" className="card mb-6 p-10 text-center text-muted-foreground">در حال بارگذاری داده‌های مدیریتی...</div> : null}
+            {statsError ? <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">دریافت آمار مدیریتی ناموفق بود. جدول‌ها همچنان از آخرین داده موجود استفاده می‌کنند.</div> : null}
             {activeTab === 'dashboard' && (
               <>
                 <DashboardStats stats={stats} />

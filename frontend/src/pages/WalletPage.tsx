@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDownUp, Coins, CreditCard, History, ShieldCheck } from 'lucide-react'
+import { ArrowDownUp, Coins, CreditCard, History, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { WalletTransaction } from '@/types'
@@ -9,129 +9,26 @@ import { getStoredAuth } from '@/auth'
 export function WalletPage() {
   const userId = getStoredAuth()?.user.id || ''
   const [activeTab, setActiveTab] = useState<'summary' | 'transactions'>('summary')
-  const { data: wallet } = useQuery({
-    queryKey: ['wallet', userId],
-    queryFn: () => api.getWallet(userId),
-    enabled: Boolean(userId),
-    refetchInterval: 30000,
-  })
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['wallet-transactions', userId],
-    queryFn: () => api.getWalletTransactions(userId),
-    enabled: Boolean(userId),
-  })
+  const walletQuery = useQuery({ queryKey: ['wallet', userId], queryFn: () => api.getWallet(userId), enabled: Boolean(userId), refetchInterval: 30000 })
+  const transactionsQuery = useQuery({ queryKey: ['wallet-transactions', userId], queryFn: () => api.getWalletTransactions(userId), enabled: Boolean(userId) })
+  const transactions = transactionsQuery.data ?? []
+  const latestTransactions = transactions.slice(0, 8)
 
-  const goldBalance = wallet?.goldBalanceGrams ?? 0
-  const balance = wallet?.balance ?? 0
-  const latestTransactions = useMemo(() => transactions.slice(0, 8), [transactions])
+  if (!userId) return <StateCard title="ورود لازم است" description="برای مشاهده کیف پول، ابتدا وارد حساب کاربری شوید." />
+  if (walletQuery.isLoading || transactionsQuery.isLoading) return <LoadingState />
+  if (walletQuery.isError || transactionsQuery.isError) return <StateCard title="دریافت کیف پول ناموفق بود" description="اتصال را بررسی کنید و دوباره تلاش کنید." action={<button className="btn btn-outline" onClick={() => { void walletQuery.refetch(); void transactionsQuery.refetch() }}><RefreshCw className="h-4 w-4" aria-hidden="true" />تلاش دوباره</button>} />
 
-  return (
-    <div className="pt-24 pb-16">
-      <div className="container mx-auto px-4">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm text-gold-600 font-bold mb-2">کیف پول دیجیتال طلا</p>
-            <h1 className="text-3xl font-black text-navy-900">مدیریت دارایی</h1>
-            <p className="text-muted-foreground mt-2">موجودی ریالی، طلای دیجیتال و تاریخچه تراکنش‌های مالی در یک نمای امن.</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setActiveTab('summary')} className={activeTab === 'summary' ? 'btn btn-primary' : 'btn btn-outline'}>خلاصه</button>
-            <button onClick={() => setActiveTab('transactions')} className={activeTab === 'transactions' ? 'btn btn-primary' : 'btn btn-outline'}>تراکنش‌ها</button>
-          </div>
-        </div>
-
-        {activeTab === 'summary' && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="card p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center"><CreditCard className="h-6 w-6" /></div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">موجودی ریالی</p>
-                    <p className="text-2xl font-black text-navy-900 mt-1">{formatPrice(balance)} تومان</p>
-                  </div>
-                </div>
-              </div>
-              <div className="card p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center"><Coins className="h-6 w-6" /></div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">موجودی طلای دیجیتال</p>
-                    <p className="text-2xl font-black text-navy-900 mt-1">{goldBalance} گرم</p>
-                  </div>
-                </div>
-              </div>
-              <div className="card p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center"><ArrowDownUp className="h-6 w-6" /></div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">تراکنش‌ها</p>
-                    <p className="text-2xl font-black text-navy-900 mt-1">{transactions.length} مورد</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-              <div className="card p-6 lg:col-span-2">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-xl font-black text-navy-900">آخرین تراکنش‌ها</h2>
-                  <History className="h-5 w-5 text-gold-600" />
-                </div>
-                <div className="space-y-3">
-                  {latestTransactions.length ? latestTransactions.map((transaction) => (
-                    <WalletTransactionRow key={transaction.id} transaction={transaction} />
-                  )) : (
-                    <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">تراکنشی ثبت نشده است</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="card p-6">
-                <h2 className="text-xl font-black text-navy-900 mb-4">امنیت مالی</h2>
-                <div className="space-y-4 text-sm text-muted-foreground">
-                  <div className="rounded-2xl bg-gray-50 p-4"><ShieldCheck className="h-5 w-5 text-gold-600 mb-2" /><p>تمام تغییرات کیف پول با تراکنش ثبت می‌شود.</p></div>
-                  <div className="rounded-2xl bg-gray-50 p-4"><ShieldCheck className="h-5 w-5 text-gold-600 mb-2" /><p>فروش بیشتر از موجودی طلای دیجیتال مجاز نیست.</p></div>
-                  <div className="rounded-2xl bg-gray-50 p-4"><ShieldCheck className="h-5 w-5 text-gold-600 mb-2" /><p>خرید و فروش با سفارش و پرداخت قابل ردیابی است.</p></div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'transactions' && (
-          <div className="card p-6">
-            <h2 className="text-xl font-black text-navy-900 mb-5">تاریخچه کامل تراکنش‌ها</h2>
-            <div className="space-y-3">
-              {transactions.length ? transactions.map((transaction) => (
-                <WalletTransactionRow key={transaction.id} transaction={transaction} />
-              )) : (
-                <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">تراکنشی ثبت نشده است</div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+  const wallet = walletQuery.data
+  return <main className="bg-stone-50 pb-16 pt-24"><div className="container mx-auto px-4"><header className="mb-8 flex flex-col gap-4 border-b border-stone-200 pb-6 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold text-amber-700">کیف پول دیجیتال طلا</p><h1 className="mt-2 text-3xl font-black tracking-tight text-stone-950">مدیریت دارایی</h1><p className="mt-2 max-w-2xl text-sm leading-7 text-stone-600">موجودی ریالی، طلای دیجیتال و تاریخچه تراکنش‌های مالی در یک نمای امن.</p></div><div className="flex gap-2" role="tablist" aria-label="بخش‌های کیف پول"><TabButton active={activeTab === 'summary'} onClick={() => setActiveTab('summary')} id="wallet-summary-tab">خلاصه</TabButton><TabButton active={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} id="wallet-transactions-tab">تراکنش‌ها</TabButton></div></header>
+    <section className="grid gap-4 md:grid-cols-3" aria-label="خلاصه موجودی"><Metric icon={<CreditCard />} label="موجودی ریالی" value={`${formatPrice(wallet?.balance ?? 0)} تومان`} /><Metric icon={<Coins />} label="طلای دیجیتال" value={`${wallet?.goldBalanceGrams ?? 0} گرم`} /><Metric icon={<ArrowDownUp />} label="تعداد تراکنش" value={`${transactions.length} مورد`} /></section>
+    {activeTab === 'summary' ? <section className="mt-6 grid gap-6 lg:grid-cols-[1.5fr_1fr]" aria-labelledby="latest-title"><div className="card p-5 sm:p-7"><div className="mb-5 flex items-center justify-between"><div><h2 id="latest-title" className="text-xl font-black text-stone-950">آخرین تراکنش‌ها</h2><p className="mt-1 text-sm text-stone-600">آخرین تغییرات ثبت‌شده در کیف پول</p></div><History className="h-5 w-5 text-amber-700" aria-hidden="true" /></div>{latestTransactions.length ? <div className="space-y-3">{latestTransactions.map((item) => <WalletTransactionRow key={item.id} transaction={item} />)}</div> : <EmptyState title="تراکنشی ثبت نشده است" description="بعد از خرید یا پرداخت با کیف پول، سوابق اینجا نمایش داده می‌شود." />}</div><SecurityCard /></section> : <section className="card p-5 sm:p-7" aria-labelledby="all-title"><h2 id="all-title" className="mb-5 text-xl font-black text-stone-950">تاریخچه کامل تراکنش‌ها</h2>{transactions.length ? <div className="space-y-3">{transactions.map((item) => <WalletTransactionRow key={item.id} transaction={item} />)}</div> : <EmptyState title="تراکنشی ثبت نشده است" description="هنوز تراکنشی برای حساب شما ثبت نشده است." />}</section>}
+  </div></main>
 }
 
-function WalletTransactionRow({ transaction }: { transaction: WalletTransaction }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${transaction.amount >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-          <ArrowDownUp className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="font-bold text-navy-900">{transaction.type || 'wallet'}</p>
-          <p className="text-xs text-muted-foreground">{transaction.description || 'تراکنش کیف پول'}</p>
-        </div>
-      </div>
-      <div className="text-left">
-        <p className={`font-black ${transaction.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>{transaction.amount} گرم</p>
-        <p className="text-xs text-muted-foreground">{transaction.createdAt}</p>
-      </div>
-    </div>
-  )
-}
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <div className="card p-5"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-50 text-amber-700">{icon}</span><div><p className="text-sm text-stone-600">{label}</p><p className="mt-1 text-xl font-black text-stone-950">{value}</p></div></div></div> }
+function TabButton({ active, onClick, children, id }: { active: boolean; onClick: () => void; children: React.ReactNode; id: string }) { return <button id={id} type="button" role="tab" aria-selected={active} onClick={onClick} className={`btn min-h-11 ${active ? 'btn-primary' : 'btn-outline'}`}>{children}</button> }
+function WalletTransactionRow({ transaction }: { transaction: WalletTransaction }) { const positive = transaction.amount >= 0; return <article className="flex flex-col gap-3 rounded-2xl border border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-2xl ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}><ArrowDownUp className="h-5 w-5" aria-hidden="true" /></span><div><p className="font-bold text-stone-950">{transaction.type || 'تراکنش کیف پول'}</p><p className="mt-1 text-xs text-stone-600">{transaction.description || 'تغییر موجودی حساب'}</p></div></div><div className="text-right sm:text-left"><p className={`font-black ${positive ? 'text-emerald-700' : 'text-red-700'}`}>{positive ? '+' : ''}{transaction.amount} گرم</p><time className="mt-1 block text-xs text-stone-500" dateTime={transaction.createdAt}>{new Date(transaction.createdAt).toLocaleString('fa-IR')}</time></div></article> }
+function SecurityCard() { return <aside className="card p-5 sm:p-7"><h2 className="text-xl font-black text-stone-950">امنیت مالی</h2><div className="mt-5 space-y-3 text-sm leading-7 text-stone-600">{['تغییرات کیف پول به‌صورت تراکنش قابل ردیابی ثبت می‌شود.','موجودی طلای دیجیتال منفی نمی‌شود.','مبلغ واقعی همیشه از سرور خوانده می‌شود.'].map((text) => <div key={text} className="flex gap-3 rounded-2xl bg-stone-100 p-4"><ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" /><p>{text}</p></div>)}</div></aside> }
+function LoadingState() { return <div className="container mx-auto px-4 pb-16 pt-32"><div className="card flex min-h-64 flex-col items-center justify-center gap-3" role="status"><Loader2 className="h-8 w-8 animate-spin text-amber-700" aria-hidden="true" /><p className="text-sm text-stone-600">در حال دریافت اطلاعات کیف پول…</p></div></div> }
+function StateCard({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) { return <div className="container mx-auto px-4 pb-16 pt-32"><div className="card mx-auto flex max-w-xl flex-col items-center gap-4 p-8 text-center"><ShieldCheck className="h-10 w-10 text-amber-700" aria-hidden="true" /><h1 className="text-2xl font-black">{title}</h1><p className="text-sm leading-7 text-stone-600">{description}</p>{action}</div></div> }
+function EmptyState({ title, description }: { title: string; description: string }) { return <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-10 text-center"><p className="font-bold text-stone-900">{title}</p><p className="mt-2 text-sm text-stone-600">{description}</p></div> }

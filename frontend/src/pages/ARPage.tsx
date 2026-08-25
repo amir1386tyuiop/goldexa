@@ -1,4 +1,7 @@
 import { Camera, Sparkles, Smartphone } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/api/client'
+import type { ArModel } from '@/types'
 
 const arSteps = [
   {
@@ -19,12 +22,18 @@ const arSteps = [
 ]
 
 export function ARPage() {
+  const { data: models = [], isLoading, isError } = useQuery<ArModel[]>({
+    queryKey: ['ar-models'],
+    queryFn: api.getArModels,
+    initialData: [],
+  })
+
   return (
     <div className="pt-20 pb-16">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h1 className="text-3xl md:text-4xl font-black text-navy-900 mb-4">
-            📷 پرو مجازی طلا با واقعیت افزوده
+            پرو مجازی طلا با واقعیت افزوده
           </h1>
           <p className="text-muted-foreground leading-relaxed">
             قبل از خرید، طلا را روی بدن خود ببینید و بررسی کنید.
@@ -45,15 +54,20 @@ export function ARPage() {
         </div>
 
         <div className="card p-8 text-center">
-          <div className="text-6xl mb-4">🔮</div>
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gold-50 text-gold-700" aria-hidden="true"><Sparkles className="h-8 w-8" /></div>
           <h2 className="text-2xl font-bold mb-4">این قابلیت در فاز ۲ فعال می‌شود</h2>
           <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
             تکنولوژی WebAR با MediaPipe برای تشخیص اعضای بدن و نمایش مدل‌های سه‌بعدی طلا
             با فریم‌ریت حداقل ۲۵ FPS روی گوشی‌های میان‌رده
           </p>
-          <button className="px-8 py-3 rounded-xl bg-gold-500 text-white font-bold hover:bg-gold-600 transition-all">
+          <button type="button" className="btn btn-primary min-h-11" disabled>
             اطلاع‌رسانی زمان فعال‌سازی
           </button>
+          <div className="mt-6 text-right" aria-live="polite">
+            {isLoading ? <p className="text-sm text-muted-foreground">در حال بررسی مدل‌های AR...</p> : null}
+            {isError ? <p role="alert" className="text-sm text-red-700">مدل‌های AR فعلاً در دسترس نیستند.</p> : null}
+            {!isLoading && !isError && models.length > 0 ? <p className="text-sm text-muted-foreground">{models.length} مدل برای فعال‌سازی آینده آماده است.</p> : null}
+          </div>
         </div>
       </div>
     </div>

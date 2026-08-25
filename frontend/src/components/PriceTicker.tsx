@@ -10,13 +10,6 @@ const priceLabels: Record<string, string> = {
   gold18: 'طلای ۱۸ عیار',
 }
 
-const priceIcons: Record<string, string> = {
-  mizaneh: '📊',
-  coin: '🪙',
-  ounce: '🌍',
-  gold18: '🏆',
-}
-
 export function PriceTicker() {
   const { data: goldPrices = [] } = useGoldPrices()
   const { data: status } = useGoldPricingStatus()
@@ -34,7 +27,7 @@ export function PriceTicker() {
           </div>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             {isLive ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-            منبع: {status?.source || 'mock'}
+            منبع: {status?.source || 'نامشخص'}
           </span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3.5 w-3.5" />
@@ -48,7 +41,7 @@ export function PriceTicker() {
               key={price.type}
               className="flex items-center gap-3 rounded-2xl border border-border bg-gradient-to-br from-gray-50 to-white p-3 transition hover:border-gold-200 hover:shadow-soft"
             >
-              <div className="text-2xl">{priceIcons[price.type]}</div>
+              <div className="rounded-xl bg-amber-50 p-2 text-amber-700"><TrendingUp className="h-5 w-5" aria-hidden="true" /></div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">{priceLabels[price.type]}</p>
                 <p className="truncate font-black text-navy-900">

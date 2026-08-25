@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { AiDesignRecommendation, AiMarketMatch, AiPricePrediction, AiServiceMetric } from '@/types'
 import { Navigate } from 'react-router-dom'
+import { getStoredAuth } from '@/auth'
 
 export function AiEnginePage() {
   return (
@@ -32,7 +33,7 @@ export function AdminOnlyAiEnginePage() {
 }
 
 export function AiEnginePanel({ insidePage = true }: { insidePage?: boolean }) {
-  const defaultUserId = '11111111-1111-1111-1111-111111111111'
+  const userId = getStoredAuth()?.user.id || ''
   const queryClient = useQueryClient()
 
   const invalidateAi = (keys: string[][]) => {
@@ -40,12 +41,12 @@ export function AiEnginePanel({ insidePage = true }: { insidePage?: boolean }) {
   }
 
   const rerunPredictions = useMutation({
-    mutationFn: () => api.rerunAiPredictions(defaultUserId),
+    mutationFn: () => api.rerunAiPredictions(userId),
     onSuccess: () => invalidateAi([['ai-predictions']]),
   })
 
   const rerunRecommendations = useMutation({
-    mutationFn: () => api.rerunAiRecommendations(defaultUserId),
+    mutationFn: () => api.rerunAiRecommendations(userId),
     onSuccess: () => invalidateAi([['ai-recommendations']]),
   })
 
@@ -60,20 +61,22 @@ export function AiEnginePanel({ insidePage = true }: { insidePage?: boolean }) {
   })
 
   const rerunAll = useMutation({
-    mutationFn: () => api.rerunAiAll(defaultUserId),
+    mutationFn: () => api.rerunAiAll(userId),
     onSuccess: () => invalidateAi([['ai-predictions'], ['ai-recommendations'], ['ai-matches'], ['ai-metrics']]),
   })
 
   const { data: predictions = [] } = useQuery<AiPricePrediction[]>({
-    queryKey: ['ai-predictions', defaultUserId],
-    queryFn: () => api.getAiPredictions(defaultUserId),
+    queryKey: ['ai-predictions', userId],
+    queryFn: () => api.getAiPredictions(userId),
     initialData: [],
+    enabled: Boolean(userId),
   })
 
   const { data: recommendations = [] } = useQuery<AiDesignRecommendation[]>({
-    queryKey: ['ai-recommendations', defaultUserId],
-    queryFn: () => api.getAiRecommendations(defaultUserId),
+    queryKey: ['ai-recommendations', userId],
+    queryFn: () => api.getAiRecommendations(userId),
     initialData: [],
+    enabled: Boolean(userId),
   })
 
   const { data: matches = [] } = useQuery<AiMarketMatch[]>({

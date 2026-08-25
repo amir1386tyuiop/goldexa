@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { ShoppingCart, X } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { cn } from '@/lib/utils'
 import { formatPrice } from '@/utils/helpers'
@@ -39,23 +39,31 @@ export function CartDrawer() {
       {isCartOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+          aria-label="بستن سبد خرید"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => { if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') toggleCart() }}
           onClick={toggleCart}
         />
       )}
 
       <aside
+        role="dialog"
+        aria-modal="true"
+        aria-hidden={!isCartOpen}
+        aria-labelledby="cart-drawer-title"
         className={cn(
-          "fixed top-0 left-0 bottom-0 z-50 w-[420px] max-w-[90vw] bg-white shadow-2xl transform transition-transform duration-300",
-          isCartOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed top-0 right-0 bottom-0 z-50 w-[420px] max-w-[92vw] bg-white shadow-2xl transform transition-transform duration-300",
+          isCartOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-border p-5">
             <div>
-              <h2 className="text-lg font-bold">🛒 سبد خرید</h2>
+              <h2 id="cart-drawer-title" className="text-lg font-bold">سبد خرید</h2>
               <p className="text-sm text-muted-foreground">{count} محصول</p>
             </div>
-            <button onClick={toggleCart} className="p-2 hover:bg-gold-50 rounded-xl transition-all">
+            <button aria-label="بستن سبد خرید" onClick={toggleCart} className="min-h-11 min-w-11 p-2 hover:bg-gold-50 rounded-xl transition-all">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -63,7 +71,7 @@ export function CartDrawer() {
           <div className="flex-1 overflow-y-auto p-4">
             {cart.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
-                <div className="text-5xl mb-4">🛒</div>
+                <ShoppingCart className="mb-4 h-12 w-12 text-amber-700" aria-hidden="true" />
                 <p className="text-lg font-medium">سبد خرید خالی است</p>
                 <p className="text-sm mt-2">محصولات مورد نظر خود را اضافه کنید</p>
               </div>
@@ -87,14 +95,16 @@ export function CartDrawer() {
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                          className="h-7 w-7 rounded-lg border border-border hover:bg-gold-50 transition-all"
+                          aria-label={`کاهش تعداد ${item.product.name}`}
+                          className="h-9 w-9 rounded-lg border border-border hover:bg-gold-50 transition-all"
                         >
                           -
                         </button>
                         <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                          className="h-7 w-7 rounded-lg border border-border hover:bg-gold-50 transition-all"
+                          aria-label={`افزایش تعداد ${item.product.name}`}
+                          className="h-9 w-9 rounded-lg border border-border hover:bg-gold-50 transition-all"
                         >
                           +
                         </button>
@@ -102,7 +112,8 @@ export function CartDrawer() {
                     </div>
                     <button
                       onClick={() => removeFromCart(item.product.id)}
-                      className="text-red-500 hover:text-red-700 text-xs font-medium self-start"
+                      aria-label={`حذف ${item.product.name} از سبد`}
+                      className="min-h-11 text-red-500 hover:text-red-700 text-xs font-medium self-start"
                     >
                       حذف
                     </button>

@@ -48,8 +48,8 @@ function ProductSection({
 }
 
 export function HomePage() {
-  const { data: feed } = useHomeFeed()
-  const { data: auctions = [] } = useQuery<Auction[]>({
+  const { data: feed, isLoading: isFeedLoading, isError: isFeedError } = useHomeFeed()
+  const { data: auctions = [], isLoading: isAuctionsLoading, isError: isAuctionsError } = useQuery<Auction[]>({
     queryKey: ['home-auctions'],
     queryFn: api.getActiveAuctions,
   })
@@ -95,6 +95,20 @@ export function HomePage() {
         </section>
       )}
 
+      {(isAuctionsLoading || isAuctionsError) && (
+        <section className="page-shell py-8" aria-live="polite">
+          {isAuctionsLoading ? (
+            <div className="grid gap-4 md:grid-cols-3" role="status" aria-label="در حال بارگذاری مزایده‌ها">
+              {[1, 2, 3].map((item) => <div key={item} className="h-56 animate-pulse rounded-3xl bg-muted" />)}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+              بارگذاری مزایده‌ها با مشکل روبه‌رو شد. لطفاً بعداً دوباره تلاش کنید.
+            </p>
+          )}
+        </section>
+      )}
+
       <ProductSection
         title="منتخب"
         subtitle="محصولات ویژه"
@@ -113,6 +127,23 @@ export function HomePage() {
         icon={<Tag className="h-4 w-4" />}
         products={feed?.discounted ?? []}
       />
+      {isFeedLoading && (
+        <section className="page-shell py-12" role="status" aria-label="در حال بارگذاری محصولات">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((item) => <div key={item} className="h-96 animate-pulse rounded-3xl bg-muted" />)}
+          </div>
+        </section>
+      )}
+      {isFeedError && (
+        <p className="page-shell py-8 text-sm text-red-800" role="alert">
+          دریافت محصولات فعلاً ممکن نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید.
+        </p>
+      )}
+      {!isFeedLoading && !isFeedError && feed && !feed.featured.length && !feed.newProducts.length && !feed.discounted.length && (
+        <p className="page-shell py-12 text-center text-muted-foreground" role="status">
+          هنوز محصولی برای نمایش وجود ندارد.
+        </p>
+      )}
     </div>
   )
 }

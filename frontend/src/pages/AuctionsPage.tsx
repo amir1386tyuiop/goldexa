@@ -1,18 +1,16 @@
-import { useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Clock, Gavel, Plus, Search, Star, TrendingUp, UserCheck } from 'lucide-react'
 import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { Auction, AuctionBid, Product, UsedGoldListing } from '@/types'
+import { getStoredAuth } from '@/auth'
 
-const defaultUserId = '11111111-1111-1111-1111-111111111111'
-
-const defaultBidder: AuctionBid = {
+const emptyBidder: AuctionBid = {
   id: '',
   auctionId: '',
-  bidderId: defaultUserId,
-  bidderName: 'داود احمدی',
+  bidderId: '',
+  bidderName: '',
   amount: 0,
   isWinning: false,
   createdAt: '',
@@ -22,9 +20,10 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
   const [activeTab, setActiveTab] = useState(initialTab)
   const [search, setSearch] = useState('')
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null)
-  const [bidForm, setBidForm] = useState(defaultBidder)
+  const auth = getStoredAuth()
+  const [bidForm, setBidForm] = useState({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
 
-  const { data: auctions = [] } = useQuery<Auction[]>({
+  const { data: auctions = [], isLoading: auctionsLoading, isError: auctionsError } = useQuery<Auction[]>({
     queryKey: ['auctions'],
     queryFn: api.getAuctions,
     initialData: [],
@@ -36,7 +35,7 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
     initialData: [],
   })
 
-  const { data: listings = [] } = useQuery<UsedGoldListing[]>({
+  const { data: listings = [], isLoading: listingsLoading, isError: listingsError } = useQuery<UsedGoldListing[]>({
     queryKey: ['used-gold-listings'],
     queryFn: () => api.getUsedGoldListings(),
     initialData: [],
@@ -106,7 +105,7 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
               <div className="card p-5">
                 <div className="relative">
                   <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
+                  <input aria-label="جستجوی مزایده یا آگهی"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     className="input pr-10"
@@ -115,15 +114,19 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 </div>
               </div>
 
-              {activeTab === 'auctions' ? (
+              {activeTab === 'auctions' && auctionsLoading ? <LoadingState label="در حال بارگذاری مزایده‌ها..." /> : null}
+              {activeTab === 'marketplace' && listingsLoading ? <LoadingState label="در حال بارگذاری آگهی‌ها..." /> : null}
+              {activeTab === 'auctions' && auctionsError ? <ErrorState label="دریافت مزایده‌ها ناموفق بود." /> : null}
+              {activeTab === 'marketplace' && listingsError ? <ErrorState label="دریافت آگهی‌ها ناموفق بود." /> : null}
+              {activeTab === 'auctions' && !auctionsLoading && !auctionsError ? (
                 <AuctionList
                   auctions={filteredAuctions}
                   selectedAuction={selectedAuction}
                   onSelect={setSelectedAuction}
                 />
-              ) : (
+              ) : activeTab === 'marketplace' && !listingsLoading && !listingsError ? (
                 <ListingList listings={filteredListings} />
-              )}
+              ) : null}
             </div>
 
             <aside className="space-y-6">
@@ -134,13 +137,13 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 minimumBid={minimumBid}
                 onBidChange={setBidForm}
                 onSubmitBid={() => {
-                  if (!selectedAuction) return
+                  if (!selectedAuction || !auth) return
                   api.placeAuctionBid(selectedAuction.id, {
                     bidderId: bidForm.bidderId,
                     bidderName: bidForm.bidderName,
                     amount: bidForm.amount,
                   })
-                  setBidForm(defaultBidder)
+                  setBidForm({ ...emptyBidder, bidderId: auth.user.id, bidderName: auth.user.name })
                 }}
               />
               <AuctionRulesPanel />
@@ -155,6 +158,8 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
 function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
         active ? 'bg-navy-900 text-white' : 'bg-white text-muted-foreground hover:bg-gold-50'
@@ -332,8 +337,8 @@ function AuctionDetailPanel({
 
 function CreateListingPanel({ products }: { products: Product[] }) {
   const [form, setForm] = useState({
-    sellerId: defaultUserId,
-    sellerName: 'داود احمدی',
+    sellerId: getStoredAuth()?.user.id || '',
+    sellerName: getStoredAuth()?.user.name || '',
     productId: products[0]?.id || '',
     title: '',
     description: '',
@@ -466,6 +471,14 @@ function EmptyState({ title, description }: { title: string; description: string
       <p className="text-sm text-muted-foreground">{description}</p>
     </div>
   )
+}
+
+function LoadingState({ label }: { label: string }) {
+  return <div role="status" className="card p-10 text-center text-muted-foreground">{label}</div>
+}
+
+function ErrorState({ label }: { label: string }) {
+  return <div role="alert" className="card border-red-200 bg-red-50 p-6 text-center text-red-800">{label}</div>
 }
 
 function getAuctionStatusText(status: string): string {

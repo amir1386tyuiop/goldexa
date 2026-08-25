@@ -18,9 +18,7 @@ import {
 import { api, type CreateAuctionInput, type PlaceAuctionBidInput } from '@/api/client'
 import type { Auction, AuctionBid } from '@/types'
 import { formatPrice, getAuctionPaymentText, getAuctionStatusBadge, getAuctionStatusText } from '@/utils/helpers'
-
-const defaultUserId = '11111111-1111-1111-1111-111111111111'
-const defaultUserName = 'داود احمدی'
+import { getStoredAuth } from '@/auth'
 
 export function AuctionPage() {
   const queryClient = useQueryClient()
@@ -29,10 +27,11 @@ export function AuctionPage() {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null)
   const [bidAmount, setBidAmount] = useState('')
   const [createPanelOpen, setCreatePanelOpen] = useState(false)
+  const auth = getStoredAuth()
   const [createAuction, setCreateAuction] = useState<CreateAuctionInput>({
     productId: '',
-    sellerId: defaultUserId,
-    sellerName: defaultUserName,
+    sellerId: auth?.user.id || '',
+    sellerName: auth?.user.name || '',
     startingPrice: 0,
     reservePrice: null,
     minimumBidIncrement: 500000,
@@ -60,8 +59,8 @@ export function AuctionPage() {
       setCreatePanelOpen(false)
       setCreateAuction({
         productId: '',
-        sellerId: defaultUserId,
-        sellerName: defaultUserName,
+        sellerId: auth?.user.id || '',
+        sellerName: auth?.user.name || '',
         startingPrice: 0,
         reservePrice: null,
         minimumBidIncrement: 500000,
@@ -84,8 +83,8 @@ export function AuctionPage() {
   const settleAuctionMutation = useMutation({
     mutationFn: ({ auctionId, amount }: { auctionId: string; amount: number }) =>
       api.settleAuction(auctionId, {
-        winnerId: defaultUserId,
-        winnerName: defaultUserName,
+        winnerId: auth?.user.id || null,
+        winnerName: auth?.user.name || null,
         amount,
       }),
     onSuccess: () => {
@@ -231,8 +230,8 @@ export function AuctionPage() {
                     placeBidMutation.mutate({
                       auctionId: selectedAuction.id,
                       body: {
-                        bidderId: defaultUserId,
-                        bidderName: defaultUserName,
+            bidderId: auth?.user.id || '',
+            bidderName: auth?.user.name || '',
                         amount: Number(bidAmount),
                       },
                     })

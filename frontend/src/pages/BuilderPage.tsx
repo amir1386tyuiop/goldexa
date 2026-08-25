@@ -5,13 +5,12 @@ import { Diamond, Hammer, Plus, Search, Sparkles, Wand2 } from 'lucide-react'
 import { api, type CreateCustomBuilderQuoteInput, type CreateJewelryDesignInput } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { GemstoneLibrary, JewelryDesign } from '@/types'
-
-const defaultUserId = '11111111-1111-1111-1111-111111111111'
-const defaultUserName = 'داود احمدی'
+import { getStoredAuth } from '@/auth'
 
 export function BuilderPage() {
   const [activeTab, setActiveTab] = useState<'designs' | 'create' | 'gemstones' | 'quote'>('designs')
   const [search, setSearch] = useState('')
+  const auth = getStoredAuth()
 
   const { data: designs = [] } = useQuery<JewelryDesign[]>({
     queryKey: ['jewelry-designs'],
@@ -40,8 +39,8 @@ export function BuilderPage() {
     const totalPrice = Number(formData.get('totalPrice'))
 
     api.createJewelryDesign({
-      userId: defaultUserId,
-      userName: defaultUserName,
+      userId: auth?.user.id || '',
+      userName: auth?.user.name || '',
       title: String(formData.get('title')),
       category: formData.get('category') as CreateJewelryDesignInput['category'],
       baseType: String(formData.get('baseType')),
@@ -65,7 +64,7 @@ export function BuilderPage() {
     if (!latestDesign) return
 
     const quote: CreateCustomBuilderQuoteInput = {
-      userId: defaultUserId,
+      userId: auth?.user.id || '',
       designId: latestDesign.id,
       goldPriceSnapshot: latestDesign.estimatedGoldPrice,
       goldWeight: latestDesign.weight,

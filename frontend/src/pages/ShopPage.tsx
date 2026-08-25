@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Filter, Search, Sparkles } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, Filter, RotateCcw, Search, Sparkles } from 'lucide-react'
 import { ProductCard } from '@/components/ProductCard'
 import { getCategoryName } from '@/utils/helpers'
 import { api } from '@/api/client'
@@ -43,7 +43,7 @@ export function ShopPage() {
     [search, category, sortBy, page, karat],
   )
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['products-paginated', queryParams],
     queryFn: () => api.getProductsPaginated(queryParams),
     placeholderData: (prev) => prev,
@@ -76,28 +76,39 @@ export function ShopPage() {
             <div className="relative lg:col-span-5">
               <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <input
+                id="shop-search"
                 type="text"
                 placeholder="جستجوی محصول، دسته یا توضیحات..."
+                aria-label="جستجوی محصول"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                className="input pr-12"
+                className="input w-full pr-12 focus-visible:ring-2 focus-visible:ring-gold-500"
               />
             </div>
-            <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className="input lg:col-span-2">
+            <label className="lg:col-span-2">
+              <span className="sr-only">دسته‌بندی</span>
+              <select aria-label="دسته‌بندی" value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className="input w-full focus-visible:ring-2 focus-visible:ring-gold-500">
               {categories.map((cat) => (
                 <option key={cat.id || 'all'} value={cat.id}>{cat.name}</option>
               ))}
-            </select>
-            <select value={karat} onChange={(e) => { setKarat(e.target.value); setPage(1) }} className="input lg:col-span-2">
+              </select>
+            </label>
+            <label className="lg:col-span-2">
+              <span className="sr-only">عیار</span>
+              <select aria-label="عیار" value={karat} onChange={(e) => { setKarat(e.target.value); setPage(1) }} className="input w-full focus-visible:ring-2 focus-visible:ring-gold-500">
               <option value="">همه عیارها</option>
               <option value="18">۱۸ عیار</option>
               <option value="24">۲۴ عیار</option>
-            </select>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input lg:col-span-3">
+              </select>
+            </label>
+            <label className="lg:col-span-3">
+              <span className="sr-only">مرتب‌سازی</span>
+              <select aria-label="مرتب‌سازی محصولات" value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input w-full focus-visible:ring-2 focus-visible:ring-gold-500">
               {sortOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>{opt.label}</option>
               ))}
-            </select>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -113,12 +124,24 @@ export function ShopPage() {
         {isLoading ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="card h-80 animate-pulse bg-gray-100" />
+              <div key={i} aria-hidden="true" className="card h-80 animate-pulse bg-gray-100" />
             ))}
+          </div>
+        ) : isError ? (
+          <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-6 py-14 text-center">
+            <AlertCircle className="mx-auto mb-4 h-10 w-10 text-red-600" aria-hidden="true" />
+            <h2 className="text-xl font-black text-red-900">دریافت محصولات با مشکل مواجه شد</h2>
+            <p className="mt-2 text-red-800/80">لطفاً اتصال خود را بررسی کنید و دوباره تلاش کنید.</p>
+            <button type="button" onClick={() => void refetch()} className="btn btn-outline mt-6 inline-flex items-center gap-2 border-red-300 text-red-800 hover:bg-red-100 focus-visible:ring-2 focus-visible:ring-red-500">
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              تلاش دوباره
+            </button>
           </div>
         ) : products.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border bg-gray-50 py-16 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gold-100 text-3xl">🔍</div>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gold-100 text-gold-700">
+              <Search className="h-7 w-7" aria-hidden="true" />
+            </div>
             <h3 className="text-xl font-black text-navy-900">محصولی یافت نشد</h3>
             <p className="mt-2 text-muted-foreground">فیلترها را تغییر دهید یا پیشنهادهای زیر را ببینید</p>
             {suggestions.length > 0 && (
@@ -146,6 +169,7 @@ export function ShopPage() {
               <div className="mt-10 flex items-center justify-center gap-3">
                 <button
                   type="button"
+                  aria-label="صفحه قبلی"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                   className="btn btn-outline px-4 py-2 disabled:opacity-40"
@@ -157,6 +181,7 @@ export function ShopPage() {
                 </span>
                 <button
                   type="button"
+                  aria-label="صفحه بعدی"
                   disabled={page >= pages}
                   onClick={() => setPage((p) => p + 1)}
                   className="btn btn-outline px-4 py-2 disabled:opacity-40"

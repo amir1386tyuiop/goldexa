@@ -1,188 +1,32 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import type { Location } from 'react-router-dom'
+import { LockKeyhole, ShieldCheck, Smartphone, UserCheck, Loader2, ArrowLeft } from 'lucide-react'
 import { api } from '@/api/client'
 import type { UserRole } from '@/types'
-import { Lock, Smartphone, ShieldCheck, UserCheck } from 'lucide-react'
-import type { Location } from 'react-router-dom'
 
-const testRoles: { label: string; role: UserRole; phone: string; description: string }[] = [
-  { label: 'خریدار تستی', role: 'buyer', phone: '09120000001', description: 'داشبورد خرید و صندوقچه' },
-  { label: 'فروشنده تستی', role: 'seller', phone: '09120000002', description: 'داشبورد محصولات و سفارش‌ها' },
-  { label: 'طراح تستی', role: 'designer', phone: '09120000003', description: 'داشبورد طراحی اختصاصی' },
-  { label: 'ادمین تستی', role: 'admin', phone: '09120000000', description: 'داشبورد مدیریت پلتفرم' },
-  { label: 'کارشناس تستی', role: 'expert', phone: '09120000004', description: 'داشبورد بررسی و تایید' },
-  { label: 'کاربر ویژه تستی', role: 'premium', phone: '09120000005', description: 'داشبورد امکانات ویژه' },
-  { label: 'رهبر خرید گروهی', role: 'group_buyer', phone: '09120000006', description: 'داشبورد خرید گروهی' },
+const roles: { value: UserRole; label: string }[] = [
+  { value: 'buyer', label: 'خریدار' }, { value: 'seller', label: 'فروشنده' },
+  { value: 'designer', label: 'طراح' }, { value: 'admin', label: 'مدیر سیستم' }, { value: 'expert', label: 'کارشناس' },
+  { value: 'premium', label: 'کاربر ویژه' }, { value: 'group_buyer', label: 'خرید گروهی' },
 ]
 
 export function LoginPage() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [role, setRole] = useState<UserRole>('buyer')
-  const [phone, setPhone] = useState(testRoles[0]?.phone || '')
-  const [otp, setOtp] = useState('')
-  const [generatedOtp, setGeneratedOtp] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const selectedRole = testRoles.find((item) => item.role === role)
+  const navigate = useNavigate(); const location = useLocation()
+  const [role, setRole] = useState<UserRole>('buyer'); const [phone, setPhone] = useState(''); const [otp, setOtp] = useState('')
+  const [otpRequested, setOtpRequested] = useState(false); const [error, setError] = useState(''); const [loading, setLoading] = useState<'otp' | 'login' | null>(null)
   const redirectLocation = (location.state as { from?: Location } | null)?.from
+  const normalizedPhone = phone.replace(/\D/g, '').slice(0, 11)
 
-  useEffect(() => {
-    const matched = testRoles.find((item) => item.role === role)
-    if (matched) {
-      setPhone(matched.phone)
-    }
-  }, [role])
+  async function requestOtp(event: FormEvent) { event.preventDefault(); if (normalizedPhone.length < 10) { setError('شماره موبایل را به‌صورت معتبر وارد کنید.'); return } setError(''); setLoading('otp'); try { await api.requestOtp(normalizedPhone, role); setOtpRequested(true) } catch (e) { setError((e as { message?: string })?.message || 'ارسال کد ورود ناموفق بود.') } finally { setLoading(null) } }
+  async function login(event: FormEvent) { event.preventDefault(); if (!otpRequested || otp.length < 4) { setError('ابتدا کد ارسال‌شده را وارد کنید.'); return } setError(''); setLoading('login'); try { await api.loginWithOtp(normalizedPhone, otp, role); const destination = redirectLocation?.pathname ? `${redirectLocation.pathname}${redirectLocation.search}${redirectLocation.hash}` : '/dashboard'; navigate(destination, { replace: true }) } catch (e) { setError((e as { message?: string })?.message || 'کد ورود معتبر نیست یا منقضی شده است.') } finally { setLoading(null) } }
 
-  async function handleRequestOtp(event: FormEvent) {
-    event.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      const response = await api.requestOtp(phone, role)
-      setGeneratedOtp(response.otp)
-    } catch (error) {
-      setError((error as { message?: string })?.message || 'درخواست OTP با خطا مواجه شد.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleLogin(event: FormEvent) {
-    event.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      await api.loginWithOtp(phone, otp, role)
-      const destination = redirectLocation?.pathname
-        ? `${redirectLocation.pathname}${redirectLocation.search}${redirectLocation.hash}`
-        : role === 'admin' ? '/admin' : '/dashboard'
-      navigate(destination, { replace: true })
-    } catch (error) {
-      setError((error as { message?: string })?.message || 'کد OTP یا نقش انتخاب‌شده معتبر نیست.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-950 via-navy-900 to-gold-700 pt-24 pb-12">
-      <div className="container mx-auto px-4">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 lg:grid-cols-2">
-          <div className="text-white">
-            <div className="mb-6 flex items-center gap-3">
-              <ShieldCheck className="h-10 w-10 text-gold-300" />
-              <div>
-                <p className="text-sm text-gold-200">Goldexa Secure Access</p>
-                <h1 className="text-3xl font-black">ورود امن با OTP</h1>
-              </div>
-            </div>
-            <p className="text-lg leading-9 text-white/80">
-              برای محیط لوکال، کد OTP بعد از زدن دکمه «درخواست OTP» همین‌جا نمایش داده می‌شود. هر شماره تست فقط اجازه ورود به داشبورد نقش خودش را دارد.
-            </p>
-            <div className="mt-8 grid gap-4">
-              {testRoles.map((item) => (
-                <button
-                  key={item.role}
-                  onClick={() => setRole(item.role)}
-                  className={`rounded-2xl border p-4 text-right transition ${
-                    role === item.role ? 'border-gold-300 bg-white/10' : 'border-white/10 bg-white/5'
-                  }`}
-                >
-                  <p className="font-bold text-white">{item.label}</p>
-                  <p className="mt-1 text-sm text-white/70">{item.phone}</p>
-                  <p className="mt-1 text-xs text-white/50">{item.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="card p-6 lg:p-8">
-            <div className="mb-6 flex items-center gap-3">
-              <Lock className="h-8 w-8 text-gold-600" />
-              <div>
-                <h2 className="text-2xl font-black">ورود به سامانه</h2>
-                <p className="text-sm text-muted-foreground">نقش و شماره تستی انتخاب‌شده</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleRequestOtp} className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium">نقش مورد نظر</span>
-                <select
-                  value={role}
-                  onChange={(event) => setRole(event.target.value as UserRole)}
-                  className="input"
-                >
-                  {testRoles.map((item) => (
-                    <option key={item.role} value={item.role}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium">شماره موبایل</span>
-                <div className="relative">
-                  <Smartphone className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    className="input pr-10"
-                    inputMode="tel"
-                  />
-                </div>
-              </label>
-
-              <button disabled={loading} className="btn btn-primary w-full">
-                درخواست OTP
-              </button>
-            </form>
-
-            {generatedOtp && (
-              <div className="mt-5 rounded-2xl border border-gold-200 bg-gold-50 p-4">
-                <p className="text-sm text-muted-foreground">کد OTP تولیدشده برای {phone}</p>
-                <p className="mt-2 text-center text-4xl font-black tracking-[0.8em] text-navy-950">{generatedOtp}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleLogin} className="mt-6 space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium">کد OTP</span>
-                <div className="relative">
-                  <UserCheck className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={otp}
-                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="input pr-10 text-center tracking-[0.5em] font-black"
-                    inputMode="numeric"
-                    maxLength={6}
-                  />
-                </div>
-              </label>
-
-              <button disabled={loading || !otp} className="btn btn-primary w-full">
-                ورود به سامانه
-              </button>
-            </form>
-
-            {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-
-            {selectedRole && (
-              <div className="mt-6 rounded-2xl bg-navy-50 p-4 text-sm text-muted-foreground">
-                <p>
-                  <span className="font-bold text-navy-900">{selectedRole.label} تستی:</span> {selectedRole.phone}
-                </p>
-                <p className="mt-1">نقش انتخاب‌شده با شماره موبایل تطبیق داده می‌شود و فقط همان داشبورد باز می‌شود.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <main className="min-h-screen bg-stone-950 px-4 py-10 text-stone-950 sm:py-16"><div className="mx-auto grid max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-stone-50 shadow-2xl lg:grid-cols-[0.9fr_1.1fr]">
+    <section className="relative overflow-hidden bg-stone-900 p-8 text-white sm:p-12"><div className="relative flex h-full flex-col justify-between gap-12"><div><div className="mb-8 flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-600"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span><div><p className="text-sm text-amber-300">Goldexa</p><p className="font-semibold">ورود امن به دارایی شما</p></div></div><p className="mb-3 text-sm font-semibold text-amber-300">حساب شما، همیشه تحت کنترل شما</p><h1 className="max-w-md text-4xl font-black leading-tight sm:text-5xl">با اطمینان وارد بازار طلا شوید.</h1><p className="mt-5 max-w-md leading-8 text-stone-300">برای ورود، شماره موبایل خود را ثبت کنید. کد یک‌بارمصرف از مسیر امن حساب کاربری برای شما ارسال می‌شود.</p></div><div className="grid gap-3 text-sm text-stone-300 sm:grid-cols-2">{['احراز هویت دومرحله‌ای','حفاظت از تراکنش‌های مالی','دسترسی یکپارچه به سفارش‌ها','پشتیبانی از نقش‌های مختلف'].map((item) => <div key={item} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3"><ShieldCheck className="h-4 w-4 text-amber-300" aria-hidden="true" />{item}</div>)}</div></div></section>
+    <section className="p-6 sm:p-12" aria-labelledby="login-title"><div className="mx-auto max-w-md"><p className="text-sm font-semibold text-amber-700">ورود به حساب</p><h2 id="login-title" className="mt-2 text-3xl font-black tracking-tight">شروع امن و سریع</h2><p className="mt-3 text-sm leading-7 text-stone-600">شماره موبایل و نقش حساب خود را وارد کنید.</p><div className="mt-8 space-y-5">
+      <form onSubmit={requestOtp} className="space-y-5" noValidate><div><label htmlFor="login-role" className="mb-2 block text-sm font-semibold">نوع حساب</label><select id="login-role" value={role} onChange={(e) => setRole(e.target.value as UserRole)} className="input w-full" disabled={loading !== null}>{roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div><div><label htmlFor="login-phone" className="mb-2 block text-sm font-semibold">شماره موبایل</label><div className="relative"><Smartphone className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" aria-hidden="true" /><input id="login-phone" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} className="input w-full pr-11" inputMode="tel" autoComplete="tel" placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷" required /></div><p className="mt-2 text-xs text-stone-500">شماره موبایل بدون فاصله وارد شود.</p></div><button type="submit" disabled={loading !== null} className="btn btn-primary flex min-h-11 w-full items-center justify-center gap-2">{loading === 'otp' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{loading === 'otp' ? 'در حال ارسال…' : 'دریافت کد ورود'}</button></form>
+      {otpRequested && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="status">کد ورود ارسال شد. کد دریافت‌شده را وارد کنید.</div>}
+      <form onSubmit={login} className="space-y-5 border-t border-stone-200 pt-5" noValidate><div><label htmlFor="login-otp" className="mb-2 block text-sm font-semibold">کد یک‌بارمصرف</label><div className="relative"><UserCheck className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" aria-hidden="true" /><input id="login-otp" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} className="input w-full pr-11 text-center font-black tracking-[0.45em]" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••" required disabled={!otpRequested} /></div></div><button type="submit" disabled={loading !== null || !otpRequested || otp.length < 4} className="btn btn-secondary flex min-h-11 w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">{loading === 'login' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{loading === 'login' ? 'در حال ورود…' : 'ورود به حساب'}</button></form>
+    </div>{error && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800" role="alert">{error}</p>}<button type="button" onClick={() => navigate('/')} className="mt-8 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-stone-600 transition hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2"><ArrowLeft className="h-4 w-4" aria-hidden="true" />بازگشت به صفحه اصلی</button><p className="mt-6 flex items-center gap-2 text-xs text-stone-500"><LockKeyhole className="h-4 w-4" aria-hidden="true" />اطلاعات ورود شما رمزنگاری و محافظت می‌شود.</p></div></section>
+  </div></main>
 }
