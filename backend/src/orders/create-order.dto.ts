@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsObject, IsOptional, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class CreateOrderItemDto {
@@ -6,6 +6,7 @@ export class CreateOrderItemDto {
   productId: string
 
   @IsNumber()
+  @IsInt()
   @Min(1)
   quantity: number
 }
@@ -55,4 +56,14 @@ export class CreateOrderDto {
 
   @IsEnum(PaymentMethodBody)
   paymentMethod: PaymentMethodBody
+
+  /** Optional five-minute server-issued pricing reservation. */
+  @IsOptional()
+  @IsString()
+  quoteId?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  quoteIds?: string[]
 }

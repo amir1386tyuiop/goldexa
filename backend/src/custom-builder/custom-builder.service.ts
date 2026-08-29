@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import {
@@ -34,15 +34,17 @@ export class CustomBuilderService {
   ) {}
 
   async findDesigns(): Promise<JewelryDesign[]> {
-    return this.designRepository.find({ order: { createdAt: 'DESC' } })
+    return this.designRepository.find({ where: { status: JewelryDesignStatus.APPROVED }, order: { createdAt: 'DESC' } })
   }
 
   async findDesignsByUser(userId: string): Promise<JewelryDesign[]> {
     return this.designRepository.findBy({ userId })
   }
 
-  async findDesign(id: string): Promise<JewelryDesign | null> {
-    return this.designRepository.findOneBy({ id })
+  async findDesign(id: string, userId?: string, isAdmin = false): Promise<JewelryDesign | null> {
+    const design = await this.designRepository.findOneBy({ id })
+    if (design && userId && !isAdmin && design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
+    return design
   }
 
   async createDesign(data: CreateJewelryDesignDto): Promise<JewelryDesign> {
@@ -63,25 +65,29 @@ export class CustomBuilderService {
       profit: data.profit ?? 0,
       tax: data.tax ?? 9,
       totalPrice: data.totalPrice ?? 0,
-      status: (data.status as JewelryDesignStatus | undefined) || JewelryDesignStatus.DRAFT,
+      status: JewelryDesignStatus.DRAFT,
     })
 
     return this.designRepository.save(design)
   }
 
-  async findDesignVersions(designId: string): Promise<JewelryDesignVersion[]> {
+  async findDesignVersions(designId: string, userId?: string, isAdmin = false): Promise<JewelryDesignVersion[]> {
+    await this.assertDesignOwner(designId, userId, isAdmin)
     return this.versionRepository.findBy({ designId })
   }
 
   async createDesignVersion(
     designId: string,
     data: CreateJewelryDesignVersionDto,
+    userId?: string,
+    isAdmin = false,
   ): Promise<JewelryDesignVersion> {
     const design = await this.designRepository.findOneBy({ id: designId })
 
     if (!design) {
       throw new NotFoundException('طرح یافت نشد')
     }
+    if (userId && !isAdmin && design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
 
     const version = this.versionRepository.create({
       designId,
@@ -96,12 +102,13 @@ export class CustomBuilderService {
     return this.versionRepository.save(version)
   }
 
-  async updateDesignStatus(id: string, status: string): Promise<JewelryDesign | null> {
+  async updateDesignStatus(id: string, status: string, userId?: string, isAdmin = false): Promise<JewelryDesign | null> {
     const design = await this.designRepository.findOneBy({ id })
 
     if (!design) {
       throw new NotFoundException('طرح یافت نشد')
     }
+    if (userId && !isAdmin && design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
 
     design.status = status as JewelryDesignStatus
     return this.designRepository.save(design)
@@ -139,19 +146,27 @@ export class CustomBuilderService {
         profit: data.profit ?? 0,
         tax: data.tax ?? 9,
         expiresAt: data.expiresAt ?? null,
-        status: (data.status as CustomBuilderQuoteStatus | undefined) || CustomBuilderQuoteStatus.DRAFT,
+        status: CustomBuilderQuoteStatus.DRAFT,
       }),
     )
   }
 
-  async updateQuoteStatus(id: string, status: string): Promise<CustomBuilderQuote | null> {
+  async updateQuoteStatus(id: string, status: string, userId?: string, isAdmin = false): Promise<CustomBuilderQuote | null> {
     const quote = await this.quoteRepository.findOneBy({ id })
 
     if (!quote) {
       throw new NotFoundException('پیش‌فاکتور یافت نشد')
     }
+    if (userId && !isAdmin && quote.userId !== userId) throw new ForbiddenException('به این پیش‌فاکتور دسترسی ندارید')
 
     quote.status = status as CustomBuilderQuoteStatus
     return this.quoteRepository.save(quote)
+  }
+
+  private async assertDesignOwner(designId: string, userId?: string, isAdmin = false): Promise<void> {
+    if (!userId || isAdmin) return
+    const design = await this.designRepository.findOneBy({ id: designId })
+    if (!design) throw new NotFoundException('طرح یافت نشد')
+    if (design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
   }
 }

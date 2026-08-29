@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
+import type { Request } from 'express'
+import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
+import { AdminGuard } from '../common/guards/admin.guard'
 import { SubscriptionsService } from './subscriptions.service'
 import {
   CreateDiscountCodeDto,
@@ -16,18 +19,21 @@ export class SubscriptionsController {
   }
 
   @Post('plans')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createPlan(@Body() body: CreateSubscriptionPlanDto) {
     return this.subscriptionsService.createPlan(body)
   }
 
   @Get('users/:userId')
-  async findUserSubscriptions(@Param('userId') userId: string) {
-    return this.subscriptionsService.findUserSubscriptions(userId)
+  @UseGuards(JwtAuthGuard)
+  async findUserSubscriptions(@Req() req: Request & { user: JwtUser }) {
+    return this.subscriptionsService.findUserSubscriptions(req.user.sub)
   }
 
   @Post('users')
-  async createUserSubscription(@Body() body: CreateUserSubscriptionDto) {
-    return this.subscriptionsService.createUserSubscription(body)
+  @UseGuards(JwtAuthGuard)
+  async createUserSubscription(@Body() body: CreateUserSubscriptionDto, @Req() req: Request & { user: JwtUser }) {
+    return this.subscriptionsService.createUserSubscription({ ...body, userId: req.user.sub })
   }
 
   @Get('discounts')
@@ -36,6 +42,7 @@ export class SubscriptionsController {
   }
 
   @Post('discounts')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createDiscount(@Body() body: CreateDiscountCodeDto) {
     return this.subscriptionsService.createDiscount(body)
   }

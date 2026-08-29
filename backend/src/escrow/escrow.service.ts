@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { DataSource, Repository } from 'typeorm'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
 import { MarketplaceRating } from './marketplace-rating.entity'
 import {
@@ -9,6 +9,7 @@ import {
   UsedGoldListingStatus,
 } from '../marketplace/used-gold-listing.entity'
 import { Auction, AuctionStatus } from '../auctions/auction.entity'
+import { WalletService } from '../wallet/wallet.service'
 import {
   CreateEscrowPaymentDto,
   CreateMarketplaceRatingDto,
@@ -26,6 +27,8 @@ export class EscrowService {
     private listingRepository: Repository<UsedGoldListing>,
     @InjectRepository(Auction)
     private auctionRepository: Repository<Auction>,
+    private readonly dataSource: DataSource,
+    private readonly walletService: WalletService,
   ) {}
 
   async findPayments(): Promise<EscrowPayment[]> {
@@ -123,12 +126,6 @@ export class EscrowService {
     id: string,
     data: UpdateEscrowStatusDto,
   ): Promise<EscrowPayment | null> {
-    const payment = await this.escrowRepository.findOneBy({ id })
-
-    if (!payment) {
-      throw new NotFoundException('پرداخت امانی یافت نشد')
-    }
-
     const transitions: Record<EscrowPaymentStatus, EscrowPaymentStatus[]> = {
       [EscrowPaymentStatus.INITIATED]: [EscrowPaymentStatus.HELD, EscrowPaymentStatus.CANCELLED],
       [EscrowPaymentStatus.HELD]: [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.DISPUTED],
@@ -137,14 +134,36 @@ export class EscrowService {
       [EscrowPaymentStatus.REFUNDED]: [],
       [EscrowPaymentStatus.CANCELLED]: [],
     }
-    const nextStatus = data.status as EscrowPaymentStatus
-    if (!transitions[payment.status].includes(nextStatus)) {
-      throw new BadRequestException(`انتقال وضعیت escrow از ${payment.status} به ${nextStatus} مجاز نیست`)
-    }
+    const existingPayment = await this.escrowRepository.findOneBy({ id })
+    if (!existingPayment) throw new NotFoundException('پرداخت امانی یافت نشد')
+    await this.walletService.ensureWalletForUser(existingPayment.buyerId)
+    await this.walletService.ensureWalletForUser(existingPayment.sellerId)
+    return this.dataSource.transaction(async (manager) => {
+      const payment = await manager.findOne(EscrowPayment, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!payment) throw new NotFoundException('پرداخت امانی یافت نشد')
 
-    payment.status = nextStatus
-    payment.trackingCode = data.trackingCode ?? payment.trackingCode
-    return this.escrowRepository.save(payment)
+      const nextStatus = data.status as EscrowPaymentStatus
+      if (!transitions[payment.status].includes(nextStatus)) {
+        throw new BadRequestException(`انتقال وضعیت escrow از ${payment.status} به ${nextStatus} مجاز نیست`)
+      }
+
+      if (nextStatus === EscrowPaymentStatus.HELD) {
+        await this.walletService.holdEscrow(payment.buyerId, payment.id, Number(payment.amount), manager)
+      } else if (nextStatus === EscrowPaymentStatus.RELEASED) {
+        const sellerAmount = Math.max(0, Number(payment.amount) - Number(payment.fee ?? 0))
+        if (sellerAmount <= 0) throw new BadRequestException('مبلغ قابل پرداخت به فروشنده نامعتبر است')
+        await this.walletService.releaseEscrow(payment.sellerId, payment.id, sellerAmount, manager)
+      } else if (nextStatus === EscrowPaymentStatus.REFUNDED) {
+        await this.walletService.refundEscrow(payment.buyerId, payment.id, Number(payment.amount), manager)
+      }
+
+      payment.status = nextStatus
+      payment.trackingCode = data.trackingCode ?? payment.trackingCode
+      return manager.save(payment)
+    })
   }
 
   async findRatings(): Promise<MarketplaceRating[]> {

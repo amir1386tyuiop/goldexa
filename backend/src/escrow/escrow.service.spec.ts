@@ -1,17 +1,21 @@
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { BadRequestException, ForbiddenException } from '@nestjs/common'
+import { DataSource } from 'typeorm'
 import { EscrowService } from './escrow.service'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
 import { MarketplaceRating } from './marketplace-rating.entity'
 import { UsedGoldListing, UsedGoldListingStatus, UsedGoldListingSaleType } from '../marketplace/used-gold-listing.entity'
 import { Auction, AuctionStatus } from '../auctions/auction.entity'
+import { WalletService } from '../wallet/wallet.service'
 
 describe('EscrowService security boundaries', () => {
   let service: EscrowService
   let escrowRepository: { find: jest.Mock; findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock }
   let listingRepository: { findOneBy: jest.Mock }
   let auctionRepository: { findOneBy: jest.Mock }
+  let walletService: { ensureWalletForUser: jest.Mock; holdEscrow: jest.Mock; releaseEscrow: jest.Mock; refundEscrow: jest.Mock }
+  let dataSource: { transaction: jest.Mock }
 
   beforeEach(async () => {
     escrowRepository = {
@@ -22,6 +26,18 @@ describe('EscrowService security boundaries', () => {
     }
     listingRepository = { findOneBy: jest.fn() }
     auctionRepository = { findOneBy: jest.fn() }
+    walletService = {
+      ensureWalletForUser: jest.fn(),
+      holdEscrow: jest.fn(),
+      releaseEscrow: jest.fn(),
+      refundEscrow: jest.fn(),
+    }
+    dataSource = {
+      transaction: jest.fn(async (callback) => callback({
+        findOne: jest.fn(async (_entity, options) => escrowRepository.findOneBy(options.where)),
+        save: jest.fn(async (value) => value),
+      })),
+    }
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -30,6 +46,8 @@ describe('EscrowService security boundaries', () => {
         { provide: getRepositoryToken(MarketplaceRating), useValue: { find: jest.fn(), findBy: jest.fn(), create: jest.fn(), save: jest.fn() } },
         { provide: getRepositoryToken(UsedGoldListing), useValue: listingRepository },
         { provide: getRepositoryToken(Auction), useValue: auctionRepository },
+        { provide: DataSource, useValue: dataSource },
+        { provide: WalletService, useValue: walletService },
       ],
     }).compile()
 
@@ -97,12 +115,34 @@ describe('EscrowService security boundaries', () => {
   })
 
   it('allows only explicitly defined status transitions', async () => {
-    escrowRepository.findOneBy.mockResolvedValue({ id: 'escrow-1', status: EscrowPaymentStatus.INITIATED })
+    escrowRepository.findOneBy.mockResolvedValue({
+      id: 'escrow-1', status: EscrowPaymentStatus.INITIATED,
+      buyerId: 'buyer-1', sellerId: 'seller-1', amount: 100, fee: 5,
+    })
     await expect(service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.RELEASED }))
       .rejects.toThrow('مجاز نیست')
 
-    escrowRepository.findOneBy.mockResolvedValue({ id: 'escrow-1', status: EscrowPaymentStatus.HELD })
+    escrowRepository.findOneBy.mockResolvedValue({
+      id: 'escrow-1', status: EscrowPaymentStatus.HELD,
+      buyerId: 'buyer-1', sellerId: 'seller-1', amount: 100, fee: 5,
+    })
     await expect(service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.RELEASED }))
       .resolves.toMatchObject({ status: EscrowPaymentStatus.RELEASED })
+    expect(walletService.releaseEscrow).toHaveBeenCalledWith('seller-1', 'escrow-1', 95, expect.anything())
+  })
+
+  it('applies wallet hold and refund exactly once across escrow transitions', async () => {
+    const payment = {
+      id: 'escrow-1', status: EscrowPaymentStatus.INITIATED,
+      buyerId: 'buyer-1', sellerId: 'seller-1', amount: 100, fee: 0,
+    }
+    escrowRepository.findOneBy.mockResolvedValue(payment)
+
+    await service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.HELD })
+    expect(walletService.holdEscrow).toHaveBeenCalledWith('buyer-1', 'escrow-1', 100, expect.anything())
+
+    payment.status = EscrowPaymentStatus.HELD
+    await service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.REFUNDED })
+    expect(walletService.refundEscrow).toHaveBeenCalledWith('buyer-1', 'escrow-1', 100, expect.anything())
   })
 })

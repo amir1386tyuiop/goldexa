@@ -11,11 +11,13 @@ import { OrderStatusHistory } from './order-status-history.entity'
 import { Refund } from './refund.entity'
 import { Shipment } from './shipment.entity'
 import { WalletModule } from '../wallet/wallet.module'
+import { PricingModule } from '../pricing/pricing.module'
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, Product, User, OrderCancellation, Invoice, OrderStatusHistory, Refund, Shipment]),
     WalletModule,
+    PricingModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

@@ -8,6 +8,7 @@ import { Order, OrderStatus } from '../orders/order.entity'
 import { OrderTrackingEvent } from './order-tracking-event.entity'
 import { ZarinpalService } from './zarinpal.service'
 import { AuditLogger } from '../common/audit-logger.service'
+import { PricingService } from '../pricing/pricing.service'
 
 describe('PaymentsService financial flow', () => {
   const order = {
@@ -40,6 +41,7 @@ describe('PaymentsService financial flow', () => {
   let zarinpal: { requestPayment: jest.Mock; verifyPayment: jest.Mock }
   let dataSource: { transaction: jest.Mock }
   let audit: { record: jest.Mock }
+  let pricingService: { requireValidQuote: jest.Mock }
   type TestManager = { findOne: jest.Mock; save: jest.Mock }
 
   beforeEach(async () => {
@@ -67,6 +69,9 @@ describe('PaymentsService financial flow', () => {
       })),
     }
     audit = { record: jest.fn(async () => undefined) }
+    pricingService = {
+      requireValidQuote: jest.fn(async () => ({ quoteId: 'Q-1', valid: true, total: 12_340 })),
+    }
     dataSource = {
       transaction: jest.fn(async (callback: (manager: TestManager) => unknown) =>
         callback({
@@ -86,6 +91,7 @@ describe('PaymentsService financial flow', () => {
         { provide: DataSource, useValue: dataSource },
         { provide: ConfigService, useValue: { get: jest.fn(() => 'true') } },
         { provide: AuditLogger, useValue: audit },
+        { provide: PricingService, useValue: pricingService },
       ],
     }).compile()
 
@@ -147,5 +153,40 @@ describe('PaymentsService financial flow', () => {
     expect(first.status).toBe('paid')
     expect(second.status).toBe('paid')
     expect(transaction.status).toBe(PaymentTransactionStatus.PAID)
+  })
+
+  it('validates the server quote before contacting ZarinPal', async () => {
+    const result = (await service.requestPayment(
+      { userId: 'user-1', orderId: 'order-1', quoteId: 'Q-1', amount: 12_340 },
+      'user-1',
+    )) as { transaction: PaymentTransaction }
+
+    expect(pricingService.requireValidQuote).toHaveBeenCalledWith('Q-1')
+    expect(zarinpal.requestPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 12_340 }))
+    expect(result.transaction.amount).toBe(12_340)
+  })
+
+  it('rejects a quote amount mismatch before contacting ZarinPal', async () => {
+    pricingService.requireValidQuote.mockResolvedValueOnce({ quoteId: 'Q-bad', valid: true, total: 99 })
+
+    await expect(
+      service.requestPayment(
+        { userId: 'user-1', orderId: 'order-1', quoteId: 'Q-bad', amount: 12_340 },
+        'user-1',
+      ),
+    ).rejects.toThrow('مبلغ پرداخت با قیمت رزرو شده مطابقت ندارد')
+    expect(zarinpal.requestPayment).not.toHaveBeenCalled()
+  })
+
+  it('does not reuse an idempotency key for a different order or amount', async () => {
+    transactionRepository.findOneBy.mockResolvedValueOnce({ ...transaction, orderId: 'other-order' })
+
+    await expect(
+      service.requestPayment(
+        { userId: 'user-1', orderId: 'order-1', amount: 12_340, idempotencyKey: 'idem-1' },
+        'user-1',
+      ),
+    ).rejects.toThrow('کلید idempotency قبلاً برای درخواست دیگری استفاده شده است')
+    expect(zarinpal.requestPayment).not.toHaveBeenCalled()
   })
 })

@@ -15,10 +15,45 @@ export function CheckoutPage() {
   const { cart, clearCart, getCartTotal, showToast } = useStore(); const [paymentMethod, setPaymentMethod] = useState<'online' | 'wallet'>('online'); const [address, setAddress] = useState<Address>(blankAddress); const [completedOrder, setCompletedOrder] = useState<Order | null>(null); const [validationError, setValidationError] = useState('')
   const addressesQuery = useQuery({ queryKey: ['addresses', userId], queryFn: () => api.getUserAddresses(userId), enabled: Boolean(userId) })
   useEffect(() => { const defaultAddress = addressesQuery.data?.find((item) => item.isDefault) || addressesQuery.data?.[0]; if (defaultAddress) setAddress({ id: defaultAddress.id, title: 'آدرس ارسال', province: defaultAddress.province, city: defaultAddress.city, street: defaultAddress.street, postalCode: defaultAddress.postalCode || '', isDefault: defaultAddress.isDefault }) }, [addressesQuery.data])
-  const createOrder = useMutation({ mutationFn: api.createOrder, onSuccess: (order) => { setCompletedOrder(order); clearCart() }, onError: (error) => { showToast((error as { message?: string })?.message || 'ثبت سفارش ناموفق بود.', 'error') } })
+  const createOrder = useMutation({
+    mutationFn: async (input: Parameters<typeof api.createOrder>[0]) => {
+      const order = await api.createOrder(input)
+      if (input.paymentMethod === 'online') {
+        const payment = await api.requestOnlinePayment({
+          userId,
+          orderId: order.id,
+          amount: Number(order.totalAmount),
+          idempotencyKey: `order-${order.id}`,
+          description: `پرداخت سفارش ${order.orderNumber || order.id}`,
+        })
+        return { order, payment }
+      }
+      return { order, payment: null }
+    },
+    onSuccess: ({ order, payment }) => {
+      clearCart()
+      if (payment?.paymentUrl && !payment.mock) {
+        window.location.assign(payment.paymentUrl)
+        return
+      }
+      setCompletedOrder(order)
+    },
+    onError: (error) => { showToast((error as { message?: string })?.message || 'ثبت سفارش ناموفق بود.', 'error') },
+  })
   const total = getCartTotal(); const shippingCost = total > 50000000 ? 0 : 180000; const finalTotal = total + shippingCost; const hasExpiredItem = useMemo(() => cart.some((item) => new Date(item.reservedUntil).getTime() <= Date.now()), [cart])
   const updateAddress = (key: keyof Address, value: string) => setAddress((current) => ({ ...current, [key]: value }))
-  function submit() { if (!userId) { setValidationError('برای ثبت سفارش باید وارد حساب کاربری شوید.'); return } if (!cart.length || createOrder.isPending) return; if (!address.province || !address.city || !address.street || address.postalCode.length < 5) { setValidationError('استان، شهر، آدرس کامل و کد پستی را تکمیل کنید.'); return } setValidationError(''); createOrder.mutate({ userId, items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })), shippingCost, address, paymentMethod }) }
+  async function submit() {
+    if (!userId) { setValidationError('برای ثبت سفارش باید وارد حساب کاربری شوید.'); return }
+    if (!cart.length || createOrder.isPending) return
+    if (!address.province || !address.city || !address.street || address.postalCode.length < 5) { setValidationError('استان، شهر، آدرس کامل و کد پستی را تکمیل کنید.'); return }
+    setValidationError('')
+    try {
+      const quotes = await Promise.all(cart.map((item) => api.createPricingQuote(item.product.category, item.product.weight)))
+      createOrder.mutate({ userId, items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })), shippingCost, address, paymentMethod, quoteIds: quotes.map((quote) => quote.quoteId) })
+    } catch (error) {
+      setValidationError((error as { message?: string })?.message || 'رزرو قیمت سفارش ناموفق بود؛ دوباره تلاش کنید.')
+    }
+  }
 
   if (!userId) return <State title="ورود لازم است" description="برای ادامه تسویه‌حساب ابتدا وارد حساب کاربری شوید." action={<button className="btn btn-primary" onClick={() => navigate('/login')}>ورود به حساب</button>} />
   if (completedOrder) return <main className="bg-stone-50 pb-16 pt-32"><div className="container mx-auto px-4"><div className="card mx-auto max-w-2xl p-8 text-center"><CheckCircle2 className="mx-auto h-16 w-16 text-emerald-700" aria-hidden="true" /><h1 className="mt-5 text-3xl font-black">سفارش با موفقیت ثبت شد</h1><p className="mt-3 text-stone-600">کد سفارش: <strong className="text-stone-950">#{completedOrder.orderNumber || completedOrder.id.slice(0, 8)}</strong></p><div className="mt-7 grid gap-3 text-right sm:grid-cols-2"><Info label="مبلغ پرداختی" value={`${formatPrice(completedOrder.totalAmount)} تومان`} /><Info label="روش پرداخت" value={completedOrder.paymentMethod === 'online' ? 'آنلاین' : 'کیف پول'} /></div><button className="btn btn-primary mt-7 w-full" onClick={() => navigate('/orders')}>مشاهده سفارش‌ها</button></div></div></main>

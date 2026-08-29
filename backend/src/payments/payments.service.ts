@@ -15,6 +15,7 @@ import {
   UpdatePaymentTransactionDto,
   VerifyPaymentDto,
 } from './create-payment.dto'
+import { PricingService } from '../pricing/pricing.service'
 
 @Injectable()
 export class PaymentsService {
@@ -32,6 +33,7 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
     private readonly audit: AuditLogger,
+    private readonly pricingService: PricingService,
   ) {}
 
   /**
@@ -89,9 +91,31 @@ export class PaymentsService {
       }
     }
 
+    if (data.quoteId) {
+      let quote
+      try {
+        quote = await this.pricingService.requireValidQuote(data.quoteId)
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'قیمت رزرو شده نامعتبر است')
+      }
+      const quotedAmount = Number(quote.total)
+      if (!Number.isFinite(quotedAmount) || quotedAmount <= 0) {
+        throw new BadRequestException('مبلغ قیمت رزرو شده نامعتبر است')
+      }
+      if (quotedAmount !== authoritativeAmount) {
+        throw new BadRequestException('مبلغ پرداخت با قیمت رزرو شده مطابقت ندارد')
+      }
+    }
+
     if (data.idempotencyKey) {
-      const existing = await this.transactionRepository.findOneBy({ idempotencyKey: data.idempotencyKey })
+      const existing = await this.transactionRepository.findOneBy({
+        idempotencyKey: data.idempotencyKey,
+        userId,
+      })
       if (existing) {
+        if (existing.orderId !== (data.orderId ?? null) || Number(existing.amount) !== authoritativeAmount) {
+          throw new BadRequestException('کلید idempotency قبلاً برای درخواست دیگری استفاده شده است')
+        }
         return this.paymentResponse(existing, true)
       }
     }
@@ -118,9 +142,15 @@ export class PaymentsService {
       if (!this.isUniqueViolation(error) || !data.idempotencyKey) {
         throw error
       }
-      const existing = await this.transactionRepository.findOneBy({ idempotencyKey: data.idempotencyKey })
+      const existing = await this.transactionRepository.findOneBy({
+        idempotencyKey: data.idempotencyKey,
+        userId,
+      })
       if (!existing) {
         throw error
+      }
+      if (existing.orderId !== (data.orderId ?? null) || Number(existing.amount) !== authoritativeAmount) {
+        throw new BadRequestException('کلید idempotency قبلاً برای درخواست دیگری استفاده شده است')
       }
       return this.paymentResponse(existing, true)
     }
@@ -162,27 +192,31 @@ export class PaymentsService {
    * Verify a returned payment. Idempotent: a transaction already marked PAID is
    * returned as-is without re-crediting or re-marking the order.
    */
-  async verifyPayment(data: VerifyPaymentDto) {
-    const inFlight = this.verificationInFlight.get(data.authority)
+  async verifyPayment(data: VerifyPaymentDto, authenticatedUserId?: string) {
+    const verificationKey = `${data.authority}:${authenticatedUserId ?? 'callback'}`
+    const inFlight = this.verificationInFlight.get(verificationKey)
     if (inFlight) {
       return inFlight
     }
 
-    const operation = this.verifyPaymentInternal(data)
-    this.verificationInFlight.set(data.authority, operation)
+    const operation = this.verifyPaymentInternal(data, authenticatedUserId)
+    this.verificationInFlight.set(verificationKey, operation)
     try {
       return await operation
     } finally {
-      if (this.verificationInFlight.get(data.authority) === operation) {
-        this.verificationInFlight.delete(data.authority)
+      if (this.verificationInFlight.get(verificationKey) === operation) {
+        this.verificationInFlight.delete(verificationKey)
       }
     }
   }
 
-  private async verifyPaymentInternal(data: VerifyPaymentDto) {
+  private async verifyPaymentInternal(data: VerifyPaymentDto, authenticatedUserId?: string) {
     const transaction = await this.transactionRepository.findOneBy({ authority: data.authority })
     if (!transaction) {
       throw new NotFoundException('تراکنش پرداخت یافت نشد')
+    }
+    if (authenticatedUserId && transaction.userId !== authenticatedUserId) {
+      throw new ForbiddenException('به این تراکنش دسترسی ندارید')
     }
 
     if (transaction.status === PaymentTransactionStatus.PAID) {
@@ -270,12 +304,19 @@ export class PaymentsService {
     })
   }
 
-  async findTransactions(): Promise<PaymentTransaction[]> {
-    return this.transactionRepository.find({ order: { createdAt: 'DESC' } })
+  async findTransactions(userId?: string, isAdmin = false): Promise<PaymentTransaction[]> {
+    return this.transactionRepository.find({
+      where: isAdmin || !userId ? {} : { userId },
+      order: { createdAt: 'DESC' },
+    })
   }
 
-  async findTransaction(id: string): Promise<PaymentTransaction | null> {
-    return this.transactionRepository.findOneBy({ id })
+  async findTransaction(id: string, userId?: string, isAdmin = false): Promise<PaymentTransaction | null> {
+    const transaction = await this.transactionRepository.findOneBy({ id })
+    if (transaction && userId && !isAdmin && transaction.userId !== userId) {
+      throw new ForbiddenException('به این تراکنش دسترسی ندارید')
+    }
+    return transaction
   }
 
   async createTransaction(data: CreatePaymentTransactionDto): Promise<PaymentTransaction> {
@@ -311,14 +352,24 @@ export class PaymentsService {
     return this.transactionRepository.save(transaction)
   }
 
-  async findOrderTracking(orderId: string): Promise<OrderTrackingEvent[]> {
+  async findOrderTracking(orderId: string, userId?: string, isAdmin = false): Promise<OrderTrackingEvent[]> {
+    if (!isAdmin && userId) {
+      const order = await this.orderRepository.findOneBy({ id: orderId, userId })
+      if (!order) throw new ForbiddenException('به رهگیری این سفارش دسترسی ندارید')
+    }
     return this.trackingRepository.findBy({ orderId })
   }
 
   async createTrackingEvent(
     orderId: string,
     data: CreateOrderTrackingEventDto,
+    userId?: string,
+    isAdmin = false,
   ): Promise<OrderTrackingEvent> {
+    if (!isAdmin && userId) {
+      const order = await this.orderRepository.findOneBy({ id: orderId, userId })
+      if (!order) throw new ForbiddenException('به این سفارش دسترسی ندارید')
+    }
     return this.trackingRepository.save(
       this.trackingRepository.create({
         ...data,

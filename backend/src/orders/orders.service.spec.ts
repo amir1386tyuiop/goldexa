@@ -8,6 +8,7 @@ describe('OrdersService wallet checkout', () => {
   let queryRunner: any
   let service: OrdersService
   let walletService: any
+  let pricingService: any
 
   beforeEach(() => {
     const orderDraft: any = { id: 'order-1' }
@@ -24,6 +25,7 @@ describe('OrdersService wallet checkout', () => {
       },
     }
     walletService = { payOrderWithWallet: jest.fn(async () => ({ id: 'wallet-tx-1' })) }
+    pricingService = { requireValidQuote: jest.fn(async () => ({ quoteId: 'Q-1', valid: true, total: 110 })) }
     const orderRepository: any = {
       manager: { connection: { createQueryRunner: jest.fn(() => queryRunner) } },
     }
@@ -38,6 +40,7 @@ describe('OrdersService wallet checkout', () => {
       {} as any,
       {} as any,
       walletService,
+      pricingService,
     )
   })
 
@@ -77,5 +80,24 @@ describe('OrdersService wallet checkout', () => {
 
     expect(walletService.payOrderWithWallet).not.toHaveBeenCalled()
     expect(queryRunner.commitTransaction).toHaveBeenCalled()
+  })
+
+  it('accepts an unexpired server quote only when it matches the authoritative order total', async () => {
+    await service.createOrder({ ...orderInput, quoteId: 'Q-1' }, 'user-1')
+
+    expect(pricingService.requireValidQuote).toHaveBeenCalledWith('Q-1')
+    expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ totalAmount: 110 }),
+    )
+  })
+
+  it('rejects a quote whose locked total differs from the server-computed order total', async () => {
+    pricingService.requireValidQuote.mockResolvedValueOnce({ quoteId: 'Q-2', valid: true, total: 999 })
+
+    await expect(service.createOrder({ ...orderInput, quoteId: 'Q-2' }, 'user-1')).rejects.toThrow(
+      'مبلغ سفارش با قیمت رزرو شده مطابقت ندارد',
+    )
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled()
   })
 })

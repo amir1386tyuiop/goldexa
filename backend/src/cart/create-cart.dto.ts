@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
 
 export class CreateCartDto {
   @IsOptional()
@@ -16,24 +16,30 @@ export class AddCartItemDto {
   productId: string
 
   @IsOptional()
-  @IsString()
-  name: string
-
-  @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(1)
   quantity?: number
 
+  /**
+   * Legacy client fields are accepted for backwards compatibility, but the
+   * service deliberately ignores them and reads the authoritative values
+   * from the locked product row.
+   */
   @IsOptional()
-  @IsNumber()
-  unitPrice: number
+  @IsString()
+  name?: string
 
   @IsOptional()
-  reservedUntil?: Date | null
+  @IsNumber()
+  unitPrice?: number
+
+  @IsOptional()
+  @IsString()
+  reservedUntil?: string
 }
 
 export class UpdateCartItemQuantityDto {
-  @IsNumber()
+  @IsInt()
   @Min(1)
   quantity: number
 }

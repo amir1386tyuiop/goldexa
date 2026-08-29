@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SmartVaultAsset } from './smart-vault-asset.entity'
@@ -25,8 +25,12 @@ export class SmartVaultService {
     return this.assetRepository.findBy({ userId })
   }
 
-  async findAsset(id: string): Promise<SmartVaultAsset | null> {
-    return this.assetRepository.findOneBy({ id })
+  async findAsset(id: string, userId: string, isAdmin = false): Promise<SmartVaultAsset | null> {
+    const asset = await this.assetRepository.findOneBy({ id })
+    if (asset && !isAdmin && asset.userId !== userId) {
+      throw new ForbiddenException('به این دارایی دسترسی ندارید')
+    }
+    return asset
   }
 
   async createAsset(data: CreateSmartVaultAssetDto): Promise<SmartVaultAsset> {
@@ -43,11 +47,18 @@ export class SmartVaultService {
     return this.assetRepository.save(asset)
   }
 
-  async findSnapshots(assetId: string): Promise<AssetValuationSnapshot[]> {
+  async findSnapshots(assetId: string, userId: string, isAdmin = false): Promise<AssetValuationSnapshot[]> {
+    const asset = await this.assetRepository.findOneBy({ id: assetId })
+    if (asset && !isAdmin && asset.userId !== userId) {
+      throw new ForbiddenException('به این دارایی دسترسی ندارید')
+    }
     return this.snapshotRepository.findBy({ assetId })
   }
 
   async createSnapshot(data: CreateAssetSnapshotDto): Promise<AssetValuationSnapshot> {
+    const asset = await this.assetRepository.findOneBy({ id: data.assetId })
+    if (!asset) throw new NotFoundException('دارایی یافت نشد')
+    if (asset.userId !== data.userId) throw new ForbiddenException('به این دارایی دسترسی ندارید')
     return this.snapshotRepository.save(this.snapshotRepository.create(data))
   }
 
@@ -68,11 +79,14 @@ export class SmartVaultService {
     return this.alertRepository.save(alert)
   }
 
-  async disableAlert(id: string): Promise<PriceAlert | null> {
+  async disableAlert(id: string, userId: string, isAdmin = false): Promise<PriceAlert | null> {
     const alert = await this.alertRepository.findOneBy({ id })
 
     if (!alert) {
       throw new NotFoundException('هشدار قیمت یافت نشد')
+    }
+    if (!isAdmin && alert.userId !== userId) {
+      throw new ForbiddenException('به این هشدار دسترسی ندارید')
     }
 
     alert.isActive = false

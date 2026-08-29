@@ -22,7 +22,7 @@ export class UsersController {
   // Public: registration.
   @Post()
   async create(@Body() body: CreateUserDto) {
-    return this.usersService.createUser(body)
+    return this.usersService.createUser({ ...body, role: UserRole.BUYER, level: UserLevel.STANDARD })
   }
 
   // API spec §4: current user's profile, resolved from the JWT.

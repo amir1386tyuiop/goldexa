@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { PricingService } from './pricing.service'
 import { AdminGuard } from '../common/guards/admin.guard'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -69,7 +69,11 @@ export class PricingController {
     @Param('category') category: string,
     @Query('goldWeight') goldWeight?: string,
   ) {
-    return this.pricingService.calculate(category, Number(goldWeight) || 1)
+    const weight = Number(goldWeight)
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw new BadRequestException('وزن طلا نامعتبر است')
+    }
+    return this.pricingService.calculate(category, weight)
   }
 
   @Post('calculate/:category')

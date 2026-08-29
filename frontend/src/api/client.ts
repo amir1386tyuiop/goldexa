@@ -1674,6 +1674,8 @@ export const api = {
   registerUser: (body: { name: string; phone: string; email?: string; role?: UserRole }) => registerUser(body),
   getGoldPrices: () => request<GoldPrice[]>('/gold-pricing'),
   getGoldPricingStatus: () => request<GoldPricingStatus>('/gold-pricing/status'),
+  createPricingQuote: (category: string, goldWeight: number) =>
+    request<{ quoteId: string; total: number; expiresAt: string }>('/pricing/quote/' + category, { method: 'POST', body: { goldWeight } }),
   getProductsPaginated: (params?: Record<string, string>) => fetchProductsPaginated(params),
   getProductsHome: () => request<ProductsHomeFeed>('/products/home'),
   getProductSuggestions: (category?: string, limit = 8) => {
@@ -1813,6 +1815,8 @@ export const api = {
   getOrders: () => request<Order[]>('/orders'),
   getOrdersByUser: (userId: string) => request<Order[]>(`/orders/user/${userId}`),
   createOrder: (body: CreateOrderInput) => request<Order>('/orders', { method: 'POST', body }),
+  requestOnlinePayment: (body: RequestPaymentInput) =>
+    request<{ paymentUrl: string | null; authority: string | null; mock?: boolean }>('/payments/zarinpal/request', { method: 'POST', body }),
   getAdminStats: () =>
     request<{
       totalUsers: number
@@ -1883,6 +1887,16 @@ export interface CreateOrderInput {
     isDefault: boolean
   }
   paymentMethod: 'online' | 'wallet'
+  quoteIds?: string[]
+}
+
+export interface RequestPaymentInput {
+  userId: string
+  orderId: string
+  amount: number
+  quoteId?: string
+  idempotencyKey: string
+  description?: string
 }
 
 export interface CreateAuctionInput {

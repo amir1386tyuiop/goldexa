@@ -75,6 +75,12 @@ export class WalletService {
     }
   }
 
+  /** Ensures internal modules can prepare a wallet before an atomic ledger flow. */
+  async ensureWalletForUser(userId: string): Promise<void> {
+    if (!userId) throw new BadRequestException('شناسه کاربر نامعتبر است')
+    await this.ensureWallet(userId)
+  }
+
   private getSpreadPercent(): number {
     const value = Number(this.configService.get<string>('GOLD_TRADE_SPREAD_PERCENT'))
     return Number.isFinite(value) && value >= 0 ? value : 2
@@ -128,13 +134,35 @@ export class WalletService {
     // The wallet row lock serializes payments for the same user. Checking the
     // order reference while holding that lock makes retries idempotent without
     // ever charging the same order twice.
-    if ((params.type === WalletTransactionType.PAYMENT || params.type === WalletTransactionType.REFUND) && params.orderId) {
+    if (
+      (params.type === WalletTransactionType.PAYMENT || params.type === WalletTransactionType.REFUND) &&
+      params.orderId
+    ) {
       const existing = await manager.findOne(WalletTransaction, {
         where: { userId: params.userId, orderId: params.orderId, type: params.type },
       })
       if (existing) {
         if (Number(existing.amount) !== params.rialDelta || Number(existing.amountGrams ?? 0) !== (params.goldDelta ?? 0)) {
           throw new BadRequestException('تراکنش تکراری با مبلغ متفاوت است')
+        }
+        return existing
+      }
+    }
+
+    if (
+      [
+        WalletTransactionType.ESCROW_HOLD,
+        WalletTransactionType.ESCROW_RELEASE,
+        WalletTransactionType.REFUND,
+      ].includes(params.type) &&
+      params.escrowId
+    ) {
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId: params.userId, escrowId: params.escrowId, type: params.type },
+      })
+      if (existing) {
+        if (Number(existing.amount) !== params.rialDelta || Number(existing.amountGrams ?? 0) !== (params.goldDelta ?? 0)) {
+          throw new BadRequestException('تراکنش escrow تکراری با مبلغ متفاوت است')
         }
         return existing
       }
@@ -252,6 +280,63 @@ export class WalletService {
       rialDelta: Math.abs(amount),
       orderId,
       description: 'بازپرداخت سفارش به کیف پول',
+    })
+  }
+
+  /** Debits the buyer exactly once when escrow enters HELD. */
+  async holdEscrow(
+    buyerId: string,
+    escrowId: string,
+    amount: number,
+    manager: EntityManager,
+  ): Promise<WalletTransaction> {
+    if (!escrowId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات قفل escrow نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId: buyerId,
+      type: WalletTransactionType.ESCROW_HOLD,
+      rialDelta: -Math.abs(amount),
+      escrowId,
+      description: 'قفل مبلغ پرداخت امانی',
+    })
+  }
+
+  /** Credits the seller exactly once when escrow is released. */
+  async releaseEscrow(
+    sellerId: string,
+    escrowId: string,
+    amount: number,
+    manager: EntityManager,
+  ): Promise<WalletTransaction> {
+    if (!escrowId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات آزادسازی escrow نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId: sellerId,
+      type: WalletTransactionType.ESCROW_RELEASE,
+      rialDelta: Math.abs(amount),
+      escrowId,
+      description: 'واریز مبلغ آزادشده escrow به فروشنده',
+    })
+  }
+
+  /** Credits the buyer exactly once when escrow is refunded. */
+  async refundEscrow(
+    buyerId: string,
+    escrowId: string,
+    amount: number,
+    manager: EntityManager,
+  ): Promise<WalletTransaction> {
+    if (!escrowId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات بازپرداخت escrow نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId: buyerId,
+      type: WalletTransactionType.REFUND,
+      rialDelta: Math.abs(amount),
+      escrowId,
+      description: 'بازپرداخت مبلغ escrow به خریدار',
     })
   }
 

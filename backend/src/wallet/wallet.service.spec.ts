@@ -92,4 +92,21 @@ describe('WalletService financial invariants', () => {
     await expect(service.payment({ userId: 'user-1', amount: 250, orderId: 'order-1' })).rejects.toThrow('db failure')
     expect(audit.record).not.toHaveBeenCalled()
   })
+
+  it('makes escrow holds idempotent by escrow id and transaction type', async () => {
+    const existing = {
+      id: 'hold-1',
+      type: WalletTransactionType.ESCROW_HOLD,
+      amount: -250,
+      amountGrams: 0,
+    }
+    manager.findOne
+      .mockResolvedValueOnce({ ...wallet })
+      .mockResolvedValueOnce(existing)
+
+    const result = await service.holdEscrow('user-1', 'escrow-1', 250, manager)
+
+    expect(result).toBe(existing)
+    expect(manager.save).not.toHaveBeenCalled()
+  })
 })

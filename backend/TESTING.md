@@ -66,6 +66,10 @@ The isolated stack was verified on 2026-08-29 with both PostgreSQL and Redis:
 2 suites and 11 tests passed, including checkout, wallet payment, refund
 ownership, over-refund rejection, idempotency, and quote/cache behavior.
 
+The current backend contract hardening also verifies that checkout carries quote
+IDs into order validation, online checkout requests a gateway transaction, and
+cart price/name values cannot override the locked product row.
+
 ## E2E smoke
 
 backend را روی test database اجرا کنید و سپس:

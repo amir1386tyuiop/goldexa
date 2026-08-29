@@ -12,6 +12,7 @@ import { Shipment } from './shipment.entity'
 import { CreateOrderDto } from './create-order.dto'
 import { WalletService } from '../wallet/wallet.service'
 import { randomUUID } from 'crypto'
+import { PricingService } from '../pricing/pricing.service'
 
 @Injectable()
 export class OrdersService {
@@ -33,6 +34,7 @@ export class OrdersService {
     @InjectRepository(OrderCancellation)
     private cancellationRepository: Repository<OrderCancellation>,
     private readonly walletService: WalletService,
+    private readonly pricingService: PricingService,
   ) {}
 
   async findAll(userId: string, isAdmin = false): Promise<Order[]> {
@@ -72,38 +74,57 @@ export class OrdersService {
     await queryRunner.startTransaction()
 
     try {
-      const itemsWithProducts = await Promise.all(
-        data.items.map(async (item) => {
-          const product = await queryRunner.manager.findOne(Product, {
-            where: { id: item.productId },
-            lock: { mode: 'pessimistic_write' },
-          })
+      // Acquire every product lock in a deterministic order to prevent
+      // deadlocks when concurrent orders contain the same products in a
+      // different request order.
+      const productsById = new Map<string, Product>()
+      const productIds = [...new Set(data.items.map((item) => item.productId))].sort()
+      for (const productId of productIds) {
+        const product = await queryRunner.manager.findOne(Product, {
+          where: { id: productId },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!product) throw new NotFoundException(`محصول ${productId} یافت نشد`)
+        productsById.set(product.id, product)
+      }
 
-          if (!product) {
-            throw new NotFoundException(`محصول ${item.productId} یافت نشد`)
-          }
-
-          if (product.stock < item.quantity) {
-            throw new BadRequestException(`موجودی محصول ${product.name} کافی نیست`)
-          }
-
-          product.stock -= item.quantity
-          await queryRunner.manager.save(product)
-
-          return {
-            productId: product.id,
-            name: product.name,
-            quantity: item.quantity,
-            unitPrice: product.finalPrice,
-            totalPrice: Number(product.finalPrice) * item.quantity,
-          }
-        }),
-      )
+      const itemsWithProducts = []
+      for (const item of data.items) {
+        const product = productsById.get(item.productId)!
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(`موجودی محصول ${product.name} کافی نیست`)
+        }
+        product.stock -= item.quantity
+        await queryRunner.manager.save(product)
+        itemsWithProducts.push({
+          productId: product.id,
+          name: product.name,
+          quantity: item.quantity,
+          unitPrice: product.finalPrice,
+          totalPrice: Number(product.finalPrice) * item.quantity,
+        })
+      }
 
       const totalAmount = itemsWithProducts.reduce(
         (total, item) => total + Number(item.totalPrice),
         data.shippingCost,
       )
+
+      const quoteIds = data.quoteIds?.length ? data.quoteIds : data.quoteId ? [data.quoteId] : []
+      if (quoteIds.length) {
+        let quotedTotal = 0
+        try {
+          const quotes = await Promise.all(quoteIds.map((quoteId) => this.pricingService.requireValidQuote(quoteId)))
+          quotedTotal = quotes.reduce((sum, quote) => sum + Number((quote as { total: number }).total), 0)
+        } catch (error) {
+          throw new BadRequestException(error instanceof Error ? error.message : 'قیمت رزرو شده نامعتبر است')
+        }
+        const matchesGoodsTotal = Math.round(quotedTotal) === Math.round(totalAmount)
+        const matchesGoodsPlusShipping = Math.round(quotedTotal + Number(data.shippingCost)) === Math.round(totalAmount)
+        if (!matchesGoodsTotal && !matchesGoodsPlusShipping) {
+          throw new BadRequestException('مبلغ سفارش با قیمت رزرو شده مطابقت ندارد')
+        }
+      }
 
       const order = queryRunner.manager.create(Order, {
         orderNumber: `GX-${randomUUID().replace(/-/g, '').slice(0, 24)}`,

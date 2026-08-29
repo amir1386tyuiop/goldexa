@@ -28,3 +28,11 @@
 - Set `POSTGRES_PASSWORD`, `JWT_SECRET`, RabbitMQ credentials, and application URLs outside git.
 - Refund bounds now include pending refunds, preventing cumulative over-refunds.
 - The production backend image and TypeORM migration path now target the actual Nest build output (`dist/src`).
+
+## Backend/frontend contract hardening
+
+- Checkout now creates server-validated pricing quotes before creating an order and starts the online payment request for non-wallet checkout.
+- Quote IDs are validated from Redis/memory cache and their totals must match the authoritative order total, including shipping where applicable.
+- Cart reservations, product pricing, wallet holds, escrow transitions, and refunds use transactional/pessimistic locking paths to prevent races and forged client totals.
+- Payment transaction and order-tracking reads are JWT-scoped; notification, smart-vault, custom-builder, subscription, audit, and public user-registration routes no longer trust arbitrary user IDs or roles from request bodies/paths.
+- Legacy cart price/name fields remain accepted for client compatibility but are ignored by the backend.

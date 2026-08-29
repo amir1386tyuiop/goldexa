@@ -24,8 +24,8 @@ export class PaymentsController {
 
   @Post('zarinpal/verify')
   @UseGuards(JwtAuthGuard)
-  async verifyPayment(@Body() body: VerifyPaymentDto) {
-    return this.paymentsService.verifyPayment(body)
+  async verifyPayment(@Body() body: VerifyPaymentDto, @Req() request: Request & { user: JwtUser }) {
+    return this.paymentsService.verifyPayment(body, request.user.sub)
   }
 
   // ZarinPal redirects the user's browser back here after payment.
@@ -35,15 +35,15 @@ export class PaymentsController {
   }
 
   @Get('transactions')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  async findTransactions() {
-    return this.paymentsService.findTransactions()
+  @UseGuards(JwtAuthGuard)
+  async findTransactions(@Req() request: Request & { user: JwtUser }) {
+    return this.paymentsService.findTransactions(request.user.sub, isAdmin(request.user))
   }
 
   @Get('transactions/:id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  async findTransaction(@Param('id') id: string) {
-    return this.paymentsService.findTransaction(id)
+  @UseGuards(JwtAuthGuard)
+  async findTransaction(@Param('id') id: string, @Req() request: Request & { user: JwtUser }) {
+    return this.paymentsService.findTransaction(id, request.user.sub, isAdmin(request.user))
   }
 
   @Post('transactions')
@@ -59,9 +59,9 @@ export class PaymentsController {
   }
 
   @Get('orders/:orderId/tracking')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  async findOrderTracking(@Param('orderId') orderId: string) {
-    return this.paymentsService.findOrderTracking(orderId)
+  @UseGuards(JwtAuthGuard)
+  async findOrderTracking(@Param('orderId') orderId: string, @Req() request: Request & { user: JwtUser }) {
+    return this.paymentsService.findOrderTracking(orderId, request.user.sub, isAdmin(request.user))
   }
 
   @Post('orders/:orderId/tracking')
@@ -69,7 +69,12 @@ export class PaymentsController {
   async createTrackingEvent(
     @Param('orderId') orderId: string,
     @Body() body: CreateOrderTrackingEventDto,
+    @Req() request: Request & { user: JwtUser },
   ) {
-    return this.paymentsService.createTrackingEvent(orderId, body)
+    return this.paymentsService.createTrackingEvent(orderId, body, request.user.sub, isAdmin(request.user))
   }
+}
+
+function isAdmin(user: JwtUser): boolean {
+  return user.role === 'admin' || user.roleNames?.includes('admin') === true
 }

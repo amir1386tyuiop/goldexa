@@ -203,4 +203,17 @@ export class PricingService {
       remainingSeconds: Math.max(0, Math.round((entry.expiresAt - Date.now()) / 1000)),
     }
   }
+
+  /**
+   * Resolve a quote for a financial operation. Callers must not use the
+   * breakdown returned by calculate() when a quote id was supplied: the
+   * cached server-issued breakdown is the only authoritative value.
+   */
+  async requireValidQuote(quoteId: string) {
+    const quote = await this.getQuote(quoteId)
+    if (!quote.valid) {
+      throw new Error(quote.reason === 'expired' ? 'قیمت رزرو شده منقضی شده است' : 'قیمت رزرو شده یافت نشد')
+    }
+    return quote
+  }
 }

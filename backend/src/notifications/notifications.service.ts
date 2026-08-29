@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { ForbiddenException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Notification, NotificationChannel } from './notification.entity'
@@ -28,7 +28,11 @@ export class NotificationsService {
     )
   }
 
-  async markRead(id: string): Promise<Notification | null> {
+  async markRead(id: string, userId?: string, isAdmin = false): Promise<Notification | null> {
+    const notification = await this.notificationRepository.findOneBy({ id })
+    if (notification && userId && !isAdmin && notification.userId !== userId) {
+      throw new ForbiddenException('به این اعلان دسترسی ندارید')
+    }
     await this.notificationRepository.update(id, { isRead: true, readAt: new Date() })
     return this.notificationRepository.findOneBy({ id })
   }

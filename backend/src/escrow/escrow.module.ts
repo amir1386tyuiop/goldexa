@@ -6,9 +6,10 @@ import { EscrowPayment } from './escrow-payment.entity'
 import { MarketplaceRating } from './marketplace-rating.entity'
 import { UsedGoldListing } from '../marketplace/used-gold-listing.entity'
 import { Auction } from '../auctions/auction.entity'
+import { WalletModule } from '../wallet/wallet.module'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([EscrowPayment, MarketplaceRating, UsedGoldListing, Auction])],
+  imports: [TypeOrmModule.forFeature([EscrowPayment, MarketplaceRating, UsedGoldListing, Auction]), WalletModule],
   controllers: [EscrowController],
   providers: [EscrowService],
 })
