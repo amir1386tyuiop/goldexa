@@ -2,13 +2,15 @@
 
 ## وضعیت فعلی و حدود اعتبار
 
-این پروژه در وضعیت توسعه‌ی MVP است و هنوز بدون سخت‌سازی امنیتی و تست integration کامل برای production آماده نیست.
+این پروژه در وضعیت توسعه‌ی MVP است. هسته مالی و دسترسی‌ها سخت‌سازی شده‌اند، اما قبل از production باید E2E واقعی با PostgreSQL و Redis اجرا و تأیید شود.
 
 - Backend build: موفق (`npm run build`).
 - Backend unit/security tests: در آخرین اجرای محلی ۳۱ تست موفق؛ تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
 - E2E checkout/refund: آماده است، اما بدون Docker/PostgreSQL واقعی عمداً skip می‌شود.
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
+- Frontend از APIهای واقعی استفاده می‌کند؛ داده‌های mock اجرایی حذف شده و صفحات سنگین به‌صورت lazy-load بارگذاری می‌شوند.
+- پرداخت امانی فروشنده و مبلغ را از listing/auction معتبر سمت سرور تطبیق می‌دهد.
 
 راهنمای تست در [backend/TESTING.md](backend/TESTING.md) و راهنمای اجرای امن MVP در [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) است.
 

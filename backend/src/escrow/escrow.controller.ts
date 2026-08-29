@@ -21,8 +21,8 @@ export class EscrowController {
   }
 
   @Get('payments/:id')
-  async findPayment(@Param('id') id: string) {
-    return this.escrowService.findPayment(id)
+  async findPayment(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.escrowService.findPayment(id, req.user.sub, req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true)
   }
 
   @Post('payments')

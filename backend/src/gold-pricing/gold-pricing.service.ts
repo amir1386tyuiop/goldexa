@@ -206,6 +206,9 @@ export class GoldPricingService implements OnModuleInit {
   }
 
   private getMockPrices(): GoldPrice[] {
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      throw new Error('منبع قیمت طلا در محیط production در دسترس نیست')
+    }
     const minute = Math.floor(Date.now() / 60000)
     const delta = ((minute % 9) - 4) * 1000
     const prices: GoldPriceInput[] = [

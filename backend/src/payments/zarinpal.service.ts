@@ -46,7 +46,8 @@ export class ZarinpalService {
   }
 
   get isMock(): boolean {
-    return !this.merchantId
+    return String(this.config.get('PAYMENT_MODE') ?? '').toLowerCase() === 'mock'
+      || (!this.merchantId && this.config.get<string>('NODE_ENV') !== 'production')
   }
 
   /** Convert تومان→ریال for the gateway (ZarinPal expects Rial). */
@@ -61,6 +62,9 @@ export class ZarinpalService {
     mobile?: string
     email?: string
   }): Promise<ZarinpalRequestResult> {
+    if (!this.merchantId && !this.isMock) {
+      throw new Error('درگاه پرداخت در محیط production پیکربندی نشده است')
+    }
     if (this.isMock) {
       const authority = `MOCK-${randomUUID()}`
       return { authority, paymentUrl: `${this.startPayBase}/${authority}`, mock: true }

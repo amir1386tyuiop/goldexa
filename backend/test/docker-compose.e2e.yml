@@ -20,6 +20,16 @@ services:
       timeout: 3s
       retries: 20
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '56379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   backend:
     build:
       context: ..
@@ -34,7 +44,9 @@ services:
       DB_USERNAME: goldeksa_e2e
       DB_PASSWORD: goldeksa_e2e_only
       DB_DATABASE: goldeksa_e2e
-      CACHE_DRIVER: memory
+      CACHE_DRIVER: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_SECRET: e2e-only-secret-at-least-32-characters-long
       JWT_EXPIRES_IN: 1h
       RETURN_OTP_IN_RESPONSE: 'true'
@@ -46,6 +58,8 @@ services:
       - '3011:3001'
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:

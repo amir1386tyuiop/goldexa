@@ -59,6 +59,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   async get<T>(key: string): Promise<T | null> {
+    this.assertDistributedInProduction(key)
     let raw: string | null = null
     const namespacedKey = this.keyFor(key)
     if (this.redisReady && this.client) {
@@ -81,6 +82,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+    this.assertDistributedInProduction(key)
     const raw = JSON.stringify(value)
     const namespacedKey = this.keyFor(key)
     const ttl = Math.max(1, Math.ceil(ttlSeconds))
@@ -97,6 +99,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   async del(key: string): Promise<void> {
+    this.assertDistributedInProduction(key)
     const namespacedKey = this.keyFor(key)
     if (this.redisReady && this.client) {
       try {
@@ -112,6 +115,12 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   private keyFor(key: string): string {
     return `${this.namespace}:${key.replace(/^:+/, '')}`
+  }
+
+  private assertDistributedInProduction(key: string): void {
+    if (process.env.NODE_ENV === 'production' && key.replace(/^:+/, '').startsWith('pricing:quote:') && !this.redisReady) {
+      throw new Error('Redis برای quoteهای checkout در محیط production الزامی است')
+    }
   }
 
   private normaliseNamespace(namespace: string): string {

@@ -22,7 +22,7 @@ npm run test:security
 
 ## E2E checkout/refund
 
-The full E2E suite uses an isolated PostgreSQL database. It does not use
+The full E2E suite uses isolated PostgreSQL and Redis services. It does not use
 `database/seed.sql`, the development compose database, or a production URL.
 The compose file mounts `database/schema.sql` only; the schema contains no
 user credentials or OTP fixtures. The wallet suite uses direct SQL fixtures
@@ -42,6 +42,10 @@ $env:DB_DATABASE = 'goldeksa_e2e'
 npm run test:e2e -- --runInBand
 docker compose -f test/docker-compose.e2e.yml down -v
 ```
+
+The E2E backend uses `CACHE_DRIVER=redis` and the dedicated Redis service on
+the internal compose network. The host mapping `56379` is available for
+optional cache inspection and does not share the development Redis instance.
 
 The wallet fixture is deliberately refused for `goldeksa` or production-like
 database names. Use a fresh E2E volume for repeatable runs.

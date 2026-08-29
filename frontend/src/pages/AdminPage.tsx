@@ -23,10 +23,8 @@ import {
   Wand2,
   Bell,
 } from 'lucide-react'
-import { tasks } from '@/data/mockData'
-import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getPriorityText, getStatusText, getTaskStatusText } from '@/utils/helpers'
+import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
-import { isMockDataEnabled } from '@/config'
 import { AiEnginePanel } from './AiEnginePage'
 import type { Auction, Order, PaymentTransaction, Product, Role, SystemSetting, User, Permission } from '@/types'
 
@@ -198,29 +196,8 @@ export function AdminPage() {
             {activeTab === 'dashboard' && (
               <>
                 <DashboardStats stats={stats} />
-                <div className="card p-6 mb-6">
-                  <h2 className="text-xl font-bold mb-4">وضعیت تسک‌های MVP</h2>
-                  <div className="space-y-3">
-                    {(isMockDataEnabled ? tasks : []).map((task) => (
-                      <div
-                        key={task.id}
-                        className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl bg-gray-50"
-                      >
-                        <div>
-                          <h3 className="font-bold text-sm mb-1">{task.title}</h3>
-                          <p className="text-xs text-muted-foreground">{task.description}</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`badge ${getPriorityBadge(task.priority)}`}>
-                            {getPriorityText(task.priority)}
-                          </span>
-                          <span className={`badge ${getStatusBadge(task.status)}`}>
-                            {getTaskStatusText(task.status)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="mb-6">
+                  <EmptyState title="فعالیت‌های MVP ثبت نشده است" description="این بخش فقط از داده‌های واقعی API مدیریت تغذیه می‌شود و داده‌ی آزمایشی در محیط اجرایی نمایش داده نمی‌شود." />
                 </div>
                 <OrdersTable orders={adminOrders.slice(0, 5)} />
               </>
@@ -687,26 +664,6 @@ function ToggleRow({
       </span>
     </div>
   )
-}
-
-function getPriorityBadge(priority: string): string {
-  const badges: Record<string, string> = {
-    low: 'badge-gold',
-    medium: 'badge-info',
-    high: 'badge-warning',
-    critical: 'badge-danger',
-  }
-  return badges[priority] || 'badge-info'
-}
-
-function getStatusBadge(status: string): string {
-  const badges: Record<string, string> = {
-    todo: 'badge-warning',
-    'in-progress': 'badge-info',
-    review: 'badge-purple',
-    done: 'badge-success',
-  }
-  return badges[status] || 'badge-info'
 }
 
 function getOrderBadge(status: string): string {

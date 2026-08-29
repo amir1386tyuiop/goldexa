@@ -10,6 +10,10 @@
 - Protected catalog mutations, marketplace listing mutations, and escrow status mutations.
 - Added checkout/refund E2E suites and an isolated PostgreSQL/Redis test compose file.
 - Added security, wallet, order, payment, cache, and pricing tests.
+- Removed frontend runtime mock data and added domain API facades with route-level lazy loading.
+- Escrow seller identity and payable amount are now reconciled against active listings or winning auctions.
+- Production now fails closed when the payment gateway or gold-price source is not configured.
+- E2E compose now includes an isolated Redis service and runs with `CACHE_DRIVER=redis`.
 
 ## Verification status
 
@@ -22,4 +26,4 @@
 
 - Do not run `database/seed.sql` against production.
 - Set `POSTGRES_PASSWORD`, `JWT_SECRET`, RabbitMQ credentials, and application URLs outside git.
-- Escrow seller/listing/order reconciliation and full refund settlement still require a real integration test before handling real funds.
+- Full refund settlement still requires a successful run of the isolated PostgreSQL/Redis E2E stack before handling real funds.

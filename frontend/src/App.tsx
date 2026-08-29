@@ -4,23 +4,26 @@ import { Navbar } from './components/Navbar'
 import { CartDrawer } from './components/CartDrawer'
 import { Footer } from './components/Footer'
 import { Toast } from './components/Toast'
-import { ShopPage } from './pages/ShopPage'
-import { ProductDetailPage } from './pages/ProductDetailPage'
-import { CheckoutPage } from './pages/CheckoutPage'
-import { ARPage } from './pages/ARPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { LoginPage } from './pages/LoginPage'
-import { AuctionsPage } from './pages/AuctionsPage'
-import { BuilderPage } from './pages/BuilderPage'
-import { AdminOnlyAiEnginePage } from './pages/AiEnginePage'
-import { EscrowPage } from './pages/EscrowPage'
-import { PricingPage } from './pages/PricingPage'
-import { WalletPage } from './pages/WalletPage'
-import { OrdersPage } from './pages/OrdersPage'
-import { AdminPage } from './pages/AdminPage'
 import { LandingPage } from './pages/LandingPage'
-import { HomePage } from './pages/HomePage'
+import { lazy, Suspense } from 'react'
 import { getStoredAuth, hasRole } from './auth'
+import { NotFoundPage } from './pages/NotFoundPage'
+
+const ShopPage = lazy(() => import('./pages/ShopPage').then(({ ShopPage }) => ({ default: ShopPage })))
+const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage').then(({ ProductDetailPage }) => ({ default: ProductDetailPage })))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then(({ CheckoutPage }) => ({ default: CheckoutPage })))
+const ARPage = lazy(() => import('./pages/ARPage').then(({ ARPage }) => ({ default: ARPage })))
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })))
+const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })))
+const AuctionsPage = lazy(() => import('./pages/AuctionsPage').then(({ AuctionsPage }) => ({ default: AuctionsPage })))
+const BuilderPage = lazy(() => import('./pages/BuilderPage').then(({ BuilderPage }) => ({ default: BuilderPage })))
+const AdminOnlyAiEnginePage = lazy(() => import('./pages/AiEnginePage').then(({ AdminOnlyAiEnginePage }) => ({ default: AdminOnlyAiEnginePage })))
+const EscrowPage = lazy(() => import('./pages/EscrowPage').then(({ EscrowPage }) => ({ default: EscrowPage })))
+const PricingPage = lazy(() => import('./pages/PricingPage').then(({ PricingPage }) => ({ default: PricingPage })))
+const WalletPage = lazy(() => import('./pages/WalletPage').then(({ WalletPage }) => ({ default: WalletPage })))
+const OrdersPage = lazy(() => import('./pages/OrdersPage').then(({ OrdersPage }) => ({ default: OrdersPage })))
+const AdminPage = lazy(() => import('./pages/AdminPage').then(({ AdminPage }) => ({ default: AdminPage })))
+const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })))
 
 const PUBLIC_MINIMAL_LAYOUT = ['/', '/login']
 
@@ -66,6 +69,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-background font-vazir">
         <AppShell>
+          <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">در حال بارگذاری…</div>}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -84,7 +88,9 @@ function App() {
             <Route path="/escrow" element={<RequireAuth><EscrowPage /></RequireAuth>} />
             <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
             <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          </Suspense>
         </AppShell>
       </div>
     </Router>

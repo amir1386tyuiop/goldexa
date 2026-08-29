@@ -230,7 +230,6 @@ export class AiEngineService {
     return Promise.all([
       this.rerunPrediction(userId),
       this.rerunRecommendation(userId),
-      this.rerunMatch(),
       ...metrics,
     ])
   }
@@ -255,8 +254,11 @@ export class AiEngineService {
   }
 
   async rerunRecommendation(userId?: string): Promise<AiDesignRecommendation> {
+    if (!userId) {
+      throw new BadRequestException('شناسه کاربر برای اجرای recommendation الزامی است')
+    }
     return this.createRecommendation({
-      userId: userId || '11111111-1111-1111-1111-111111111111',
+      userId,
       score: 86 + (Date.now() % 10),
       reason: 'بر اساس رفتار خرید، بودجه و سبک‌های پربازدید، این طرح بیشترین احتمال انتخاب را دارد.',
       source: 'goldeksa-design-rerun-v1',
@@ -264,13 +266,7 @@ export class AiEngineService {
   }
 
   async rerunMatch(): Promise<AiMarketMatch> {
-    return this.createMatch({
-      buyerId: '11111111-1111-1111-1111-111111111111',
-      sellerId: '22222222-2222-2222-2222-222222222222',
-      score: 89 + (Date.now() % 8),
-      reason: 'تطابق بر اساس بودجه، محصول موردعلاقه و رفتار خرید انتخاب شد.',
-      status: 'pending',
-    })
+    throw new BadRequestException('اجرای match بدون buyer و seller واقعی مجاز نیست')
   }
 
   async rerunMetric(): Promise<AiServiceMetric[]> {

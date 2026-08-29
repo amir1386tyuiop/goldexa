@@ -15,10 +15,11 @@ export class CreateEscrowPaymentDto {
   @IsOptional()
   @IsString()
   orderId?: string | null
-  // buyerId is always taken from the verified JWT subject.
-  @IsNotEmpty()
+  // sellerId is resolved from the referenced listing/auction on the server.
+  // It remains optional for backwards-compatible clients, but is never trusted.
+  @IsOptional()
   @IsString()
-  sellerId: string
+  sellerId?: string
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   amount: number
