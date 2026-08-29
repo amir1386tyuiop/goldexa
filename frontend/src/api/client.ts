@@ -1770,10 +1770,12 @@ export const api = {
   getInventory: (productId: string) => request<Inventory>(`/catalog/inventory/${productId}`),
   getSellers: () => request<SellerProfile[]>('/catalog/sellers'),
   getCart: (userId: string) => request<Cart | null>(`/cart/user/${userId}`),
+  createCart: (userId: string) => request<Cart>('/cart', { method: 'POST', body: { userId } }),
   addCartItem: (body: unknown) => request<CartItem>('/cart/items', { method: 'POST', body }),
   updateCartItemQuantity: (id: string, quantity: number) =>
     request<CartItem>(`/cart/items/${id}/quantity`, { method: 'PATCH', body: { quantity } }),
   removeCartItem: (id: string) => request<void>(`/cart/items/${id}`, { method: 'DELETE' }),
+  clearCart: (cartId: string) => request<void>(`/cart/${cartId}/clear`, { method: 'POST', body: {} }),
   getWallet: (userId: string) => request<Wallet | null>(`/wallet/user/${userId}`),
   getWalletTransactions: (userId: string) => request<WalletTransaction[]>(`/wallet/user/${userId}/transactions`),
   getPricingRules: () => request<PricingRule[]>('/pricing/rules'),

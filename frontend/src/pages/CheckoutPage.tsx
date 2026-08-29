@@ -16,7 +16,7 @@ export function CheckoutPage() {
   const addressesQuery = useQuery({ queryKey: ['addresses', userId], queryFn: () => api.getUserAddresses(userId), enabled: Boolean(userId) })
   useEffect(() => { const defaultAddress = addressesQuery.data?.find((item) => item.isDefault) || addressesQuery.data?.[0]; if (defaultAddress) setAddress({ id: defaultAddress.id, title: 'آدرس ارسال', province: defaultAddress.province, city: defaultAddress.city, street: defaultAddress.street, postalCode: defaultAddress.postalCode || '', isDefault: defaultAddress.isDefault }) }, [addressesQuery.data])
   const createOrder = useMutation({
-    mutationFn: async (input: Parameters<typeof api.createOrder>[0]) => {
+    mutationFn: async ({ input, backendCartId }: { input: Parameters<typeof api.createOrder>[0]; backendCartId: string }) => {
       const order = await api.createOrder(input)
       if (input.paymentMethod === 'online') {
         const payment = await api.requestOnlinePayment({
@@ -26,11 +26,12 @@ export function CheckoutPage() {
           idempotencyKey: `order-${order.id}`,
           description: `پرداخت سفارش ${order.orderNumber || order.id}`,
         })
-        return { order, payment }
+        return { order, payment, backendCartId }
       }
-      return { order, payment: null }
+      return { order, payment: null, backendCartId }
     },
-    onSuccess: ({ order, payment }) => {
+    onSuccess: async ({ order, payment, backendCartId }) => {
+      await api.clearCart(backendCartId)
       clearCart()
       if (payment?.paymentUrl && !payment.mock) {
         window.location.assign(payment.paymentUrl)
@@ -42,14 +43,28 @@ export function CheckoutPage() {
   })
   const total = getCartTotal(); const shippingCost = total > 50000000 ? 0 : 180000; const finalTotal = total + shippingCost; const hasExpiredItem = useMemo(() => cart.some((item) => new Date(item.reservedUntil).getTime() <= Date.now()), [cart])
   const updateAddress = (key: keyof Address, value: string) => setAddress((current) => ({ ...current, [key]: value }))
+  async function syncBackendCart() {
+    const backendCart = (await api.getCart(userId)) || (await api.createCart(userId))
+    await api.clearCart(backendCart.id)
+    await Promise.all(cart.map((item) => api.addCartItem({
+      cartId: backendCart.id,
+      productId: item.product.id,
+      quantity: item.quantity,
+    })))
+    return backendCart.id
+  }
   async function submit() {
     if (!userId) { setValidationError('برای ثبت سفارش باید وارد حساب کاربری شوید.'); return }
     if (!cart.length || createOrder.isPending) return
     if (!address.province || !address.city || !address.street || address.postalCode.length < 5) { setValidationError('استان، شهر، آدرس کامل و کد پستی را تکمیل کنید.'); return }
     setValidationError('')
     try {
+      const backendCartId = await syncBackendCart()
       const quotes = await Promise.all(cart.map((item) => api.createPricingQuote(item.product.category, item.product.weight)))
-      createOrder.mutate({ userId, items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })), shippingCost, address, paymentMethod, quoteIds: quotes.map((quote) => quote.quoteId) })
+      createOrder.mutate({
+        input: { userId, items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })), shippingCost, address, paymentMethod, quoteIds: quotes.map((quote) => quote.quoteId) },
+        backendCartId,
+      })
     } catch (error) {
       setValidationError((error as { message?: string })?.message || 'رزرو قیمت سفارش ناموفق بود؛ دوباره تلاش کنید.')
     }
