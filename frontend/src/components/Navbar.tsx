@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Gem, LogOut, Menu, PackageCheck, ShoppingBag, ShoppingCart, TrendingUp, User, Wallet, X } from 'lucide-react'
+import { Activity, Gem, LogOut, Menu, PackageCheck, ShieldCheck, ShoppingBag, ShoppingCart, TrendingUp, User, Wallet, X } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/store'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ export function Navbar() {
   const isCartOpen = useStore((state) => state.isCartOpen)
   const toggleCart = useStore((state) => state.toggleCart)
   const currentUser = getStoredAuth()?.user
+  const accountPath = currentUser?.role === 'admin' ? '/admin' : '/dashboard'
 
   function closeMenu() { setMenuOpen(false) }
   function handleLogout() { clearStoredAuth(); closeMenu(); navigate('/') }
@@ -52,7 +53,7 @@ export function Navbar() {
             {cartCount > 0 && <span className="absolute -left-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-700 px-1 text-xs font-bold text-white">{cartCount}</span>}
           </button>
           {currentUser ? <>
-            <Link to="/dashboard" className="hidden items-center gap-2 rounded-xl bg-stone-950 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 sm:flex"><User className="h-4 w-4" />حساب من</Link>
+            <Link to={accountPath} className="hidden items-center gap-2 rounded-xl bg-stone-950 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 sm:flex"><User className="h-4 w-4" />{currentUser.role === 'admin' ? 'پنل مدیریت' : 'حساب من'}</Link>
             <button aria-label="خروج از حساب" onClick={handleLogout} className="hidden rounded-xl p-3 text-stone-500 hover:bg-red-50 hover:text-red-700 sm:block"><LogOut className="h-4 w-4" /></button>
           </> : <Link to="/login" className="hidden items-center gap-2 rounded-xl bg-stone-950 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 sm:flex"><User className="h-4 w-4" />ورود</Link>}
         </div>
@@ -62,6 +63,7 @@ export function Navbar() {
         <nav className="mx-auto flex max-w-7xl flex-col gap-1" aria-label="منوی موبایل">
           {navItems.map(({ label, path, icon: Icon }) => <Link key={path} to={path} onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><Icon className="h-5 w-5 text-amber-700" />{label}</Link>)}
           <Link to="/dashboard" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><PackageCheck className="h-5 w-5 text-amber-700" />داشبورد و سفارش‌ها</Link>
+          {currentUser?.role === 'admin' && <Link to="/admin" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 font-semibold text-amber-900 hover:bg-amber-100"><ShieldCheck className="h-5 w-5 text-amber-700" />پنل مدیریت</Link>}
           <Link to="/wallet" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><Wallet className="h-5 w-5 text-amber-700" />کیف پول</Link>
           {!currentUser && <Link to="/login" onClick={closeMenu} className="mt-2 flex min-h-12 items-center justify-center rounded-xl bg-stone-950 px-4 py-3 font-semibold text-white">ورود / ثبت‌نام</Link>}
         </nav>
