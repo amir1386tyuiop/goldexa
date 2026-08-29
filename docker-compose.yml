@@ -126,6 +126,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      PGHOST: postgres
     volumes:
       - ./database/seed.sql:/seed/seed.sql:ro
     depends_on:
