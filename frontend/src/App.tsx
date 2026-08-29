@@ -81,7 +81,8 @@ function App() {
             <Route path="/auctions" element={<AuctionsPage />} />
             <Route path="/marketplace" element={<AuctionsPage initialTab="marketplace" />} />
             <Route path="/builder" element={<BuilderPage />} />
-            <Route path="/ai-engine" element={<RequireAdmin><AdminOnlyAiEnginePage /></RequireAdmin>} />
+            <Route path="/ai-workspace" element={<RequireAdmin><AdminOnlyAiEnginePage /></RequireAdmin>} />
+            <Route path="/ai-engine" element={<Navigate to="/ai-workspace" replace />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/wallet" element={<RequireAuth><WalletPage /></RequireAuth>} />
             <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />

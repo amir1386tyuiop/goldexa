@@ -1,207 +1,76 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
-import { ArrowUpRight, Brain, LineChart, RefreshCw, Sparkles, Users } from 'lucide-react'
-import { api } from '@/api/client'
-import { formatPrice } from '@/utils/helpers'
-import type { AiDesignRecommendation, AiMarketMatch, AiPricePrediction, AiServiceMetric } from '@/types'
+import { FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { Activity, AlertTriangle, ArrowLeft, Bot, CheckCircle2, ChevronLeft, HelpCircle, Clock3, Database, Gauge, LayoutDashboard, LineChart, Loader2, MessageSquare, RefreshCw, Sparkles, TrendingUp, Users, Wand2, XCircle } from 'lucide-react'
+import { api } from '@/api/client'
 import { getStoredAuth } from '@/auth'
+import { formatPrice } from '@/utils/helpers'
+import type { AiDesignRecommendation, AiMarketMatch, AiPricePrediction, AiProviderPublicConfig, AiRunResult, AiServiceMetric } from '@/types'
 
-export function AiEnginePage() {
-  return (
-    <div className="pt-20 pb-16">
-      <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-black text-navy-900">موتور هوش مصنوعی</h1>
-          <p className="text-muted-foreground mt-2">پیش‌بینی قیمت، توصیه طراحی، تطابق خریدار و فروشنده و شاخص‌های مدل</p>
-        </div>
-        <AiEnginePanel />
-      </div>
-    </div>
-  )
-}
+type WorkspaceTab = 'overview' | 'predictions' | 'design' | 'matching' | 'assistant' | 'metrics'
+const tabs: Array<{ id: WorkspaceTab; label: string; description: string; icon: typeof LayoutDashboard }> = [
+  { id: 'overview', label: 'نمای کلی', description: 'وضعیت و خلاصه مدل‌ها', icon: LayoutDashboard },
+  { id: 'predictions', label: 'پیش‌بینی قیمت', description: 'روند قیمت و اطمینان مدل', icon: TrendingUp },
+  { id: 'design', label: 'توصیه طراحی', description: 'پیشنهادهای شخصی‌سازی‌شده', icon: Wand2 },
+  { id: 'matching', label: 'Matching', description: 'تطبیق خریدار و فروشنده', icon: Users },
+  { id: 'assistant', label: 'دستیار', description: 'پرسش از دستیار AI', icon: MessageSquare },
+  { id: 'metrics', label: 'Metrics', description: 'سلامت و عملکرد سرویس', icon: Gauge },
+]
 
-export function AdminOnlyAiEnginePage() {
-  const raw = localStorage.getItem('goldeksa_auth')
-  const auth = raw ? (JSON.parse(raw) as { user?: { role?: string } } | null) : null
+const mockPredictions: AiPricePrediction[] = [{ id: 'mock-prediction', targetType: 'gold_18k', currentPrice: 7430000, predictedPrice: 7595000, confidenceScore: 78, horizonDays: 7, modelVersion: 'local-preview-v1', createdAt: new Date().toISOString() }]
+const mockRecommendations: AiDesignRecommendation[] = [{ id: 'mock-recommendation', userId: 'local', designId: null, productIds: [], score: 88, reason: 'ترکیب مینیمال طلای زرد با سنگ سبز، متناسب با سلیقه و بازدیدهای اخیر.', source: 'local-preview', createdAt: new Date().toISOString() }]
+const mockMatches: AiMarketMatch[] = [{ id: 'mock-match', buyerId: 'buyer-preview', sellerId: 'seller-preview', listingId: null, score: 91, reason: 'هم‌خوانی بالا در بازه قیمت، عیار و نوع محصول.', status: 'pending', createdAt: new Date().toISOString() }]
+const mockMetrics: AiServiceMetric[] = [{ id: 'mock-latency', name: 'میانگین زمان پاسخ', value: 420, metadata: { unit: 'ms', source: 'local-preview' }, createdAt: new Date().toISOString() }, { id: 'mock-success', name: 'نرخ موفقیت درخواست', value: 98.4, metadata: { unit: '%', source: 'local-preview' }, createdAt: new Date().toISOString() }]
 
-  if (auth?.user?.role === 'admin') {
-    return <AiEnginePage />
-  }
+export function AiEnginePage() { return <AiWorkspace /> }
+export function AdminOnlyAiEnginePage() { return getStoredAuth()?.user.role === 'admin' ? <AiWorkspace /> : <Navigate to="/login" replace /> }
+export function AiEnginePanel({ insidePage = true }: { insidePage?: boolean }) { return <AiWorkspace compact={!insidePage} /> }
 
-  return <Navigate to="/login" replace />
-}
-
-export function AiEnginePanel({ insidePage = true }: { insidePage?: boolean }) {
+function AiWorkspace({ compact = false }: { compact?: boolean }) {
   const userId = getStoredAuth()?.user.id || ''
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview')
+  const [dataMode, setDataMode] = useState<'real' | 'local'>('real')
   const queryClient = useQueryClient()
+  const predictionsQuery = useQuery({ queryKey: ['ai-predictions', userId], queryFn: () => api.getAiPredictions(userId), enabled: Boolean(userId) })
+  const recommendationsQuery = useQuery({ queryKey: ['ai-recommendations', userId], queryFn: () => api.getAiRecommendations(userId), enabled: Boolean(userId) })
+  const matchesQuery = useQuery({ queryKey: ['ai-matches'], queryFn: api.getAiMatches })
+  const metricsQuery = useQuery({ queryKey: ['ai-metrics'], queryFn: api.getAiMetrics })
+  const providersQuery = useQuery({ queryKey: ['ai-providers'], queryFn: api.getAiProviders })
+  const rerun = useMutation({ mutationFn: () => api.rerunAiAll(userId), onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: ['ai-predictions'] }), queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] }), queryClient.invalidateQueries({ queryKey: ['ai-matches'] }), queryClient.invalidateQueries({ queryKey: ['ai-metrics'] })]) })
+  const predictions = dataMode === 'local' ? mockPredictions : predictionsQuery.data || []
+  const recommendations = dataMode === 'local' ? mockRecommendations : recommendationsQuery.data || []
+  const matches = dataMode === 'local' ? mockMatches : matchesQuery.data || []
+  const metrics = dataMode === 'local' ? mockMetrics : metricsQuery.data || []
+  const providers = providersQuery.data || []
+  const anyLoading = [predictionsQuery, recommendationsQuery, matchesQuery, metricsQuery].some((query) => query.isLoading)
+  const anyError = [predictionsQuery, recommendationsQuery, matchesQuery, metricsQuery].some((query) => query.isError)
+  const activeTabMeta = tabs.find((tab) => tab.id === activeTab) || tabs[0]
+  const configuredProviders = providers.filter((provider) => provider.configured).length
 
-  const invalidateAi = (keys: string[][]) => {
-    keys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }))
-  }
-
-  const rerunPredictions = useMutation({
-    mutationFn: () => api.rerunAiPredictions(userId),
-    onSuccess: () => invalidateAi([['ai-predictions']]),
-  })
-
-  const rerunRecommendations = useMutation({
-    mutationFn: () => api.rerunAiRecommendations(userId),
-    onSuccess: () => invalidateAi([['ai-recommendations']]),
-  })
-
-  const rerunMatches = useMutation({
-    mutationFn: () => api.rerunAiMatches(),
-    onSuccess: () => invalidateAi([['ai-matches']]),
-  })
-
-  const rerunMetrics = useMutation({
-    mutationFn: () => api.rerunAiMetrics(),
-    onSuccess: () => invalidateAi([['ai-metrics']]),
-  })
-
-  const rerunAll = useMutation({
-    mutationFn: () => api.rerunAiAll(userId),
-    onSuccess: () => invalidateAi([['ai-predictions'], ['ai-recommendations'], ['ai-matches'], ['ai-metrics']]),
-  })
-
-  const { data: predictions = [] } = useQuery<AiPricePrediction[]>({
-    queryKey: ['ai-predictions', userId],
-    queryFn: () => api.getAiPredictions(userId),
-    initialData: [],
-    enabled: Boolean(userId),
-  })
-
-  const { data: recommendations = [] } = useQuery<AiDesignRecommendation[]>({
-    queryKey: ['ai-recommendations', userId],
-    queryFn: () => api.getAiRecommendations(userId),
-    initialData: [],
-    enabled: Boolean(userId),
-  })
-
-  const { data: matches = [] } = useQuery<AiMarketMatch[]>({
-    queryKey: ['ai-matches'],
-    queryFn: api.getAiMatches,
-    initialData: [],
-  })
-
-  const { data: metrics = [] } = useQuery<AiServiceMetric[]>({
-    queryKey: ['ai-metrics'],
-    queryFn: api.getAiMetrics,
-    initialData: [],
-  })
-
-  return (
-    <div className={insidePage ? 'pt-20 pb-16' : ''}>
-      <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-3xl font-black text-navy-900">موتور هوش مصنوعی</h1>
-              <p className="text-muted-foreground mt-2">پیش‌بینی قیمت، توصیه طراحی، تطابق خریدار و فروشنده و شاخص‌های مدل</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <ActionButton label="اجرای همه" isPending={rerunAll.isPending} isSuccess={rerunAll.isSuccess} onRun={() => rerunAll.mutate(undefined)} />
-              <ActionButton label="پیش‌بینی" isPending={rerunPredictions.isPending} isSuccess={rerunPredictions.isSuccess} onRun={() => rerunPredictions.mutate(undefined)} />
-              <ActionButton label="طراحی" isPending={rerunRecommendations.isPending} isSuccess={rerunRecommendations.isSuccess} onRun={() => rerunRecommendations.mutate(undefined)} />
-              <ActionButton label="تطابق" isPending={rerunMatches.isPending} isSuccess={rerunMatches.isSuccess} onRun={() => rerunMatches.mutate(undefined)} />
-              <ActionButton label="شاخص‌ها" isPending={rerunMetrics.isPending} isSuccess={rerunMetrics.isSuccess} onRun={() => rerunMetrics.mutate(undefined)} />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AiSection title="پیش‌بینی قیمت طلا" icon={<LineChart className="h-5 w-5 text-gold-600" />}>
-            {predictions.length === 0 ? (
-              <EmptyState title="پیش‌بینی ثبت نشده" description="پیش‌بینی‌های قیمت طلا اینجا نمایش داده می‌شوند." />
-            ) : (
-              predictions.map((prediction) => (
-                <AiCard key={prediction.id} label={prediction.modelVersion} value={formatPrice(prediction.predictedPrice)} detail={`${prediction.confidenceScore}% اطمینان برای ${prediction.horizonDays} روز آینده`} />
-              ))
-            )}
-          </AiSection>
-
-          <AiSection title="توصیه طراحی" icon={<Sparkles className="h-5 w-5 text-gold-600" />}>
-            {recommendations.length === 0 ? (
-              <EmptyState title="توصیه‌ای ثبت نشده" description="بر اساس رفتار کاربر، طرح‌های پیشنهادی اینجا نمایش داده می‌شوند." />
-            ) : (
-              recommendations.map((item) => (
-                <AiCard key={item.id} label={item.source} value={`${item.score} از ۱۰۰`} detail={item.reason} />
-              ))
-            )}
-          </AiSection>
-
-          <AiSection title="تطابق بازار" icon={<Users className="h-5 w-5 text-gold-600" />}>
-            {matches.length === 0 ? (
-              <EmptyState title="تطابقی ثبت نشده" description="تطابق‌های هوشمند خریدار و فروشنده اینجا نمایش داده می‌شوند." />
-            ) : (
-              matches.map((item) => (
-                <AiCard key={item.id} label={item.status} value={`${item.score} از ۱۰۰`} detail={`${item.buyerId} با ${item.sellerId}`} />
-              ))
-            )}
-          </AiSection>
-
-          <AiSection title="شاخص‌های سرویس" icon={<Brain className="h-5 w-5 text-gold-600" />}>
-            {metrics.length === 0 ? (
-              <EmptyState title="شاخصی ثبت نشده" description="مقادیر عملکرد مدل‌های هوش مصنوعی اینجا نمایش داده می‌شوند." />
-            ) : (
-              metrics.map((item) => (
-                <AiCard key={item.id} label={item.name} value={String(item.value)} detail={JSON.stringify(item.metadata)} />
-              ))
-            )}
-          </AiSection>
-        </div>
-      </div>
+  return <div className={compact ? '' : 'min-h-screen bg-stone-50 pb-16 pt-20'}><div className="page-shell">
+    <header className="relative overflow-hidden rounded-[2rem] bg-stone-950 px-5 py-7 text-white shadow-xl shadow-stone-900/10 sm:px-8 sm:py-9"><div className="absolute -left-16 -top-24 h-64 w-64 rounded-full bg-amber-400/15 blur-3xl" aria-hidden="true" /><div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"><div className="max-w-2xl"><div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-bold text-amber-300"><span className="inline-flex items-center gap-2 rounded-full border border-amber-200/20 bg-white/10 px-3 py-1.5"><Sparkles className="h-3.5 w-3.5" aria-hidden="true" />Goldexa Intelligence</span><span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1.5 text-emerald-200">{configuredProviders ? `${configuredProviders} provider فعال` : 'Provider در حالت بررسی'}</span></div><h1 className="text-3xl font-black tracking-tight sm:text-4xl">مرکز کار هوش مصنوعی</h1><p className="mt-3 max-w-xl text-sm leading-7 text-stone-300">از یک workspace واحد برای دیدن سیگنال‌های بازار، پیشنهادهای طراحی، matching و گفت‌وگو با دستیار استفاده کنید.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setDataMode(dataMode === 'real' ? 'local' : 'real')} className="btn min-h-11 gap-2 border border-white/15 bg-white/10 px-4 text-xs text-white hover:bg-white/15" aria-pressed={dataMode === 'local'}><Database className="h-4 w-4" aria-hidden="true" />{dataMode === 'real' ? 'داده API واقعی' : 'پیش‌نمایش محلی'}</button><button type="button" onClick={() => rerun.mutate()} disabled={rerun.isPending || !userId} className="btn min-h-11 gap-2 bg-amber-400 px-4 text-xs font-black text-stone-950 hover:bg-amber-300 disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${rerun.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />{rerun.isPending ? 'در حال به‌روزرسانی' : 'اجرای دوباره مدل‌ها'}</button></div></div></header>
+    <div className="mt-5 grid gap-5 lg:grid-cols-[230px_minmax(0,1fr)]"><aside className="h-fit rounded-3xl border border-stone-200 bg-white p-3 shadow-sm" aria-label="بخش‌های workspace AI"><p className="px-3 pb-2 pt-2 text-xs font-bold text-stone-500">WORKSPACE</p><nav className="space-y-1" role="tablist" aria-orientation="vertical">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-2xl px-3 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 ${activeTab === tab.id ? 'bg-stone-950 text-white' : 'text-stone-600 hover:bg-amber-50 hover:text-stone-950'}`}><Icon className={`h-4.5 w-4.5 shrink-0 ${activeTab === tab.id ? 'text-amber-300' : 'text-stone-400'}`} aria-hidden="true" /><span className="min-w-0"><span className="block text-sm font-bold">{tab.label}</span><span className={`mt-0.5 block truncate text-[11px] ${activeTab === tab.id ? 'text-stone-300' : 'text-stone-500'}`}>{tab.description}</span></span></button> })}</nav><div className="mt-4 rounded-2xl bg-amber-50 p-3 text-xs leading-6 text-amber-950"><div className="flex items-center gap-2 font-bold"><HelpCircle className="h-4 w-4" aria-hidden="true" />داده از کجا می‌آید؟</div><p className="mt-1">حالت API از backend موجود استفاده می‌کند. پیش‌نمایش محلی فقط برای دیدن تجربه‌ی UI و بدون ادعای پیش‌بینی واقعی است.</p></div></aside>
+      <main className="min-w-0">{anyError && dataMode === 'real' && <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 sm:flex-row sm:items-center sm:justify-between" role="alert"><span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />بخشی از داده‌های AI از API دریافت نشد. می‌توانید دوباره تلاش کنید یا پیش‌نمایش محلی را ببینید.</span><button type="button" onClick={() => setDataMode('local')} className="btn min-h-10 shrink-0 bg-white px-3 text-xs text-red-900 hover:bg-red-100">نمایش پیش‌نمایش محلی</button></div>}{rerun.isError && <div className="mb-5 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert"><XCircle className="h-4 w-4" aria-hidden="true" />اجرای دوباره مدل‌ها انجام نشد. وضعیت provider و اتصال API را بررسی کنید.</div>}<div className="mb-5 flex items-center justify-between gap-4"><div><p className="text-xs font-bold text-amber-700">AI WORKSPACE / {activeTabMeta.label.toUpperCase()}</p><h2 className="mt-1 text-2xl font-black text-stone-950">{activeTabMeta.label}</h2></div>{anyLoading && dataMode === 'real' && <span className="inline-flex items-center gap-2 text-xs text-stone-500" role="status"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />در حال همگام‌سازی</span>}</div>{activeTab === 'overview' && <OverviewTab predictions={predictions} recommendations={recommendations} matches={matches} metrics={metrics} providers={providers} onSelect={setActiveTab} />}{activeTab === 'predictions' && <PredictionsTab items={predictions} query={predictionsQuery} />}{activeTab === 'design' && <DesignTab items={recommendations} query={recommendationsQuery} />}{activeTab === 'matching' && <MatchingTab items={matches} query={matchesQuery} />}{activeTab === 'assistant' && <AssistantTab userId={userId} />}{activeTab === 'metrics' && <MetricsTab items={metrics} query={metricsQuery} providers={providers} />}</main>
     </div>
-  )
+  </div></div>
 }
 
-function AiSection({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
-  return (
-    <section className="card p-6">
-      <div className="flex items-center gap-3">
-        {icon}
-        <h2 className="text-xl font-black text-navy-900">{title}</h2>
-      </div>
-      <div className="mt-5 space-y-3">{children}</div>
-    </section>
-  )
-}
+function OverviewTab({ predictions, recommendations, matches, metrics, providers, onSelect }: { predictions: AiPricePrediction[]; recommendations: AiDesignRecommendation[]; matches: AiMarketMatch[]; metrics: AiServiceMetric[]; providers: AiProviderPublicConfig[]; onSelect: (tab: WorkspaceTab) => void }) { const latest = predictions[0]; return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="پیش‌بینی فعال" value={predictions.length.toLocaleString('fa-IR')} icon={<LineChart />} detail="سیگنال قیمت" /><Kpi label="توصیه طراحی" value={recommendations.length.toLocaleString('fa-IR')} icon={<Sparkles />} detail="پیشنهاد آماده" /><Kpi label="Matching" value={matches.length.toLocaleString('fa-IR')} icon={<Users />} detail="تطابق بازار" /><Kpi label="Metric ثبت‌شده" value={metrics.length.toLocaleString('fa-IR')} icon={<Activity />} detail="شاخص سرویس" /></div><div className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]"><section className="card p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold text-stone-500">آخرین سیگنال قیمت</p><h3 className="mt-2 text-3xl font-black text-stone-950">{latest ? `${formatPrice(latest.predictedPrice)} تومان` : 'داده‌ای نیست'}</h3><p className="mt-2 text-sm text-stone-500">{latest ? `افق ${latest.horizonDays} روزه · ${latest.confidenceScore}٪ اطمینان` : 'یک اجرای مدل انجام دهید تا سیگنال نمایش داده شود.'}</p></div><span className="rounded-2xl bg-emerald-50 p-3 text-emerald-700"><TrendingUp className="h-5 w-5" aria-hidden="true" /></span></div><MiniChart /></section><section className="card p-5 sm:p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-bold text-stone-500">دسترسی providerها</p><h3 className="mt-1 text-xl font-black">آماده‌ی استفاده</h3></div><Bot className="h-6 w-6 text-amber-700" aria-hidden="true" /></div><div className="mt-4 space-y-3">{providers.length ? providers.slice(0, 4).map((provider) => <div key={provider.key} className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2.5 text-sm"><span className="truncate font-semibold">{provider.label}</span><span className={`inline-flex items-center gap-1 text-xs font-bold ${provider.configured ? 'text-emerald-700' : 'text-stone-500'}`}>{provider.configured ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />}{provider.configured ? 'فعال' : 'پیکربندی نشده'}</span></div>) : <EmptyState title="providerی گزارش نشده" description="API providerها هنوز پاسخی برنگردانده است." />}</div></section></div><QuickLinks onSelect={onSelect} /></div> }
 
-function ActionButton({ onRun, isPending, isSuccess, label }: { onRun: () => void; isPending: boolean; isSuccess: boolean; label: string }) {
-  return (
-    <button
-      type="button"
-      disabled={isPending}
-      onClick={onRun}
-      className="inline-flex items-center gap-2 rounded-xl border border-gold-500/20 bg-gold-50 px-3 py-2 text-xs font-black text-navy-900 hover:bg-gold-100 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      <RefreshCw className={`h-3.5 w-3.5 ${isPending ? 'animate-spin' : ''}`} />
-      {isPending ? 'در حال اجرا...' : isSuccess ? `${label} انجام شد` : label}
-      <ArrowUpRight className="h-3.5 w-3.5" />
-    </button>
-  )
-}
+function PredictionsTab({ items, query }: { items: AiPricePrediction[]; query: { isError: boolean; refetch: () => unknown } }) { return <DataSection title="پیش‌بینی‌های ثبت‌شده" icon={<LineChart />} action={<RetryButton onRetry={query.refetch} />}>{query.isError ? <InlineError /> : items.length ? <div className="grid gap-3 md:grid-cols-2">{items.map((item) => <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-stone-500">{item.modelVersion || 'مدل نامشخص'}</p><p className="mt-2 text-2xl font-black text-stone-950">{formatPrice(item.predictedPrice)} <span className="text-xs font-semibold text-stone-500">تومان</span></p></div><Confidence value={item.confidenceScore} /></div><div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3 text-xs text-stone-500"><span>قیمت فعلی: {formatPrice(item.currentPrice)}</span><span>افق {item.horizonDays} روز</span></div></article>)}</div> : <EmptyState title="هنوز پیش‌بینی‌ای ثبت نشده" description="با اجرای دوباره مدل‌ها، اولین سیگنال قیمت در اینجا نمایش داده می‌شود." />}</DataSection> }
+function DesignTab({ items, query }: { items: AiDesignRecommendation[]; query: { isError: boolean; refetch: () => unknown } }) { return <DataSection title="توصیه‌های شخصی‌سازی‌شده طراحی" icon={<Wand2 />} action={<RetryButton onRetry={query.refetch} />}>{query.isError ? <InlineError /> : items.length ? <div className="space-y-3">{items.map((item) => <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className="badge badge-gold">{item.source || 'AI recommendation'}</span><span className="text-xs text-stone-500">{item.productIds.length} محصول مرتبط</span></div><p className="mt-3 leading-7 text-stone-700">{item.reason || 'دلیل این توصیه هنوز ثبت نشده است.'}</p></div><strong className="shrink-0 text-xl text-amber-700">{item.score}٪</strong></div></article>)}</div> : <EmptyState title="توصیه‌ای آماده نیست" description="پس از اجرای مدل توصیه‌گر، پیشنهادهای طراحی متناسب با کاربر اینجا می‌آید." />}</DataSection> }
+function MatchingTab({ items, query }: { items: AiMarketMatch[]; query: { isError: boolean; refetch: () => unknown } }) { return <DataSection title="تطابق‌های بازار" icon={<Users />} action={<RetryButton onRetry={query.refetch} />}>{query.isError ? <InlineError /> : items.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-right text-sm"><thead><tr className="border-b border-stone-200 text-xs text-stone-500"><th className="pb-3 pr-3 font-semibold">خریدار / فروشنده</th><th className="pb-3 font-semibold">دلیل تطابق</th><th className="pb-3 font-semibold">امتیاز</th><th className="pb-3 font-semibold">وضعیت</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-b border-stone-100 last:border-0"><td className="py-4 pr-3 font-bold">{item.buyerId} <span className="px-1 text-stone-400">→</span> {item.sellerId}</td><td className="max-w-xs py-4 text-stone-600">{item.reason || 'بدون توضیح'}</td><td className="py-4 font-black text-amber-700">{item.score}٪</td><td className="py-4"><span className="badge badge-info">{item.status}</span></td></tr>)}</tbody></table></div> : <EmptyState title="Matchingی ثبت نشده" description="تطابق‌های هوشمند بازار پس از اجرای مدل در اینجا قابل بررسی هستند." />}</DataSection> }
 
-function AiCard({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-xl bg-gold-50 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold text-muted-foreground">{label}</p>
-          <p className="text-xs text-muted-foreground mt-1">{detail}</p>
-        </div>
-        <strong className="text-navy-900">{value}</strong>
-      </div>
-    </div>
-  )
-}
+function AssistantTab({ userId }: { userId: string }) { const [prompt, setPrompt] = useState(''); const [result, setResult] = useState<AiRunResult | null>(null); const mutation = useMutation({ mutationFn: (value: string) => api.chatWithAi({ task: 'assistant', prompt: value, userId }), onSuccess: setResult }); function submit(event: FormEvent) { event.preventDefault(); if (prompt.trim()) mutation.mutate(prompt.trim()) } return <div className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]"><section className="card p-5 sm:p-6"><div className="flex items-start gap-3"><span className="rounded-2xl bg-stone-950 p-3 text-amber-300"><Bot className="h-5 w-5" aria-hidden="true" /></span><div><h3 className="text-xl font-black">از دستیار بپرسید</h3><p className="mt-1 text-sm leading-6 text-stone-500">برای تحلیل قیمت، انتخاب طراحی یا خلاصه‌سازی وضعیت بازار سؤال خود را بنویسید.</p></div></div><form onSubmit={submit} className="mt-5"><label htmlFor="ai-assistant-prompt" className="text-sm font-bold text-stone-700">پیام شما</label><textarea id="ai-assistant-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} className="input mt-2 min-h-32 resize-y py-3" placeholder="مثلاً: برای خرید طلای ۱۸ عیار در هفته‌ی آینده به چه نکاتی توجه کنم؟" /><button type="submit" disabled={mutation.isPending || !prompt.trim()} className="btn btn-primary mt-3 w-full gap-2"><MessageSquare className="h-4 w-4" aria-hidden="true" />{mutation.isPending ? 'دستیار در حال پاسخ‌گویی…' : 'ارسال پرسش'}</button></form>{mutation.isError && <p className="mt-3 flex items-center gap-2 text-sm text-red-700" role="alert"><AlertTriangle className="h-4 w-4" aria-hidden="true" />اتصال به provider دستیار برقرار نشد. API و پیکربندی provider را بررسی کنید.</p>}</section><section className="card min-h-[300px] p-5 sm:p-6"><div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-4"><h3 className="font-black">پاسخ دستیار</h3><span className="badge badge-gold">{result?.provider?.label || 'منتظر پرسش شما'}</span></div>{result ? <div className="whitespace-pre-wrap py-5 text-sm leading-8 text-stone-700">{result.output}</div> : <div className="grid min-h-[230px] place-items-center text-center text-sm text-stone-500"><div><Bot className="mx-auto h-9 w-9 text-stone-300" aria-hidden="true" /><p className="mt-3">پاسخ AI پس از ارسال پرسش اینجا نمایش داده می‌شود.</p></div></div>}</section></div> }
 
-function EmptyState({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-xl border border-dashed p-6 text-center">
-      <h3 className="font-bold text-navy-900">{title}</h3>
-      <p className="text-sm text-muted-foreground mt-2">{description}</p>
-    </div>
-  )
-}
+function MetricsTab({ items, query, providers }: { items: AiServiceMetric[]; query: { isError: boolean; refetch: () => unknown }; providers: AiProviderPublicConfig[] }) { return <div className="space-y-5"><DataSection title="شاخص‌های سرویس" icon={<Gauge />} action={<RetryButton onRetry={query.refetch} />}>{query.isError ? <InlineError /> : items.length ? <div className="grid gap-3 sm:grid-cols-2">{items.map((item) => <div key={item.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex items-center justify-between gap-3"><span className="text-sm font-bold text-stone-600">{item.name}</span><Activity className="h-4 w-4 text-amber-700" aria-hidden="true" /></div><p className="mt-3 text-3xl font-black text-stone-950">{item.value.toLocaleString('fa-IR')}</p><p className="mt-2 text-xs text-stone-500">{metricUnit(item.metadata)}</p></div>)}</div> : <EmptyState title="Metricی ثبت نشده" description="شاخص‌های عملکرد سرویس بعد از اولین اجرای metric در اینجا دیده می‌شوند." />}</DataSection><DataSection title="وضعیت providerها" icon={<Database />}>{providers.length ? <div className="grid gap-3 md:grid-cols-2">{providers.map((provider) => <div key={provider.key} className="flex items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-4"><div><p className="font-bold">{provider.label}</p><p className="mt-1 text-xs text-stone-500">{provider.modelId || 'مدل پیش‌فرض'} · {provider.key}</p></div><span className={`badge ${provider.configured ? 'badge-success' : 'badge-warning'}`}>{provider.configured ? 'قابل استفاده' : 'نیازمند تنظیم'}</span></div>)}</div> : <EmptyState title="providerی در دسترس نیست" description="تنظیمات provider از API خوانده می‌شود." />}</DataSection></div> }
+
+function DataSection({ title, icon, action, children }: { title: string; icon: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) { return <section className="card p-5 sm:p-6"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="rounded-xl bg-amber-50 p-2.5 text-amber-700">{icon}</span><h3 className="text-xl font-black">{title}</h3></div>{action}</div><div className="mt-5">{children}</div></section> }
+function RetryButton({ onRetry }: { onRetry: () => unknown }) { return <button type="button" onClick={() => void onRetry()} className="btn min-h-10 gap-2 border border-stone-200 bg-white px-3 text-xs hover:bg-stone-50"><RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />تلاش دوباره</button> }
+function Kpi({ label, value, detail, icon }: { label: string; value: string; detail: string; icon: React.ReactNode }) { return <div className="card p-4"><div className="flex items-center justify-between gap-3"><span className="rounded-xl bg-stone-100 p-2 text-stone-700">{icon}</span><span className="text-xs text-stone-500">{detail}</span></div><p className="mt-4 text-xs font-bold text-stone-500">{label}</p><p className="mt-1 text-2xl font-black text-stone-950">{value}</p></div> }
+function Confidence({ value }: { value: number }) { return <span className="rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-black text-emerald-700">{value}٪ اطمینان</span> }
+function QuickLinks({ onSelect }: { onSelect: (tab: WorkspaceTab) => void }) { return <section className="card p-5 sm:p-6"><div className="flex items-center justify-between"><div><h3 className="text-xl font-black">شروع سریع</h3><p className="mt-1 text-sm text-stone-500">مستقیم به کاری بروید که می‌خواهید انجام دهید.</p></div><ArrowLeft className="h-5 w-5 text-stone-400" aria-hidden="true" /></div><div className="mt-4 grid gap-3 sm:grid-cols-3">{(['predictions', 'design', 'assistant'] as WorkspaceTab[]).map((id) => { const tab = tabs.find((item) => item.id === id)!; const Icon = tab.icon; return <button key={id} type="button" onClick={() => onSelect(id)} className="flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-4 text-right transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"><span className="flex items-center gap-3"><Icon className="h-5 w-5 text-amber-700" aria-hidden="true" /><span><span className="block text-sm font-bold">{tab.label}</span><span className="mt-1 block text-xs text-stone-500">{tab.description}</span></span></span><ChevronLeft className="h-4 w-4 text-stone-400" aria-hidden="true" /></button> })}</div></section> }
+function MiniChart() { return <div className="mt-6 overflow-hidden rounded-2xl bg-stone-950 p-3"><svg viewBox="0 0 600 150" className="h-28 w-full" role="img" aria-label="نمودار روند نمونه قیمت"><path d="M0 118 C45 115 52 92 97 99 S150 70 190 86 S240 90 280 56 S325 72 360 61 S410 25 450 48 S510 20 600 15" fill="none" stroke="#fbbf24" strokeWidth="4" strokeLinecap="round" /><path d="M0 118 C45 115 52 92 97 99 S150 70 190 86 S240 90 280 56 S325 72 360 61 S410 25 450 48 S510 20 600 15 L600 150 L0 150 Z" fill="url(#goldexa-gradient)" opacity=".16" /><defs><linearGradient id="goldexa-gradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#fbbf24" /><stop offset="1" stopColor="#fbbf24" stopOpacity="0" /></linearGradient></defs></svg><p className="mt-1 text-[11px] text-stone-400">نمایش روند برای درک UI است؛ عدد معتبر از prediction API خوانده می‌شود.</p></div> }
+function EmptyState({ title, description }: { title: string; description: string }) { return <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center"><HelpCircle className="mx-auto h-7 w-7 text-stone-400" aria-hidden="true" /><h4 className="mt-3 font-bold text-stone-800">{title}</h4><p className="mt-1 text-sm leading-6 text-stone-500">{description}</p></div> }
+function InlineError() { return <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert"><AlertTriangle className="h-4 w-4" aria-hidden="true" />داده این بخش در دسترس نیست. از تلاش دوباره یا پیش‌نمایش محلی استفاده کنید.</div> }
+function metricUnit(metadata: unknown) { if (metadata && typeof metadata === 'object' && 'unit' in metadata) return String((metadata as { unit?: unknown }).unit || 'واحد ثبت نشده'); return 'واحد ثبت نشده' }

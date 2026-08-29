@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common'
+import { BadRequestException, GatewayTimeoutException, Injectable, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import axios, { AxiosError } from 'axios'
 import {
@@ -48,7 +48,7 @@ export class OpenRouterAiClient {
     try {
       const response = await axios.post(`${baseUrl}/chat/completions`, body, {
         headers: this.getHeaders(),
-        timeout: 120000,
+        timeout: this.timeout(120000),
       })
 
       const content = this.extractChatContent(response.data)
@@ -99,7 +99,7 @@ export class OpenRouterAiClient {
         },
         {
           headers: this.getHeaders(),
-          timeout: 180000,
+          timeout: this.timeout(180000),
         },
       )
 
@@ -136,6 +136,8 @@ export class OpenRouterAiClient {
       modelEnvKey: provider.modelEnvKey,
       capabilities: provider.capabilities,
       configured: Boolean(this.configService.get<string>(provider.envKey)),
+      enabled: this.configService.get<string>('AI_ENGINE_ENABLED')?.toLowerCase() === 'true',
+      endpoint: 'openrouter',
     }
   }
 
@@ -189,6 +191,11 @@ export class OpenRouterAiClient {
 
   private getBaseUrl(): string {
     return this.configService.get<string>('OPENROUTER_BASE_URL') || 'https://openrouter.ai/api/v1'
+  }
+
+  private timeout(fallback: number): number {
+    const configured = Number(this.configService.get<string>('AI_OPENROUTER_TIMEOUT_MS') || fallback)
+    return Number.isFinite(configured) ? Math.min(Math.max(configured, 1000), 180000) : fallback
   }
 
   private extractChatContent(data: OpenRouterResponse): string {
@@ -285,6 +292,12 @@ export class OpenRouterAiClient {
 
   private toBadRequest(error: unknown, provider: AiProviderPublicConfig, model: string): BadRequestException {
     const axiosError = error as AxiosError<OpenRouterResponse>
+    if (axiosError?.code === 'ECONNABORTED' || axiosError?.code === 'ETIMEDOUT') {
+      return new GatewayTimeoutException({ message: 'زمان پاسخ سرویس AI تمام شد', provider: provider.key, model })
+    }
+    if (!axiosError?.response) {
+      return new ServiceUnavailableException({ message: 'سرویس OpenRouter در دسترس نیست', provider: provider.key, model })
+    }
     const responseData = axiosError?.response?.data
     const responseError = responseData?.error as { message?: unknown } | undefined
     const message =

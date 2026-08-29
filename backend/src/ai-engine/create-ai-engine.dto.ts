@@ -1,3 +1,5 @@
+import { IsArray, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator'
+
 export class CreateAiPricePredictionDto {
   targetType: string
   targetId?: string | null
@@ -31,4 +33,51 @@ export class CreateAiServiceMetricDto {
   name: string
   value: number
   metadata?: unknown
+}
+
+export class ExecuteAiPredictionDto {
+  @IsNumber()
+  currentPrice: number
+
+  @IsOptional()
+  @IsArray()
+  historicalPrices?: number[]
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(365)
+  horizonDays?: number
+}
+
+export class ExecuteAiRecommendationDto {
+  @IsOptional()
+  @IsArray()
+  userHistory?: string[]
+
+  @IsOptional()
+  @IsNumber()
+  budget?: number
+
+  @IsOptional()
+  @IsString()
+  style?: string
+}
+
+export class ExecuteAiMatchDto {
+  @IsString()
+  buyerId: string
+
+  @IsString()
+  sellerId: string
+
+  @IsOptional()
+  @IsString()
+  listingId?: string
+
+  @IsOptional()
+  buyerContext?: unknown
+
+  @IsOptional()
+  sellerContext?: unknown
 }

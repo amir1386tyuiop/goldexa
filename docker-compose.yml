@@ -98,6 +98,8 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       GOLD_PRICE_SOURCE: ${GOLD_PRICE_SOURCE:-mock}
       AI_ENGINE_ENABLED: ${AI_ENGINE_ENABLED:-false}
+      AI_LOCAL_URL: ${AI_LOCAL_URL:-http://ai-service:8000}
+      AI_LOCAL_TIMEOUT_MS: ${AI_LOCAL_TIMEOUT_MS:-8000}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     ports:

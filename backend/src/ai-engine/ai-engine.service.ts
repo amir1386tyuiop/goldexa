@@ -5,6 +5,7 @@ import { Repository } from 'typeorm'
 import { NotificationChannel } from '../notifications/notification.entity'
 import { NotificationsService } from '../notifications/notifications.service'
 import { ContentService } from '../content/content.service'
+import { Product } from '../products/product.entity'
 import { AiDesignRecommendation } from './ai-design-recommendation.entity'
 import { AiMarketMatch, AiMatchStatus } from './ai-market-match.entity'
 import { AiPricePrediction } from './ai-price-prediction.entity'
@@ -12,6 +13,10 @@ import { AiServiceMetric } from './ai-service-metric.entity'
 import {
   AiProviderConfig,
   AiProviderPublicConfig,
+  AiProviderStatus,
+  AiPredictionInput,
+  AiRecommendationInput,
+  AiMatchInput,
   AiRunResult,
   AiTaskKey,
   OpenRouterChatOptions,
@@ -19,6 +24,7 @@ import {
 } from './ai-engine.types'
 import { AI_PROVIDER_REGISTRY, getAiProvider } from './ai-provider-registry'
 import { OpenRouterAiClient } from './openrouter-ai.client'
+import { LocalAiClient } from './local-ai.client'
 import {
   CreateAiDesignRecommendationDto,
   CreateAiMarketMatchDto,
@@ -50,7 +56,10 @@ export class AiEngineService {
     private matchRepository: Repository<AiMarketMatch>,
     @InjectRepository(AiServiceMetric)
     private metricRepository: Repository<AiServiceMetric>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
     private readonly openRouterAiClient: OpenRouterAiClient,
+    private readonly localAiClient: LocalAiClient,
     private readonly configService: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly contentService: ContentService,
@@ -58,6 +67,73 @@ export class AiEngineService {
 
   async findProviders(): Promise<AiProviderPublicConfig[]> {
     return AI_PROVIDER_REGISTRY.map((provider) => this.openRouterAiClient.toPublicProvider(provider))
+  }
+
+  async providerStatus(): Promise<AiProviderStatus[]> {
+    const localConfigured = this.localAiClient.isConfigured()
+    const localHealthy = localConfigured ? await this.localAiClient.health() : null
+    const preferLocal = this.preferLocal()
+    return AI_PROVIDER_REGISTRY.map((provider) => {
+      const configured = Boolean(this.configService.get<string>(provider.envKey))
+      const endpoint = preferLocal && localConfigured ? 'local' : 'openrouter'
+      return {
+        key: provider.key,
+        label: provider.label,
+        modelId: this.resolveModel(provider),
+        configured: endpoint === 'local' ? localHealthy === true : configured,
+        enabled: this.isEnabled(),
+        healthy: endpoint === 'local' ? localHealthy : configured ? null : false,
+        endpoint,
+        fallbackEnabled: preferLocal && localConfigured && configured,
+      }
+    })
+  }
+
+  async executePrediction(input: AiPredictionInput, userId: string): Promise<AiPricePrediction> {
+    const result = await this.runStructuredInference('prediction', userId, input, async () => this.localAiClient.predict(input))
+    const predictedPrice = this.numberFrom(result, 'predicted_price')
+    const confidence = this.numberFrom(result, 'confidence', 'confidence_score')
+    if (predictedPrice === null || confidence === null) throw new BadRequestException('خروجی prediction معتبر نیست')
+    return this.createPrediction({
+      targetType: input.targetType || 'user', targetId: userId, currentPrice: input.currentPrice,
+      predictedPrice, confidenceScore: Math.min(Math.max(confidence <= 1 ? confidence * 100 : confidence, 0), 100),
+      horizonDays: input.horizonDays || 14, modelVersion: String(result.model_version || 'ai-engine-v1'),
+      features: { provider: result.provider || 'ai-service', generatedAt: new Date().toISOString() },
+    })
+  }
+
+  async executeRecommendation(input: AiRecommendationInput, userId: string): Promise<AiDesignRecommendation> {
+    const products = await this.productRepository.find({ take: 100 })
+    const candidateDesigns = products.map((product) => ({
+      product_id: product.id,
+      name: product.name,
+      tags: [product.category, `${product.karat}k`, product.isFeatured ? 'featured' : '', product.isNew ? 'new' : ''].filter(Boolean),
+      price: Number(product.finalPrice),
+    }))
+    const result = await this.runStructuredInference('recommendation', userId, { ...input, candidateDesigns }, async () => this.localAiClient.recommend({ ...input, candidateDesigns, userId }))
+    const recommendations = Array.isArray(result.recommendations) ? result.recommendations : []
+    const first = recommendations[0] as Record<string, unknown> | undefined
+    if (!first || !this.numberFrom(first, 'score')) throw new BadRequestException('خروجی recommendation معتبر نیست')
+    return this.createRecommendation({
+      userId, designId: input.designId ?? null,
+      productIds: recommendations.map((item) => String((item as Record<string, unknown>).product_id || '')).filter(Boolean),
+      score: Math.min(Math.max(this.numberFrom(first, 'score')! <= 1 ? this.numberFrom(first, 'score')! * 100 : this.numberFrom(first, 'score')!, 0), 100),
+      reason: String(first.reason || 'پیشنهاد بر اساس داده‌های واقعی کاربر و مدل AI.'),
+      source: String(result.provider || 'ai-service'),
+    })
+  }
+
+  async executeMatch(input: AiMatchInput, adminUserId: string): Promise<AiMarketMatch> {
+    const result = await this.runStructuredInference('matching', adminUserId, input, async () => this.localAiClient.match(input))
+    const score = this.numberFrom(result, 'score')
+    if (score === null) throw new BadRequestException('خروجی matching معتبر نیست')
+    return this.createMatch({
+      buyerId: input.buyerId, sellerId: input.sellerId, listingId: input.listingId ?? null,
+      score: Math.min(Math.max(score <= 1 ? score * 100 : score, 0), 100),
+      reason: Array.isArray(result.reasons)
+        ? result.reasons.map((item) => String(item)).join(' · ')
+        : String(result.reason || 'تطابق بر اساس داده‌های واقعی طرفین و مدل AI.'),
+    } as CreateAiMarketMatchDto)
   }
 
   async chat(input: RunAiTaskInput): Promise<AiRunResult> {
@@ -225,44 +301,16 @@ export class AiEngineService {
   }
 
   async rerunAll(userId: string | null): Promise<unknown[]> {
-    const metrics = await this.rerunMetric()
-
-    return Promise.all([
-      this.rerunPrediction(userId),
-      this.rerunRecommendation(userId),
-      ...metrics,
-    ])
+    if (!userId) throw new BadRequestException('شناسه کاربر برای اجرای AI الزامی است')
+    throw new BadRequestException('برای اجرای واقعی، endpointهای execute با داده‌ی ورودی استفاده شوند')
   }
 
   async rerunPrediction(targetId: string | null): Promise<AiPricePrediction> {
-    const currentPrice = 5_850_000
-    const predictedPrice = Math.round(currentPrice * (1 + (((Date.now() % 9) - 4) * 0.0015)))
-
-    return this.createPrediction({
-      targetType: 'user',
-      targetId,
-      currentPrice,
-      predictedPrice,
-      confidenceScore: 84 + (Date.now() % 7),
-      horizonDays: 14,
-      modelVersion: 'goldeksa-price-rerun-v1',
-      features: {
-        rerun: true,
-        generatedAt: new Date().toISOString(),
-      },
-    })
+    throw new BadRequestException('اجرای prediction بدون currentPrice و داده‌ی واقعی مجاز نیست؛ از predictions/execute استفاده کنید')
   }
 
   async rerunRecommendation(userId?: string): Promise<AiDesignRecommendation> {
-    if (!userId) {
-      throw new BadRequestException('شناسه کاربر برای اجرای recommendation الزامی است')
-    }
-    return this.createRecommendation({
-      userId,
-      score: 86 + (Date.now() % 10),
-      reason: 'بر اساس رفتار خرید، بودجه و سبک‌های پربازدید، این طرح بیشترین احتمال انتخاب را دارد.',
-      source: 'goldeksa-design-rerun-v1',
-    })
+    throw new BadRequestException('اجرای recommendation بدون داده‌ی واقعی مجاز نیست؛ از recommendations/execute استفاده کنید')
   }
 
   async rerunMatch(): Promise<AiMarketMatch> {
@@ -614,5 +662,64 @@ export class AiEngineService {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '')
       .toLowerCase()
+  }
+
+  private async runStructuredInference(
+    kind: 'prediction' | 'recommendation' | 'matching',
+    userId: string,
+    input: unknown,
+    localCall: () => Promise<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>> {
+    const prompt = kind === 'prediction'
+      ? `برای پیش‌بینی قیمت طلا فقط JSON معتبر با کلیدهای predicted_price, confidence, model_version برگردان. داده: ${this.stringifyContext(input)}`
+      : kind === 'recommendation'
+        ? `برای کاربر ${userId} فقط JSON معتبر با کلید recommendations برگردان؛ هر آیتم باید product_id و score و reason داشته باشد. داده: ${this.stringifyContext(input)}`
+        : `برای تطبیق بازار فقط JSON معتبر با کلیدهای score و reason برگردان. داده: ${this.stringifyContext(input)}`
+
+    if (this.preferLocal() && this.localAiClient.isConfigured()) {
+      try {
+        return await localCall()
+      } catch (error) {
+        if (!this.configuredOpenRouter()) throw error
+      }
+    }
+
+    if (!this.configuredOpenRouter()) {
+      throw new BadRequestException('هیچ provider قابل استفاده‌ای برای AI تنظیم نشده است')
+    }
+
+    const provider = getAiProvider('assistant')
+    const publicProvider = this.openRouterAiClient.toPublicProvider(provider)
+    const result = await this.openRouterAiClient.chat(
+      provider,
+      publicProvider,
+      [{ role: 'system', content: 'خروجی را فقط JSON معتبر و بدون markdown برگردان. نتیجه را جعل نکن و اگر داده کافی نیست خطا بده.' }, { role: 'user', content: prompt }],
+      { temperature: 0, maxTokens: 800, responseFormat: { type: 'json_object' } },
+    )
+    try {
+      return JSON.parse(result.output) as Record<string, unknown>
+    } catch {
+      throw new BadRequestException('خروجی JSON از provider معتبر نیست')
+    }
+  }
+
+  private configuredOpenRouter(): boolean {
+    return Boolean(this.configService.get<string>('OPENROUTER_API_KEY'))
+  }
+
+  private preferLocal(): boolean {
+    return (this.configService.get<string>('AI_PREFER_LOCAL') || 'true').toLowerCase() === 'true'
+  }
+
+  private isEnabled(): boolean {
+    return (this.configService.get<string>('AI_ENGINE_ENABLED') || 'false').toLowerCase() === 'true'
+  }
+
+  private numberFrom(value: Record<string, unknown>, ...keys: string[]): number | null {
+    for (const key of keys) {
+      const number = Number(value[key])
+      if (Number.isFinite(number)) return number
+    }
+    return null
   }
 }

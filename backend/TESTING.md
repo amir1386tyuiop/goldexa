@@ -130,3 +130,29 @@ npm run test:e2e
 تست‌ها دسترسی anonymous به orders، cart، wallet، payment transactions، direct payment verification، pricing rule mutation، checkout، wallet payment و refund را بررسی می‌کنند. بدون `E2E_BASE_URL` این suite skip می‌شود.
 
 `database/seed.sql` فقط برای development است و تست‌ها نباید روی production database اجرا شوند.
+
+## AI Engine integration
+
+`AI_ENGINE_ENABLED` باید صریحاً `true` باشد. مسیرهای کاربری به JWT نیاز دارند و
+شناسه کاربر را فقط از `sub` توکن می‌گیرند؛ `userId` ارسالی در body مبنای مالکیت
+نیست. مسیرهای زیر برای اتصال UI هستند:
+
+- `GET /ai-engine/providers` برای فهرست capabilityها (بدون secret)
+- `GET /ai-engine/providers/status` برای admin با permission `VIEW_REPORTS`
+- `GET /ai-engine/predictions/me` و `POST /ai-engine/predictions/execute`
+- `GET /ai-engine/recommendations/me` و `POST /ai-engine/recommendations/execute`
+- `POST /ai-engine/matches/execute` برای admin با permission `VIEW_REPORTS`
+
+`AI_LOCAL_URL` سرویس اختیاری local AI است. با `AI_PREFER_LOCAL=true` ابتدا
+local استفاده می‌شود و در صورت خطای آن، فقط اگر `OPENROUTER_API_KEY` تنظیم باشد
+به OpenRouter fallback می‌شود. اگر هیچ provider آماده نباشد یا خروجی ساختاریافته
+نامعتبر باشد، درخواست خطا می‌دهد و نتیجه‌ی ساختگی ذخیره نمی‌شود. timeoutها با
+`AI_LOCAL_TIMEOUT_MS` (پیش‌فرض ۸ ثانیه) و `AI_OPENROUTER_TIMEOUT_MS` قابل تنظیم
+هستند؛ کلید API هرگز در response status/config یا لاگ metric قرار نمی‌گیرد.
+
+تست‌های unit قرارداد اجرای local، fallback و رد خروجی غیر JSON را پوشش می‌دهند:
+
+```powershell
+npm test -- --runInBand ai-engine.service.spec.ts
+npm run build
+```

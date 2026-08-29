@@ -37,6 +37,43 @@ export interface AiProviderPublicConfig {
   modelEnvKey: string
   capabilities: string[]
   configured: boolean
+  enabled: boolean
+  endpoint: 'openrouter' | 'local'
+}
+
+export interface AiProviderStatus {
+  key: string
+  label: string
+  modelId: string
+  configured: boolean
+  enabled: boolean
+  healthy: boolean | null
+  endpoint: 'openrouter' | 'local'
+  fallbackEnabled: boolean
+}
+
+export interface AiPredictionInput {
+  currentPrice: number
+  historicalPrices?: number[]
+  horizonDays?: number
+  targetType?: string
+  targetId?: string | null
+}
+
+export interface AiRecommendationInput {
+  userHistory?: string[]
+  budget?: number
+  style?: string
+  designId?: string | null
+  candidateDesigns?: Array<{ product_id: string; name: string; tags: string[]; price?: number }>
+}
+
+export interface AiMatchInput {
+  buyerId: string
+  sellerId: string
+  listingId?: string | null
+  buyerContext?: unknown
+  sellerContext?: unknown
 }
 
 export interface RunAiTaskInput {
