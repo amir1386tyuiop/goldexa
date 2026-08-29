@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Gem, LogOut, Menu, PackageCheck, ShieldCheck, ShoppingBag, ShoppingCart, TrendingUp, User, Wallet, X } from 'lucide-react'
+import { Activity, Bot, Gem, LogOut, Menu, PackageCheck, ShieldCheck, ShoppingBag, ShoppingCart, TrendingUp, User, Wallet, X } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/store'
 import { cn } from '@/lib/utils'
@@ -45,6 +45,7 @@ export function Navbar() {
             </Link>
           ))}
           {currentUser?.role === 'admin' && <Link to="/admin" className="rounded-xl bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900">مدیریت</Link>}
+          {currentUser?.role === 'admin' && <Link to="/ai-workspace" className={cn('flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors hover:bg-amber-50', location.pathname === '/ai-workspace' ? 'bg-stone-950 text-white hover:bg-stone-800' : 'text-amber-900')}><Bot className="h-4 w-4" />هوش مصنوعی</Link>}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -64,6 +65,7 @@ export function Navbar() {
           {navItems.map(({ label, path, icon: Icon }) => <Link key={path} to={path} onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><Icon className="h-5 w-5 text-amber-700" />{label}</Link>)}
           <Link to="/dashboard" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><PackageCheck className="h-5 w-5 text-amber-700" />داشبورد و سفارش‌ها</Link>
           {currentUser?.role === 'admin' && <Link to="/admin" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 font-semibold text-amber-900 hover:bg-amber-100"><ShieldCheck className="h-5 w-5 text-amber-700" />پنل مدیریت</Link>}
+          {currentUser?.role === 'admin' && <Link to="/ai-workspace" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-semibold text-amber-900 hover:bg-amber-100"><Bot className="h-5 w-5 text-amber-700" />مرکز هوش مصنوعی</Link>}
           <Link to="/wallet" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><Wallet className="h-5 w-5 text-amber-700" />کیف پول</Link>
           {!currentUser && <Link to="/login" onClick={closeMenu} className="mt-2 flex min-h-12 items-center justify-center rounded-xl bg-stone-950 px-4 py-3 font-semibold text-white">ورود / ثبت‌نام</Link>}
         </nav>
