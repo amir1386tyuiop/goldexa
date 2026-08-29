@@ -30,7 +30,8 @@ describe('CartService reservations', () => {
     }
     const itemRepository: any = { findOne: jest.fn() }
     const productRepository: any = {}
-    return { service: new CartService(cartRepository, itemRepository, productRepository), manager, queryRunner, cartRepository, itemRepository }
+    const pricingService = { calculateProductPrice: jest.fn().mockResolvedValue(125000) }
+    return { service: new CartService(cartRepository, itemRepository, productRepository, pricingService as any), manager, queryRunner, cartRepository, itemRepository }
   }
 
   it('locks cart then product and persists authoritative product fields', async () => {

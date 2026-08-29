@@ -26,7 +26,7 @@ describe('OrdersService wallet checkout', () => {
       },
     }
     walletService = { payOrderWithWallet: jest.fn(async () => ({ id: 'wallet-tx-1' })) }
-    pricingService = { requireValidQuote: jest.fn(async () => ({ quoteId: 'Q-1', valid: true, total: 110 })) }
+    pricingService = { requireValidQuote: jest.fn(async () => ({ quoteId: 'Q-1', valid: true, total: 110 })), calculateProductPrice: jest.fn(async () => 100) }
     dataSource = { transaction: jest.fn() }
     const orderRepository: any = {
       manager: { connection: { createQueryRunner: jest.fn(() => queryRunner) } },

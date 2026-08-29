@@ -105,9 +105,17 @@ export class PricingService {
    * inject an arbitrary price into the final calculation.
    */
   async calculate(category: string, goldWeight: number) {
+    return this.calculateInternal(category, goldWeight, 18)
+  }
+
+  private async calculateInternal(category: string, goldWeight: number, karat: number) {
     const weight = Number(goldWeight)
+    const purity = Number(karat)
     if (!Number.isFinite(weight) || weight <= 0) {
       throw new Error('وزن طلا نامعتبر است')
+    }
+    if (!Number.isFinite(purity) || purity <= 0 || purity > 24) {
+      throw new Error('عیار طلا نامعتبر است')
     }
 
     const [rule, spreadRule, taxRule, laborRule] = await Promise.all([
@@ -122,7 +130,7 @@ export class PricingService {
       throw new Error('قیمت لحظه‌ای طلا در دسترس نیست')
     }
 
-    const rawGold = pricePerGram * weight
+    const rawGold = pricePerGram * weight * (purity / 18)
 
     // اجرت: قاعده‌ی مطلق (پایه + هر گرم) در اولویت، وگرنه درصدی از ارزش طلا
     const labor = laborRule
@@ -147,6 +155,7 @@ export class PricingService {
       category,
       pricePerGram,
       goldWeight: weight,
+      karat: purity,
       rawGold: Math.round(rawGold),
       labor: Math.round(labor),
       profit: Math.round(profit),
@@ -155,6 +164,12 @@ export class PricingService {
       spreadPercent,
       total: Math.round(total),
     }
+  }
+
+  /** Resolve a catalog product price from the latest live 18k feed. */
+  async calculateProductPrice(product: { category: string; weight: number; karat?: number }) {
+    const breakdown = await this.calculateInternal(product.category, product.weight, product.karat || 18)
+    return breakdown.total
   }
 
   // --- 5-minute price reservation (قفل/رزرو قیمت) ---

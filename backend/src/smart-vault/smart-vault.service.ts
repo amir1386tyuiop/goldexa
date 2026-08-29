@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SmartVaultAsset } from './smart-vault-asset.entity'
@@ -9,6 +9,8 @@ import {
   CreatePriceAlertDto,
   CreateSmartVaultAssetDto,
 } from './create-smart-vault.dto'
+import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
+import { GoldPriceType } from '../gold-pricing/gold-price.entity'
 
 @Injectable()
 export class SmartVaultService {
@@ -19,6 +21,7 @@ export class SmartVaultService {
     private snapshotRepository: Repository<AssetValuationSnapshot>,
     @InjectRepository(PriceAlert)
     private alertRepository: Repository<PriceAlert>,
+    @Optional() private readonly goldPricing?: GoldPricingService,
   ) {}
 
   async findAssets(userId: string): Promise<SmartVaultAsset[]> {
@@ -27,12 +30,22 @@ export class SmartVaultService {
 
   async getSummary(userId: string) {
     const assets = await this.findAssets(userId)
+    const liveGoldPrice = this.goldPricing
+      ? Number((await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18))?.value || 0)
+      : 0
     const summary = assets.reduce(
       (result, asset) => {
+        const liveRawGoldValue = liveGoldPrice > 0
+          ? liveGoldPrice * Number(asset.weight) * (Number(asset.karat || 18) / 18)
+          : Number(asset.currentRawGoldValue ?? asset.currentValue)
+        const liveCurrentValue = liveRawGoldValue
+        const liveProfitLoss = liveGoldPrice > 0
+          ? liveCurrentValue - Number(asset.purchasePrice)
+          : Number(asset.profitLoss)
         result.purchaseValue += Number(asset.purchasePrice)
-        result.currentValue += Number(asset.currentValue)
+        result.currentValue += liveCurrentValue
         result.goldWeight += Number(asset.weight)
-        result.profitLoss += Number(asset.profitLoss)
+        result.profitLoss += liveProfitLoss
         return result
       },
       { assetCount: 0, purchaseValue: 0, currentValue: 0, goldWeight: 0, profitLoss: 0 },

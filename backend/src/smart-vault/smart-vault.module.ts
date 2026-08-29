@@ -5,9 +5,10 @@ import { AssetValuationSnapshot } from './asset-valuation-snapshot.entity'
 import { PriceAlert } from './price-alert.entity'
 import { SmartVaultController } from './smart-vault.controller'
 import { SmartVaultService } from './smart-vault.service'
+import { GoldPricingModule } from '../gold-pricing/gold-pricing.module'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SmartVaultAsset, AssetValuationSnapshot, PriceAlert])],
+  imports: [TypeOrmModule.forFeature([SmartVaultAsset, AssetValuationSnapshot, PriceAlert]), GoldPricingModule],
   controllers: [SmartVaultController],
   providers: [SmartVaultService],
   exports: [SmartVaultService],

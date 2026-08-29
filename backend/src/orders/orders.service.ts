@@ -97,12 +97,13 @@ export class OrdersService {
         }
         product.stock -= item.quantity
         await queryRunner.manager.save(product)
+        const livePrice = await this.pricingService.calculateProductPrice(product)
         itemsWithProducts.push({
           productId: product.id,
           name: product.name,
           quantity: item.quantity,
-          unitPrice: product.finalPrice,
-          totalPrice: Number(product.finalPrice) * item.quantity,
+          unitPrice: livePrice,
+          totalPrice: livePrice * item.quantity,
         })
       }
 

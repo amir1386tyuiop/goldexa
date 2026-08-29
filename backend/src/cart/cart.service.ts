@@ -6,6 +6,7 @@ import { CartItem } from './cart-item.entity'
 import { Product } from '../products/product.entity'
 import { AddCartItemDto, CreateCartDto } from './create-cart.dto'
 import { JwtUser } from '../common/guards/jwt-auth.guard'
+import { PricingService } from '../pricing/pricing.service'
 
 @Injectable()
 export class CartService {
@@ -15,6 +16,7 @@ export class CartService {
     @InjectRepository(Cart) private cartRepository: Repository<Cart>,
     @InjectRepository(CartItem) private itemRepository: Repository<CartItem>,
     @InjectRepository(Product) private productRepository: Repository<Product>,
+    private readonly pricingService: PricingService,
   ) {}
 
   async findByUser(userId: string): Promise<Cart | null> {
@@ -76,13 +78,14 @@ export class CartService {
       })
       if (!product) throw new NotFoundException('محصول یافت نشد')
       await this.assertStockAvailable(manager, product, quantity)
+      const livePrice = await this.pricingService.calculateProductPrice(product)
       const item = manager.create(CartItem, {
         cartId: data.cartId,
         productId: product.id,
         name: product.name,
         quantity,
-        unitPrice: product.finalPrice,
-        totalPrice: Number(product.finalPrice) * quantity,
+        unitPrice: livePrice,
+        totalPrice: livePrice * quantity,
         reservedUntil: new Date(Date.now() + this.reservationMinutes * 60 * 1000),
       })
       return manager.save(CartItem, item)
@@ -112,10 +115,11 @@ export class CartService {
       })
       if (!product) throw new NotFoundException('محصول یافت نشد')
       await this.assertStockAvailable(manager, product, quantity, lockedItem.id)
+      const livePrice = await this.pricingService.calculateProductPrice(product)
       lockedItem.quantity = quantity
       lockedItem.name = product.name
-      lockedItem.unitPrice = product.finalPrice
-      lockedItem.totalPrice = Number(product.finalPrice) * quantity
+      lockedItem.unitPrice = livePrice
+      lockedItem.totalPrice = livePrice * quantity
       lockedItem.reservedUntil = new Date(Date.now() + this.reservationMinutes * 60 * 1000)
       return manager.save(CartItem, lockedItem)
     })

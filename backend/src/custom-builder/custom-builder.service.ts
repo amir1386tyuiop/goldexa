@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import {
@@ -19,6 +19,8 @@ import {
   CreateJewelryDesignDto,
   CreateJewelryDesignVersionDto,
 } from './create-custom-builder.dto'
+import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
+import { GoldPriceType } from '../gold-pricing/gold-price.entity'
 
 @Injectable()
 export class CustomBuilderService {
@@ -31,6 +33,7 @@ export class CustomBuilderService {
     private gemstoneRepository: Repository<GemstoneLibrary>,
     @InjectRepository(CustomBuilderQuote)
     private quoteRepository: Repository<CustomBuilderQuote>,
+    @Optional() private readonly goldPricing?: GoldPricingService,
   ) {}
 
   async findDesigns(): Promise<JewelryDesign[]> {
@@ -149,6 +152,18 @@ export class CustomBuilderService {
     const source = design
       ? { goldPriceSnapshot: Number(design.estimatedGoldPrice), goldWeight: Number(design.weight), laborCost: Number(design.laborCost), profit: Number(design.profit), tax: Number(design.tax), total: Number(design.totalPrice) }
       : data
+    if (this.goldPricing) {
+      const livePrice = Number((await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18))?.value || 0)
+      if (!livePrice) throw new NotFoundException('قیمت لحظه‌ای طلا در دسترس نیست')
+      const rawGold = livePrice * Number(source.goldWeight) * (Number(design?.karat || 18) / 18)
+      const laborCost = Number(source.laborCost || 0)
+      const profit = Number(source.profit || 0)
+      const taxRate = Number(source.tax ?? 9)
+      Object.assign(source, {
+        goldPriceSnapshot: livePrice,
+        total: Math.round(rawGold + laborCost + profit + ((laborCost + profit) * taxRate) / 100),
+      })
+    }
     const expiresAt = data.expiresAt && new Date(data.expiresAt).getTime() > Date.now()
       ? new Date(data.expiresAt)
       : new Date(Date.now() + 30 * 60 * 1000)
