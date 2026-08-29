@@ -150,7 +150,42 @@ export class AiEngineService {
   }
 
   async chat(input: RunAiTaskInput): Promise<AiRunResult> {
+    if (this.preferLocal() && !this.configuredOpenRouter()) {
+      return this.runLocalDesignChat(input)
+    }
     return this.runTask({ ...input, task: 'assistant' })
+  }
+
+  /** Useful local design-builder fallback until an external model key is supplied. */
+  private async runLocalDesignChat(input: RunAiTaskInput): Promise<AiRunResult> {
+    const provider = getAiProvider('assistant')
+    const publicProvider = this.openRouterAiClient.toPublicProvider(provider)
+    const startedAt = Date.now()
+    const prompt = input.prompt || ''
+    const weightMatch = prompt.match(/(\d+(?:[.,]\d+)?)\s*گرم/i)
+    const karatMatch = prompt.match(/(\d{1,2})\s*(?:عیار|k)/i)
+    const weight = weightMatch ? Number(weightMatch[1].replace(',', '.')) : 3
+    const karat = karatMatch ? Number(karatMatch[1]) : 18
+    const category = /گردنبند|necklace/i.test(prompt) ? 'necklace' : /گوشواره|earring/i.test(prompt) ? 'earring' : /دستبند|bracelet/i.test(prompt) ? 'bracelet' : 'ring'
+    const style = /کلاسیک|classic/i.test(prompt) ? 'کلاسیک' : /نگین|الماس|diamond/i.test(prompt) ? 'نگین‌دار' : /مدرن|modern/i.test(prompt) ? 'مدرن' : 'مینیمال'
+    const livePrice = this.goldPricing ? Number((await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18))?.value || 0) : 0
+    if (!livePrice) throw new BadRequestException('قیمت لحظه‌ای طلا برای ساخت طرح در دسترس نیست')
+    const rawGold = livePrice * weight * (karat / 18)
+    const labor = rawGold * 0.12
+    const profit = (rawGold + labor) * 0.08
+    const tax = (labor + profit) * 0.09
+    const design = {
+      title: `طرح ${style} ${category === 'ring' ? 'انگشتر' : category === 'necklace' ? 'گردنبند' : category === 'earring' ? 'گوشواره' : 'دستبند'}`,
+      category, style, weight, karat,
+      materials: ['طلای زرد', `${karat} عیار`],
+      stones: /الماس|diamond/i.test(prompt) ? ['الماس سفید'] : /زمرد/i.test(prompt) ? ['زمرد سبز'] : [],
+      brief: `فرم ${style} با خطوط تمیز، تناسب روزمره و قابلیت ساخت مطابق توضیح شما.`,
+      pricing: { liveGoldPricePerGram: livePrice, rawGold: Math.round(rawGold), labor: Math.round(labor), profit: Math.round(profit), tax: Math.round(tax), total: Math.round(rawGold + labor + profit + tax), currency: 'IRR' },
+      disclaimer: 'این طرح مفهومی است؛ قیمت بر اساس آخرین قیمت زنده طلای ۱۸ عیار محاسبه شده و قبل از ثبت سفارش باید توسط کارشناس تأیید شود.',
+    }
+    const output = JSON.stringify({ type: 'jewelry_design', design }, null, 2)
+    await this.recordSuccess(provider, publicProvider, startedAt, { mode: 'local-design-builder' }, { livePrice })
+    return { task: 'assistant', provider: publicProvider, model: 'local-design-builder-v1', output, usage: { mode: 'local' }, raw: { design }, metadata: { source: 'local', livePrice } }
   }
 
   async code(input: RunAiTaskInput): Promise<AiRunResult> {
