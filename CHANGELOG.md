@@ -20,10 +20,11 @@
 - Backend build: passing.
 - Frontend lint/build: passing.
 - Backend unit/security suites: passing locally.
-- Real PostgreSQL/Redis E2E: requires Docker Desktop or an equivalent test environment and `E2E_BASE_URL`; skipped when unavailable.
+- Real PostgreSQL/Redis E2E: passed with 2 suites and 11 tests in the isolated Docker stack.
 
 ## Important release notes
 
 - Do not run `database/seed.sql` against production.
 - Set `POSTGRES_PASSWORD`, `JWT_SECRET`, RabbitMQ credentials, and application URLs outside git.
-- Full refund settlement still requires a successful run of the isolated PostgreSQL/Redis E2E stack before handling real funds.
+- Refund bounds now include pending refunds, preventing cumulative over-refunds.
+- The production backend image and TypeORM migration path now target the actual Nest build output (`dist/src`).

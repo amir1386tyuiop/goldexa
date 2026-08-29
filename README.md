@@ -6,7 +6,7 @@
 
 - Backend build: موفق (`npm run build`).
 - Backend unit/security tests: در آخرین اجرای محلی ۳۱ تست موفق؛ تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
-- E2E checkout/refund: آماده است، اما بدون Docker/PostgreSQL واقعی عمداً skip می‌شود.
+- E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۲ suite، ۱۱ تست موفق).
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
 - Frontend از APIهای واقعی استفاده می‌کند؛ داده‌های mock اجرایی حذف شده و صفحات سنگین به‌صورت lazy-load بارگذاری می‌شوند.

@@ -179,7 +179,21 @@ export class OrdersService {
   }
 
   async requestRefund(orderId: string, amount: number, reason: string, userId: string, isAdmin = false): Promise<Refund> {
-    await this.findOwnedOrder(orderId, userId, isAdmin)
+    const order = await this.findOwnedOrder(orderId, userId, isAdmin)
+    const refundAmount = Number(amount)
+    if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+      throw new BadRequestException('مبلغ بازپرداخت باید بیشتر از صفر باشد')
+    }
+
+    const existingRefunds = await this.refundRepository.findBy({ orderId })
+    const reservedRefundTotal = existingRefunds
+      .filter((refund) => !['rejected', 'cancelled'].includes(refund.status))
+      .reduce((total, refund) => total + Number(refund.amount), 0)
+    const availableRefund = Number(order.totalAmount) - reservedRefundTotal
+    if (refundAmount > availableRefund) {
+      throw new BadRequestException('مبلغ بازپرداخت از مبلغ قابل بازپرداخت سفارش بیشتر است')
+    }
+
     return this.refundRepository.save(this.refundRepository.create({ orderId, amount, reason, status: 'pending' }))
   }
 

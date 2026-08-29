@@ -62,6 +62,10 @@ The suite covers:
 `wallet checkout contract` is skipped unless the isolated database fixture
 environment is explicitly enabled. A skipped suite is not a production signoff.
 
+The isolated stack was verified on 2026-08-29 with both PostgreSQL and Redis:
+2 suites and 11 tests passed, including checkout, wallet payment, refund
+ownership, over-refund rejection, idempotency, and quote/cache behavior.
+
 ## E2E smoke
 
 backend را روی test database اجرا کنید و سپس:
