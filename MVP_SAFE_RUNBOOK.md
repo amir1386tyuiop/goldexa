@@ -52,5 +52,7 @@ curl --fail https://api.example.com/health
 ## CI/CD
 
 فایل `.github/workflows/ci.yml` روی pull request و push به `main`/`develop`، backend
-lint/build/unit/security، frontend lint/build/audit، compose validation و Docker
-build را اجرا می‌کند. merge فقط بعد از سبز شدن همه‌ی jobهای required انجام شود.
+lint/build/unit/security، E2E واقعی PostgreSQL/Redis، frontend lint/build/audit،
+compose validation و Docker build را اجرا می‌کند. Dependabot نیز dependencyهای
+Node، Python و Docker را هفتگی بررسی می‌کند. merge فقط بعد از سبز شدن همه‌ی
+jobهای required انجام شود.

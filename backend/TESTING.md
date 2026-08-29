@@ -70,6 +70,17 @@ The current backend contract hardening also verifies that checkout carries quote
 IDs into order validation, online checkout requests a gateway transaction, and
 cart price/name values cannot override the locked product row.
 
+## Phase 2 MVP: Builder, Smart Vault and AR
+
+Custom Builder creates user-owned drafts and derives quote amounts from the
+persisted design. Quote expiry defaults to 30 minutes; only admins can approve
+designs or manage gemstones. Smart Vault exposes an authenticated `/summary`
+endpoint and enforces asset/snapshot/alert ownership. AR catalog reads are
+feature-gated with `AR_ENABLED=false` by default; model writes require admin
+access and previews require authentication, while public reads expose shared
+previews only. Set `AR_ENABLED=true` only after the external WebAR/model
+service is configured.
+
 ## Dependency audit
 
 After a clean `npm ci`, verify the runtime dependency tree with:
@@ -102,8 +113,9 @@ Expected headers include `X-Content-Type-Options`, `X-Frame-Options`,
 
 GitHub Actions runs backend lint/build/unit tests, the security regression suite
 with `ENFORCE_SECURITY_TESTS=1`, production dependency audits, frontend
-lint/build/audit, compose validation, and Docker image builds. The isolated E2E
-stack remains available for release validation and must never point to a
+lint/build/audit, compose validation, Docker image builds, and the isolated E2E
+suite with real PostgreSQL and Redis. The E2E job waits for `/health` before
+running and always tears down its dedicated stack; it must never point to a
 production database.
 
 ## E2E smoke
