@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -6,6 +6,8 @@ import { NotificationChannel } from '../notifications/notification.entity'
 import { NotificationsService } from '../notifications/notifications.service'
 import { ContentService } from '../content/content.service'
 import { Product } from '../products/product.entity'
+import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
+import { GoldPriceType } from '../gold-pricing/gold-price.entity'
 import { AiDesignRecommendation } from './ai-design-recommendation.entity'
 import { AiMarketMatch, AiMatchStatus } from './ai-market-match.entity'
 import { AiPricePrediction } from './ai-price-prediction.entity'
@@ -63,6 +65,7 @@ export class AiEngineService {
     private readonly configService: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly contentService: ContentService,
+    @Optional() private readonly goldPricing?: GoldPricingService,
   ) {}
 
   async findProviders(): Promise<AiProviderPublicConfig[]> {
@@ -90,12 +93,22 @@ export class AiEngineService {
   }
 
   async executePrediction(input: AiPredictionInput, userId: string): Promise<AiPricePrediction> {
-    const result = await this.runStructuredInference('prediction', userId, input, async () => this.localAiClient.predict(input))
+    const livePrice = this.goldPricing
+      ? Number((await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18))?.value || 0)
+      : Number(input.currentPrice)
+    if (!livePrice || livePrice <= 0) throw new BadRequestException('قیمت لحظه‌ای طلا در دسترس نیست')
+    const history = this.goldPricing ? await this.goldPricing.getHistory(GoldPriceType.GOLD_18, 30) : []
+    const effectiveInput: AiPredictionInput = {
+      ...input,
+      currentPrice: livePrice,
+      historicalPrices: history.length >= 2 ? history.reverse().map((item) => Number(item.value)) : input.historicalPrices,
+    }
+    const result = await this.runStructuredInference('prediction', userId, effectiveInput, async () => this.localAiClient.predict(effectiveInput))
     const predictedPrice = this.numberFrom(result, 'predicted_price')
     const confidence = this.numberFrom(result, 'confidence', 'confidence_score')
     if (predictedPrice === null || confidence === null) throw new BadRequestException('خروجی prediction معتبر نیست')
     return this.createPrediction({
-      targetType: input.targetType || 'user', targetId: userId, currentPrice: input.currentPrice,
+      targetType: input.targetType || 'user', targetId: userId, currentPrice: livePrice,
       predictedPrice, confidenceScore: Math.min(Math.max(confidence <= 1 ? confidence * 100 : confidence, 0), 100),
       horizonDays: input.horizonDays || 14, modelVersion: String(result.model_version || 'ai-engine-v1'),
       features: { provider: result.provider || 'ai-service', generatedAt: new Date().toISOString() },

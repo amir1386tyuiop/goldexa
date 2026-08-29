@@ -19,6 +19,7 @@ import { RolePermissionMapping } from '../auth/role-permission-mapping.entity'
 import { User } from '../users/user.entity'
 import { FeatureFlagGuard } from '../common/feature-flag.guard'
 import { Product } from '../products/product.entity'
+import { GoldPricingModule } from '../gold-pricing/gold-pricing.module'
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { Product } from '../products/product.entity'
     TypeOrmModule.forFeature([AiPricePrediction, AiDesignRecommendation, AiMarketMatch, AiServiceMetric, Role, Permission, UserRoleMapping, RolePermissionMapping, User, Product]),
     NotificationsModule,
     ContentModule,
+    GoldPricingModule,
   ],
   controllers: [AiEngineController],
   providers: [AiEngineService, OpenRouterAiClient, LocalAiClient, RoleService, FeatureFlagGuard],
