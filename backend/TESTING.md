@@ -81,6 +81,31 @@ npm audit --omit=dev --offline --json
 The current backend lockfile reports zero vulnerabilities. Run the same audit
 without `--omit=dev` before shipping development tooling changes.
 
+## Runtime security configuration
+
+Production and test startup require an explicit `JWT_SECRET` with at least 32
+characters. Production also requires HTTPS origins in `FRONTEND_URL`; wildcard
+CORS is rejected. The security configuration tests cover these fail-closed
+rules and origin normalization.
+
+The API applies baseline security headers in `src/main.ts`. Verify them against
+a running instance with:
+
+```powershell
+curl.exe -I http://localhost:3001/health
+```
+
+Expected headers include `X-Content-Type-Options`, `X-Frame-Options`,
+`Referrer-Policy`, `Permissions-Policy`, and `Content-Security-Policy`.
+
+## CI gate
+
+GitHub Actions runs backend lint/build/unit tests, the security regression suite
+with `ENFORCE_SECURITY_TESTS=1`, production dependency audits, frontend
+lint/build/audit, compose validation, and Docker image builds. The isolated E2E
+stack remains available for release validation and must never point to a
+production database.
+
 ## E2E smoke
 
 backend را روی test database اجرا کنید و سپس:

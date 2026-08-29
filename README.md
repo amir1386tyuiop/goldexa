@@ -2,10 +2,12 @@
 
 ## وضعیت فعلی و حدود اعتبار
 
-این پروژه در وضعیت توسعه‌ی MVP است. هسته مالی و دسترسی‌ها سخت‌سازی شده‌اند، اما قبل از production باید E2E واقعی با PostgreSQL و Redis اجرا و تأیید شود.
+این پروژه در وضعیت توسعه‌ی MVP است. هسته مالی، دسترسی‌ها و کنترل‌های runtime
+سخت‌سازی شده‌اند؛ پیش از production باید چک‌لیست [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md)
+و E2E واقعی با PostgreSQL و Redis اجرا و تأیید شود.
 
 - Backend build: موفق (`npm run build`).
-- Backend unit/security tests: در آخرین اجرای محلی ۳۱ تست موفق؛ تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
+- Backend unit tests: در آخرین اجرای محلی ۵۵ تست موفق؛ security gate جداگانه ۱۵ تست موفق دارد. تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
 - E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۲ suite، ۱۱ تست موفق).
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
@@ -66,7 +68,7 @@ goldexacode/
 ### ✅ 1.1 معماری و راه‌اندازی پروژه
 - [x] Setup Repositoryهای Git
 - [x] تعیین Tech Stack نهایی
-- [x] Setup CI/CD Pipeline اولیه
+- [x] Setup CI/CD Pipeline برای lint/build/test/security/audit و compose validation
 - [x] ایجاد Design System
 
 ### ✅ 1.2 درگاه قیمت‌گذاری لحظه‌ای طلا
@@ -208,5 +210,11 @@ psql -U postgres -f database/schema.sql
 
 GitHub Actions با workflowهای:
 - Backend Test
+- Backend Security Regression و dependency audit
 - Frontend Build
+- Frontend dependency audit
+- Compose Validation
 - Docker Build
+
+جزئیات استقرار امن، healthcheck و fail-closed configuration در
+[MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) و [backend/TESTING.md](backend/TESTING.md) آمده است.
