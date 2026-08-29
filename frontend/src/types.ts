@@ -341,6 +341,15 @@ export interface SmartVaultAsset {
   updatedAt: string
 }
 
+export interface SmartVaultSummary {
+  assetCount: number
+  purchaseValue: number
+  currentValue: number
+  goldWeight: number
+  profitLoss: number
+  profitLossPercent: number
+}
+
 export interface AssetValuationSnapshot {
   id: string
   assetId: string

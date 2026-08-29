@@ -6,6 +6,8 @@ import {
   CreateGemstoneDto,
   CreateJewelryDesignDto,
   CreateJewelryDesignVersionDto,
+  UpdateCustomBuilderQuoteStatusDto,
+  UpdateJewelryDesignStatusDto,
 } from './create-custom-builder.dto'
 import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
 import { AdminGuard } from '../common/guards/admin.guard'
@@ -41,7 +43,7 @@ export class CustomBuilderController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('designs/:id/status')
-  async updateDesignStatus(@Param('id') id: string, @Body() body: { status: string }, @Req() req: AuthenticatedRequest) { return this.customBuilderService.updateDesignStatus(id, body.status, req.user.sub, isAdmin(req.user)) }
+  async updateDesignStatus(@Param('id') id: string, @Body() body: UpdateJewelryDesignStatusDto, @Req() req: AuthenticatedRequest) { return this.customBuilderService.updateDesignStatus(id, body.status, req.user.sub, isAdmin(req.user)) }
 
   @Get('gemstones')
   async findGemstones() { return this.customBuilderService.findGemstones() }
@@ -64,7 +66,7 @@ export class CustomBuilderController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('quotes/:id/status')
-  async updateQuoteStatus(@Param('id') id: string, @Body() body: { status: string }, @Req() req: AuthenticatedRequest) { return this.customBuilderService.updateQuoteStatus(id, body.status, req.user.sub, isAdmin(req.user)) }
+  async updateQuoteStatus(@Param('id') id: string, @Body() body: UpdateCustomBuilderQuoteStatusDto, @Req() req: AuthenticatedRequest) { return this.customBuilderService.updateQuoteStatus(id, body.status, req.user.sub, isAdmin(req.user)) }
 }
 
 function isAdmin(user: JwtUser): boolean { return user.role === 'admin' || user.roleNames?.includes('admin') === true }

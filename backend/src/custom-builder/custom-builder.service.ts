@@ -110,6 +110,11 @@ export class CustomBuilderService {
     }
     if (userId && !isAdmin && design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
 
+    const allowed = isAdmin
+      ? Object.values(JewelryDesignStatus)
+      : [JewelryDesignStatus.DRAFT, JewelryDesignStatus.IN_PROGRESS, JewelryDesignStatus.READY_FOR_REVIEW]
+    if (!allowed.includes(status as JewelryDesignStatus)) throw new ForbiddenException('این وضعیت برای شما مجاز نیست')
+
     design.status = status as JewelryDesignStatus
     return this.designRepository.save(design)
   }
@@ -139,13 +144,22 @@ export class CustomBuilderService {
   }
 
   async createQuote(data: CreateCustomBuilderQuoteDto): Promise<CustomBuilderQuote> {
+    const design = data.designId ? await this.designRepository.findOneBy({ id: data.designId }) : null
+    if (data.designId && !design) throw new NotFoundException('طرح یافت نشد')
+    const source = design
+      ? { goldPriceSnapshot: Number(design.estimatedGoldPrice), goldWeight: Number(design.weight), laborCost: Number(design.laborCost), profit: Number(design.profit), tax: Number(design.tax), total: Number(design.totalPrice) }
+      : data
+    const expiresAt = data.expiresAt && new Date(data.expiresAt).getTime() > Date.now()
+      ? new Date(data.expiresAt)
+      : new Date(Date.now() + 30 * 60 * 1000)
     return this.quoteRepository.save(
       this.quoteRepository.create({
         ...data,
+        ...source,
         designId: data.designId ?? null,
-        profit: data.profit ?? 0,
-        tax: data.tax ?? 9,
-        expiresAt: data.expiresAt ?? null,
+        profit: source.profit ?? 0,
+        tax: source.tax ?? 9,
+        expiresAt,
         status: CustomBuilderQuoteStatus.DRAFT,
       }),
     )

@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Diamond, Hammer, Plus, Search, Sparkles, Wand2 } from 'lucide-react'
 import { api, type CreateCustomBuilderQuoteInput, type CreateJewelryDesignInput } from '@/api/client'
@@ -8,6 +8,7 @@ import type { GemstoneLibrary, JewelryDesign } from '@/types'
 import { getStoredAuth } from '@/auth'
 
 export function BuilderPage() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'designs' | 'create' | 'gemstones' | 'quote'>('designs')
   const [search, setSearch] = useState('')
   const auth = getStoredAuth()
@@ -23,22 +24,29 @@ export function BuilderPage() {
     queryFn: api.getGemstones,
     initialData: [],
   })
+  const userId = auth?.user.id || ''
+  const userDesignsQuery = useQuery<JewelryDesign[]>({ queryKey: ['jewelry-designs', 'user', userId], queryFn: () => api.getJewelryDesignsByUser(userId), enabled: Boolean(userId) })
+  const quotesQuery = useQuery({ queryKey: ['builder-quotes', userId], queryFn: () => api.getCustomBuilderQuotes(userId), enabled: Boolean(userId) })
+  const designMutation = useMutation({ mutationFn: api.createJewelryDesign, onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['jewelry-designs'] }); setActiveTab('designs') } })
+  const quoteMutation = useMutation({ mutationFn: api.createCustomBuilderQuote, onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['builder-quotes', userId] }); setActiveTab('quote') } })
 
   const filteredDesigns = useMemo(() => {
-    if (!search) return designs
+    const visibleDesigns = auth ? [...(userDesignsQuery.data || []), ...designs.filter((item) => item.status === 'approved' && item.userId !== userId)] : designs
+    if (!search) return visibleDesigns
     const keyword = search.toLowerCase()
-    return designs.filter(
+    return visibleDesigns.filter(
       (design) => design.title.toLowerCase().includes(keyword) || design.category.toLowerCase().includes(keyword),
     )
-  }, [designs, search])
+  }, [auth, designs, search, userDesignsQuery.data, userId])
 
   const createDesign = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!auth) return
     const formData = new FormData(event.currentTarget)
     const weight = Number(formData.get('weight'))
     const totalPrice = Number(formData.get('totalPrice'))
 
-    api.createJewelryDesign({
+    designMutation.mutate({
       userId: auth?.user.id || '',
       userName: auth?.user.name || '',
       title: String(formData.get('title')),
@@ -75,7 +83,7 @@ export function BuilderPage() {
       status: 'sent',
     }
 
-    api.createCustomBuilderQuote(quote)
+    quoteMutation.mutate(quote)
   }
 
   return (
@@ -86,7 +94,7 @@ export function BuilderPage() {
             <h1 className="text-3xl font-black text-navy-900">طراحی طلای اختصاصی</h1>
             <p className="text-muted-foreground mt-2">ساخت طرح سفارشی، انتخاب سنگ، پیش‌نمایش سه‌بعدی و پیش‌فاکتور لحظه‌ای</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="بخش‌های طراحی">
             <TabButton active={activeTab === 'designs'} onClick={() => setActiveTab('designs')}>طرح‌ها</TabButton>
             <TabButton active={activeTab === 'create'} onClick={() => setActiveTab('create')}>طراحی جدید</TabButton>
             <TabButton active={activeTab === 'gemstones'} onClick={() => setActiveTab('gemstones')}>سنگ‌ها</TabButton>
@@ -109,11 +117,11 @@ export function BuilderPage() {
             </div>
 
             {activeTab === 'create' ? (
-              <CreateDesignPanel onSubmit={createDesign} />
+            <CreateDesignPanel onSubmit={createDesign} disabled={designMutation.isPending} />
             ) : activeTab === 'gemstones' ? (
               <GemstoneGrid gemstones={gemstones} />
             ) : activeTab === 'quote' ? (
-              <QuotePanel design={filteredDesigns[0] || null} onCreate={createQuote} />
+              <QuotePanel design={filteredDesigns[0] || null} quotes={quotesQuery.data || []} onCreate={createQuote} disabled={quoteMutation.isPending || !auth} />
             ) : (
               <DesignGrid designs={filteredDesigns} />
             )}
@@ -132,7 +140,7 @@ export function BuilderPage() {
 function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
   return (
     <button
-      onClick={onClick}
+      onClick={onClick} role="tab" aria-selected={active}
       className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
         active ? 'bg-navy-900 text-white' : 'bg-white text-muted-foreground hover:bg-gold-50'
       }`}
@@ -198,7 +206,7 @@ function GemstoneGrid({ gemstones }: { gemstones: GemstoneLibrary[] }) {
   )
 }
 
-function CreateDesignPanel({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function CreateDesignPanel({ onSubmit, disabled }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; disabled: boolean }) {
   return (
     <form onSubmit={onSubmit} className="card p-6 space-y-4">
       <h2 className="text-xl font-black text-navy-900">طراحی جدید</h2>
@@ -225,7 +233,7 @@ function CreateDesignPanel({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormE
         <input name="tax" type="number" className="input" placeholder="مالیات درصد" defaultValue={9} required />
         <input name="totalPrice" type="number" className="input" placeholder="قیمت کل" required />
       </div>
-      <button type="submit" className="button-primary w-full">
+      <button type="submit" className="button-primary w-full" disabled={disabled}>
         <Plus className="h-4 w-4 ml-2" />
         ثبت طرح
       </button>
@@ -233,7 +241,7 @@ function CreateDesignPanel({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormE
   )
 }
 
-function QuotePanel({ design, onCreate }: { design: JewelryDesign | null; onCreate: () => void }) {
+function QuotePanel({ design, quotes, onCreate, disabled }: { design: JewelryDesign | null; quotes: { id: string; status: string; total: number; expiresAt?: string | null }[]; onCreate: () => void; disabled: boolean }) {
   if (!design) {
     return <EmptyState title="طرحی برای پیش‌فاکتور وجود ندارد" description="ابتدا یک طرح ثبت کنید." />
   }
@@ -254,10 +262,11 @@ function QuotePanel({ design, onCreate }: { design: JewelryDesign | null; onCrea
         <InfoPill label="مالیات" value={`${design.tax}%`} />
         <InfoPill label="مجموع" value={formatPrice(design.totalPrice)} />
       </div>
-      <button onClick={onCreate} className="button-primary w-full mt-5">
+      <button onClick={onCreate} className="button-primary w-full mt-5" disabled={disabled}>
         <Sparkles className="h-4 w-4 ml-2" />
         صدور پیش‌فاکتور
       </button>
+      {quotes.length > 0 && <div className="mt-5 border-t border-stone-200 pt-4"><p className="text-sm font-bold">آخرین پیش‌فاکتورها</p><div className="mt-2 space-y-2">{quotes.slice(0, 3).map((quote) => <div key={quote.id} className="flex justify-between text-xs text-stone-600"><span>{quote.status}</span><span>{formatPrice(quote.total)} تومان</span></div>)}</div></div>}
     </div>
   )
 }

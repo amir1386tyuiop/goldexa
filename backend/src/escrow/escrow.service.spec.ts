@@ -11,7 +11,7 @@ import { WalletService } from '../wallet/wallet.service'
 
 describe('EscrowService security boundaries', () => {
   let service: EscrowService
-  let escrowRepository: { find: jest.Mock; findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock }
+  let escrowRepository: { find: jest.Mock; findOne: jest.Mock; findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock }
   let listingRepository: { findOneBy: jest.Mock }
   let auctionRepository: { findOneBy: jest.Mock }
   let walletService: { ensureWalletForUser: jest.Mock; holdEscrow: jest.Mock; releaseEscrow: jest.Mock; refundEscrow: jest.Mock }
@@ -20,6 +20,7 @@ describe('EscrowService security boundaries', () => {
   beforeEach(async () => {
     escrowRepository = {
       find: jest.fn(),
+      findOne: jest.fn(async (options) => escrowRepository.findOneBy(options.where)),
       findOneBy: jest.fn(),
       create: jest.fn((value) => value),
       save: jest.fn(async (value) => value),

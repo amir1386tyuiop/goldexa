@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { DataSource, Repository } from 'typeorm'
 import { Order, OrderStatus, PaymentMethod } from './order.entity'
 import { Product } from '../products/product.entity'
 import { User } from '../users/user.entity'
@@ -35,6 +35,7 @@ export class OrdersService {
     private cancellationRepository: Repository<OrderCancellation>,
     private readonly walletService: WalletService,
     private readonly pricingService: PricingService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(userId: string, isAdmin = false): Promise<Order[]> {
@@ -59,7 +60,7 @@ export class OrdersService {
   }
 
   async findByUser(userId: string): Promise<Order[]> {
-    return this.orderRepository.findBy({ userId })
+    return this.orderRepository.find({ where: { userId }, order: { createdAt: 'DESC' } })
   }
 
   async createOrder(data: CreateOrderDto, userId: string): Promise<Order> {
@@ -188,34 +189,44 @@ export class OrdersService {
     userId: string,
     isAdmin = false,
   ): Promise<Invoice> {
-    await this.findOwnedOrder(orderId, userId, isAdmin)
+    const order = await this.findOwnedOrder(orderId, userId, isAdmin)
+    const amount = Number(totalAmount)
+    if (!Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) !== Math.round(Number(order.totalAmount) * 100)) {
+      throw new BadRequestException('مبلغ فاکتور باید با مبلغ سفارش برابر باشد')
+    }
     return this.invoiceRepository.save(
       this.invoiceRepository.create({
         orderId,
-        invoiceNumber: `INV-${Date.now()}`,
-        totalAmount,
+        invoiceNumber: `INV-${randomUUID().replace(/-/g, '').slice(0, 24)}`,
+        totalAmount: amount,
         pdf_url: pdfUrl ?? null,
       }),
     )
   }
 
   async requestRefund(orderId: string, amount: number, reason: string, userId: string, isAdmin = false): Promise<Refund> {
-    const order = await this.findOwnedOrder(orderId, userId, isAdmin)
     const refundAmount = Number(amount)
-    if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
-      throw new BadRequestException('مبلغ بازپرداخت باید بیشتر از صفر باشد')
+    if (!Number.isFinite(refundAmount) || refundAmount <= 0 || !reason?.trim()) {
+      throw new BadRequestException('مبلغ و دلیل بازپرداخت الزامی است')
     }
-
-    const existingRefunds = await this.refundRepository.findBy({ orderId })
-    const reservedRefundTotal = existingRefunds
-      .filter((refund) => !['rejected', 'cancelled'].includes(refund.status))
-      .reduce((total, refund) => total + Number(refund.amount), 0)
-    const availableRefund = Number(order.totalAmount) - reservedRefundTotal
-    if (refundAmount > availableRefund) {
-      throw new BadRequestException('مبلغ بازپرداخت از مبلغ قابل بازپرداخت سفارش بیشتر است')
-    }
-
-    return this.refundRepository.save(this.refundRepository.create({ orderId, amount, reason, status: 'pending' }))
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: isAdmin ? { id: orderId } : { id: orderId, userId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!order) throw new NotFoundException('سفارش یافت نشد')
+      if (![OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED].includes(order.status)) {
+        throw new BadRequestException('این سفارش در وضعیت قابل بازپرداخت نیست')
+      }
+      const existingRefunds = await manager.find(Refund, { where: { orderId } })
+      const reservedRefundTotal = existingRefunds
+        .filter((refund) => !['rejected', 'cancelled'].includes(refund.status))
+        .reduce((total, refund) => total + Number(refund.amount), 0)
+      if (refundAmount > Number(order.totalAmount) - reservedRefundTotal) {
+        throw new BadRequestException('مبلغ بازپرداخت از مبلغ قابل بازپرداخت سفارش بیشتر است')
+      }
+      return manager.save(Refund, manager.create(Refund, { orderId, amount: refundAmount, reason: reason.trim(), status: 'pending' }))
+    })
   }
 
   async requestCancellation(orderId: string, reason: string, userId: string, isAdmin = false): Promise<OrderCancellation> {

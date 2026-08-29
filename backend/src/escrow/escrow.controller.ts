@@ -15,9 +15,8 @@ export class EscrowController {
   constructor(private readonly escrowService: EscrowService) {}
 
   @Get('payments')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  async findPayments() {
-    return this.escrowService.findPayments()
+  async findPayments(@Req() req: Request & { user: JwtUser }) {
+    return this.escrowService.findPayments(req.user.sub, req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true)
   }
 
   @Get('payments/:id')
@@ -43,8 +42,9 @@ export class EscrowController {
   }
 
   @Get('ratings/user/:userId')
-  async findRatingsByUser(@Param('userId') userId: string) {
-    return this.escrowService.findRatingsByUser(userId)
+  async findRatingsByUser(@Param('userId') userId: string, @Req() req: Request & { user: JwtUser }) {
+    const isAdmin = req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true
+    return this.escrowService.findRatingsByUser(isAdmin ? userId : req.user.sub)
   }
 
   @Post('ratings')

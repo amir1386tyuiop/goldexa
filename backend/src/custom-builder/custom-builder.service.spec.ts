@@ -1,0 +1,26 @@
+import { CustomBuilderService } from './custom-builder.service'
+import { JewelryDesignStatus } from './jewelry-design.entity'
+
+describe('CustomBuilderService', () => {
+  const design = { id: 'd1', userId: 'u1', estimatedGoldPrice: 100, weight: 2, laborCost: 20, profit: 10, tax: 9, totalPrice: 140 }
+  const designs = { find: jest.fn(), findBy: jest.fn(), findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve({ id: 'd1', ...value })) }
+  const versions = { findBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
+  const gemstones = { findBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
+  const quotes = { find: jest.fn(), findBy: jest.fn(), findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
+
+  beforeEach(() => jest.clearAllMocks())
+
+  it('builds a quote from the persisted design and ignores forged totals', async () => {
+    designs.findOneBy.mockResolvedValue(design)
+    const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never)
+    const result = await service.createQuote({ designId: 'd1', userId: 'u1', goldPriceSnapshot: 1, goldWeight: 1, laborCost: 1, profit: 1, tax: 1, total: 1 })
+    expect(result).toMatchObject({ goldPriceSnapshot: 100, goldWeight: 2, laborCost: 20, profit: 10, tax: 9, total: 140, status: 'draft' })
+    expect(result.expiresAt).toBeInstanceOf(Date)
+  })
+
+  it('does not allow a buyer to approve a design', async () => {
+    designs.findOneBy.mockResolvedValue({ ...design, status: JewelryDesignStatus.DRAFT })
+    const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never)
+    await expect(service.updateDesignStatus('d1', JewelryDesignStatus.APPROVED, 'u1')).rejects.toThrow()
+  })
+})

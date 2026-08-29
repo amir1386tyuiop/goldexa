@@ -20,6 +20,11 @@ export class SmartVaultController {
     return this.smartVaultService.findAssets(req.user.sub)
   }
 
+  @Get('summary')
+  async getSummary(@Req() req: AuthenticatedRequest) {
+    return this.smartVaultService.getSummary(req.user.sub)
+  }
+
   @Get('assets/:id')
   async findAsset(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.smartVaultService.findAsset(id, req.user.sub, isAdmin(req.user))

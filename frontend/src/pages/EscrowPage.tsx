@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { CheckCircle, ShieldCheck, Star, TrendingUp } from 'lucide-react'
-import { api, type CreateEscrowPaymentInput, type CreateMarketplaceRatingInput, type CreateOrderTrackingEventInput, type CreatePaymentTransactionInput } from '@/api/client'
+import { ShieldCheck, Star, TrendingUp } from 'lucide-react'
+import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { EscrowPayment, MarketplaceRating, OrderTrackingEvent, PaymentTransaction } from '@/types'
 import { getStoredAuth } from '@/auth'
@@ -12,74 +12,31 @@ export function EscrowPage() {
   const [orderId, setOrderId] = useState('')
   const auth = getStoredAuth()
 
-  const { data: escrows = [] } = useQuery<EscrowPayment[]>({
+  const { data: escrows = [], isLoading: escrowsLoading, isError: escrowsError } = useQuery<EscrowPayment[]>({
     queryKey: ['escrow-payments'],
     queryFn: api.getEscrowPayments,
     initialData: [],
   })
 
-  const { data: ratings = [] } = useQuery<MarketplaceRating[]>({
+  const { data: ratings = [], isLoading: ratingsLoading, isError: ratingsError } = useQuery<MarketplaceRating[]>({
     queryKey: ['marketplace-ratings', auth?.user.id],
     queryFn: () => api.getMarketplaceRatings(auth!.user.id),
     initialData: [],
     enabled: Boolean(auth),
   })
 
-  const { data: payments = [] } = useQuery<PaymentTransaction[]>({
+  const { data: payments = [], isLoading: paymentsLoading, isError: paymentsError } = useQuery<PaymentTransaction[]>({
     queryKey: ['payment-transactions'],
     queryFn: api.getPaymentTransactions,
     initialData: [],
   })
 
-  const { data: tracking = [] } = useQuery<OrderTrackingEvent[]>({
+  const { data: tracking = [], isLoading: trackingLoading, isError: trackingError } = useQuery<OrderTrackingEvent[]>({
     queryKey: ['order-tracking', orderId],
     queryFn: () => (orderId ? api.getOrderTracking(orderId) : Promise.resolve([])),
     initialData: [],
     enabled: Boolean(orderId && auth),
   })
-
-  const createEscrow = () => {
-    const body: CreateEscrowPaymentInput = {
-      buyerId: auth?.user.id || '',
-      sellerId: '',
-      amount: 35000000,
-      fee: 1050000,
-      trackingCode: `ESC-${Date.now()}`,
-    }
-    api.createEscrowPayment(body)
-  }
-
-  const createRating = () => {
-    const body: CreateMarketplaceRatingInput = {
-      reviewerId: auth?.user.id || '',
-      revieweeId: '',
-      rating: 5,
-      body: 'تجربه خوب از معامله امن',
-      category: 'seller',
-    }
-    api.createMarketplaceRating(body)
-  }
-
-  const createPayment = () => {
-    const body: CreatePaymentTransactionInput = {
-      userId: auth?.user.id || '',
-      amount: 35000000,
-      paymentMethod: 'zarinpal',
-      trackingCode: `PAY-${Date.now()}`,
-    }
-    api.createPaymentTransaction(body)
-  }
-
-  const createTracking = () => {
-    if (!orderId) return
-    const body: CreateOrderTrackingEventInput = {
-      orderId,
-      status: 'in_transit',
-      location: 'مرکز توزیع',
-      description: 'سفارش در مسیر تحویل است',
-    }
-    api.createOrderTrackingEvent(orderId, body)
-  }
 
   const filteredTracking = useMemo(() => {
     if (!orderId) return tracking
@@ -104,15 +61,16 @@ export function EscrowPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {activeTab === 'escrow' && <EscrowList payments={escrows} onCreate={createEscrow} />}
-            {activeTab === 'ratings' && <RatingList ratings={ratings} onCreate={createRating} />}
-            {activeTab === 'payments' && <PaymentList payments={payments} onCreate={createPayment} />}
+            {activeTab === 'escrow' && <AsyncState loading={escrowsLoading} error={escrowsError} label="پرداخت‌های امانی" content={<EscrowList payments={escrows} />} />}
+            {activeTab === 'ratings' && <AsyncState loading={ratingsLoading} error={ratingsError} label="امتیازها" content={<RatingList ratings={ratings} />} />}
+            {activeTab === 'payments' && <AsyncState loading={paymentsLoading} error={paymentsError} label="تراکنش‌ها" content={<PaymentList payments={payments} />} />}
             {activeTab === 'tracking' && (
               <TrackingPanel
                 orderId={orderId}
                 onOrderIdChange={setOrderId}
                 events={filteredTracking}
-                onCreate={createTracking}
+                loading={trackingLoading}
+                error={trackingError}
               />
             )}
           </div>
@@ -140,17 +98,14 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
   )
 }
 
-function EscrowList({ payments, onCreate }: { payments: EscrowPayment[]; onCreate: () => void }) {
+function EscrowList({ payments }: { payments: EscrowPayment[] }) {
   if (payments.length === 0) {
     return <EmptyState title="پرداخت امانی ثبت نشده" description="پرداخت‌های امن بازار دست دوم اینجا نمایش داده می‌شوند." />
   }
 
   return (
     <div className="space-y-4">
-      <button onClick={onCreate} className="button-primary">
-        <ShieldCheck className="h-4 w-4 ml-2" />
-        ایجاد پرداخت امانی
-      </button>
+      <p className="rounded-xl bg-gold-50 p-4 text-sm text-muted-foreground">پرداخت امانی پس از انتخاب آگهی معتبر در Marketplace یا پایان مزایده ایجاد می‌شود.</p>
       {payments.map((payment) => (
         <div key={payment.id} className="card p-5">
           <div className="flex items-start justify-between gap-3">
@@ -172,17 +127,14 @@ function EscrowList({ payments, onCreate }: { payments: EscrowPayment[]; onCreat
   )
 }
 
-function RatingList({ ratings, onCreate }: { ratings: MarketplaceRating[]; onCreate: () => void }) {
+function RatingList({ ratings }: { ratings: MarketplaceRating[] }) {
   if (ratings.length === 0) {
     return <EmptyState title="امتیازی ثبت نشده" description="بعد از معامله، خریدار و فروشنده می‌توانند به هم امتیاز بدهند." />
   }
 
   return (
     <div className="space-y-4">
-      <button onClick={onCreate} className="button-primary">
-        <Star className="h-4 w-4 ml-2" />
-        ثبت امتیاز
-      </button>
+      <p className="rounded-xl bg-gold-50 p-4 text-sm text-muted-foreground">ثبت امتیاز فقط بعد از معامله‌ی معتبر و اتصال به سفارش یا آگهی انجام می‌شود.</p>
       {ratings.map((rating) => (
         <div key={rating.id} className="card p-5">
           <div className="flex items-start justify-between gap-3">
@@ -198,17 +150,14 @@ function RatingList({ ratings, onCreate }: { ratings: MarketplaceRating[]; onCre
   )
 }
 
-function PaymentList({ payments, onCreate }: { payments: PaymentTransaction[]; onCreate: () => void }) {
+function PaymentList({ payments }: { payments: PaymentTransaction[] }) {
   if (payments.length === 0) {
     return <EmptyState title="تراکنشی ثبت نشده" description="تراکنش‌های پرداخت و درگاه بانکی اینجا نمایش داده می‌شوند." />
   }
 
   return (
     <div className="space-y-4">
-      <button onClick={onCreate} className="button-primary">
-        <TrendingUp className="h-4 w-4 ml-2" />
-        ایجاد تراکنش
-      </button>
+      <p className="rounded-xl bg-gold-50 p-4 text-sm text-muted-foreground">تراکنش‌ها از checkout و درگاه پرداخت ثبت می‌شوند و در اینجا فقط نمایش داده می‌شوند.</p>
       {payments.map((payment) => (
         <div key={payment.id} className="card p-5">
           <div className="flex items-start justify-between gap-3">
@@ -232,23 +181,22 @@ function TrackingPanel({
   orderId,
   onOrderIdChange,
   events,
-  onCreate,
+  loading,
+  error,
 }: {
   orderId: string
   onOrderIdChange: (value: string) => void
   events: OrderTrackingEvent[]
-  onCreate: () => void
+  loading: boolean
+  error: boolean
 }) {
   return (
     <div className="card p-6 space-y-4">
       <div className="flex gap-2">
         <input value={orderId} onChange={(event) => onOrderIdChange(event.target.value)} className="input" placeholder="شناسه سفارش" />
-        <button onClick={onCreate} className="button-primary">
-          <CheckCircle className="h-4 w-4 ml-2" />
-          افزودن رویداد
-        </button>
+        <span className="text-xs text-muted-foreground self-center">رویدادها توسط سامانه ارسال ثبت می‌شوند.</span>
       </div>
-      {events.length === 0 ? (
+      {loading ? <div role="status" className="py-8 text-center text-muted-foreground">در حال دریافت رهگیری...</div> : error ? <div role="alert" className="py-8 text-center text-red-700">دریافت رهگیری ناموفق بود.</div> : events.length === 0 ? (
         <EmptyState title="رویداد رهگیری یافت نشد" description="کد سفارش را وارد کنید تا رویدادهای رهگیری نمایش داده شوند." />
       ) : (
         events.map((event) => (
@@ -260,6 +208,12 @@ function TrackingPanel({
       )}
     </div>
   )
+}
+
+function AsyncState({ loading, error, label, content }: { loading: boolean; error: boolean; label: string; content: ReactNode }) {
+  if (loading) return <div role="status" className="card p-10 text-center text-muted-foreground">در حال دریافت {label}...</div>
+  if (error) return <div role="alert" className="card border-red-200 bg-red-50 p-8 text-center text-red-800">دریافت {label} ناموفق بود. دوباره تلاش کنید.</div>
+  return content
 }
 
 function EscrowSummary({

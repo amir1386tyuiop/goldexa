@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { IsNull, Not, Repository } from 'typeorm'
+import { DataSource, IsNull, Not, Repository } from 'typeorm'
 import {
   Auction,
   AuctionPaymentStatus,
@@ -28,6 +28,7 @@ export class AuctionsService {
     private productRepository: Repository<Product>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(): Promise<Auction[]> {
@@ -106,8 +107,15 @@ export class AuctionsService {
     const startsAt = new Date(data.startsAt)
     const endsAt = new Date(data.endsAt)
 
-    if (endsAt <= startsAt) {
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
       throw new BadRequestException('زمان پایان مزایده باید بعد از زمان شروع باشد')
+    }
+
+    if (!Number.isFinite(data.startingPrice) || data.startingPrice <= 0 || !Number.isFinite(data.minimumBidIncrement) || data.minimumBidIncrement <= 0) {
+      throw new BadRequestException('قیمت شروع و حداقل افزایش باید بزرگ‌تر از صفر باشند')
+    }
+    if (data.bidIncrementType === BidIncrementType.PERCENT && (!Number.isFinite(data.bidIncrementPercent) || (data.bidIncrementPercent ?? 0) <= 0)) {
+      throw new BadRequestException('درصد افزایش پیشنهاد باید بزرگ‌تر از صفر باشد')
     }
 
     const durationDays = data.durationDays ?? this.getDurationDays(startsAt, endsAt)
@@ -168,55 +176,54 @@ export class AuctionsService {
       throw new NotFoundException('کاربر پیشنهاددهنده یافت نشد')
     }
 
-    const minimumAmount = this.getMinimumBidAmount(auction)
-
-    if (!Number.isFinite(data.amount) || data.amount < minimumAmount) {
-      throw new BadRequestException(`حداقل مبلغ پیشنهاد ${minimumAmount.toLocaleString('fa-IR')} تومان است`)
-    }
-
     if (auction.sellerId === bidderId) {
       throw new BadRequestException('فروشنده نمی‌تواند روی مزایده خودش پیشنهاد ثبت کند')
     }
 
-    await this.auctionBidRepository.update(
-      { auctionId: id, isWinning: true },
-      { isWinning: false },
-    )
+    return this.dataSource.transaction(async (manager) => {
+      const lockedAuction = await manager.findOne(Auction, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!lockedAuction) throw new NotFoundException('مزایده یافت نشد')
+      if (![AuctionStatus.ACTIVE, AuctionStatus.EXTENDED].includes(lockedAuction.status)) {
+        throw new BadRequestException('مزایده در حال حاضر برای ثبت پیشنهاد فعال نیست')
+      }
 
-    const now = new Date()
-    const shouldExtend =
-      this.minutesUntil(auction.endsAt, now) <= auction.autoExtendMinutes &&
-      auction.autoExtendSeconds > 0
+      const minimumAmount = this.getMinimumBidAmount(lockedAuction)
+      if (!Number.isFinite(data.amount) || data.amount < minimumAmount) {
+        throw new BadRequestException(`حداقل مبلغ پیشنهاد ${minimumAmount.toLocaleString('fa-IR')} تومان است`)
+      }
 
-    if (shouldExtend) {
-      auction.endsAt = new Date(auction.endsAt.getTime() + auction.autoExtendSeconds * 1000)
-      auction.paymentDeadlineAt = this.addMinutes(auction.endsAt, auction.paymentWindowMinutes)
-      auction.status = AuctionStatus.EXTENDED
-    }
+      await manager.update(AuctionBid, { auctionId: id, isWinning: true }, { isWinning: false })
+      const now = new Date()
+      const shouldExtend = this.minutesUntil(lockedAuction.endsAt, now) <= lockedAuction.autoExtendMinutes && lockedAuction.autoExtendSeconds > 0
+      if (shouldExtend) {
+        lockedAuction.endsAt = new Date(lockedAuction.endsAt.getTime() + lockedAuction.autoExtendSeconds * 1000)
+        lockedAuction.paymentDeadlineAt = this.addMinutes(lockedAuction.endsAt, lockedAuction.paymentWindowMinutes)
+        lockedAuction.status = AuctionStatus.EXTENDED
+      }
 
-    const bid = this.auctionBidRepository.create({
-      auctionId: id,
-      bidderId,
-      bidderName: bidder.name,
-      amount: data.amount,
-      isWinning: true,
+      await manager.save(AuctionBid, manager.create(AuctionBid, {
+        auctionId: id,
+        bidderId,
+        bidderName: bidder.name,
+        amount: data.amount,
+        isWinning: true,
+      }))
+      lockedAuction.currentPrice = data.amount
+      lockedAuction.bidCount += 1
+      if (lockedAuction.winningBidderId && lockedAuction.winningBidderId !== bidderId) {
+        lockedAuction.secondWinnerId = lockedAuction.winningBidderId
+        lockedAuction.secondWinnerName = lockedAuction.winningBidderName
+        lockedAuction.secondWinnerAmount = lockedAuction.winningAmount
+      }
+      lockedAuction.winningBidderId = bidderId
+      lockedAuction.winningBidderName = bidder.name
+      lockedAuction.winningAmount = data.amount
+      lockedAuction.reserveMet = !lockedAuction.reservePrice || data.amount >= lockedAuction.reservePrice
+      return manager.save(Auction, lockedAuction)
     })
-
-    await this.auctionBidRepository.save(bid)
-
-    auction.currentPrice = data.amount
-    auction.bidCount += 1
-    if (auction.winningBidderId && auction.winningBidderId !== bidderId) {
-      auction.secondWinnerId = auction.winningBidderId
-      auction.secondWinnerName = auction.winningBidderName
-      auction.secondWinnerAmount = auction.winningAmount
-    }
-    auction.winningBidderId = bidderId
-    auction.winningBidderName = bidder.name
-    auction.winningAmount = data.amount
-    auction.reserveMet = !auction.reservePrice || data.amount >= auction.reservePrice
-
-    return this.auctionRepository.save(auction)
   }
 
   async settleAuction(id: string): Promise<Auction> {

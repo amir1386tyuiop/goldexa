@@ -63,7 +63,9 @@ import type {
   SellRecommendation,
   SellerProfile,
   Shipment,
+  AssetValuationSnapshot,
   SmartVaultAsset,
+  SmartVaultSummary,
   Stone,
   SubscriptionPlan,
   SystemSetting,
@@ -406,6 +408,17 @@ export async function getSystemSettings(): Promise<SystemSetting[]> {
 
 export async function getNotificationPreferences(userId: string): Promise<NotificationPreference | null> {
   return request<NotificationPreference | null>(`/audit/notification-preferences/${userId}`)
+}
+
+export async function updateNotificationPreferences(
+  userId: string,
+  body: Partial<Pick<NotificationPreference, 'inApp' | 'sms' | 'push' | 'email'>>,
+): Promise<NotificationPreference> {
+  return request<NotificationPreference>(`/audit/notification-preferences/${userId}`, { method: 'PATCH', body })
+}
+
+export async function markNotificationRead(notificationId: string): Promise<Notification | null> {
+  return request<Notification | null>(`/notifications/${notificationId}/read`, { method: 'PATCH' })
 }
 
 export async function getUserFollows(userId: string): Promise<UserFollow[]> {
@@ -1708,6 +1721,8 @@ export const api = {
   createUsedGoldListing: (body: CreateUsedGoldListingInput) =>
     request<UsedGoldListing>('/marketplace/listings', { method: 'POST', body }),
   getVaultAssets: (userId: string) => request<SmartVaultAsset[]>(`/smart-vault/assets/user/${userId}`),
+  getVaultSummary: () => request<SmartVaultSummary>('/smart-vault/summary'),
+  getVaultSnapshots: (assetId: string) => request<AssetValuationSnapshot[]>(`/smart-vault/assets/${assetId}/snapshots`),
   getVaultAlerts: (userId: string) => request<PriceAlert[]>(`/smart-vault/alerts/user/${userId}`),
   createPriceAlert: (body: CreatePriceAlertInput) =>
     request<PriceAlert>('/smart-vault/alerts', { method: 'POST', body }),
@@ -1718,6 +1733,7 @@ export const api = {
   getSubscriptionPlans: () => request<SubscriptionPlan[]>('/subscriptions/plans'),
   getDiscountCodes: () => request<DiscountCode[]>('/subscriptions/discounts'),
   getNotifications: (userId: string) => request<Notification[]>(`/notifications/user/${userId}`),
+  markNotificationRead: (notificationId: string) => markNotificationRead(notificationId),
   getJewelryDesigns: () => request<JewelryDesign[]>('/custom-builder/designs'),
   getJewelryDesignsByUser: (userId: string) => request<JewelryDesign[]>(`/custom-builder/designs/user/${userId}`),
   getJewelryDesignVersions: (designId: string) => request<JewelryDesignVersion[]>(`/custom-builder/designs/${designId}/versions`),
@@ -1778,6 +1794,8 @@ export const api = {
   clearCart: (cartId: string) => request<void>(`/cart/${cartId}/clear`, { method: 'POST', body: {} }),
   getWallet: (userId: string) => request<Wallet | null>(`/wallet/user/${userId}`),
   getWalletTransactions: (userId: string) => request<WalletTransaction[]>(`/wallet/user/${userId}/transactions`),
+  buyWalletGold: (body: { userId: string; amountGrams: number }) => request<WalletTransaction>('/wallet/gold/buy', { method: 'POST', body }),
+  sellWalletGold: (body: { userId: string; amountGrams: number }) => request<WalletTransaction>('/wallet/gold/sell', { method: 'POST', body }),
   getPricingRules: () => request<PricingRule[]>('/pricing/rules'),
   getPricingSpreads: () => request<PricingSpread[]>('/pricing/spreads'),
   getTaxRules: () => request<TaxRule[]>('/pricing/tax'),
@@ -1797,6 +1815,8 @@ export const api = {
   getEventLogs: () => request<EventLog[]>('/audit/events'),
   getSystemSettings: () => request<SystemSetting[]>('/audit/settings'),
   getNotificationPreferences: (userId: string) => request<NotificationPreference | null>(`/audit/notification-preferences/${userId}`),
+  updateNotificationPreferences: (userId: string, body: Partial<Pick<NotificationPreference, 'inApp' | 'sms' | 'push' | 'email'>>) =>
+    updateNotificationPreferences(userId, body),
   getUserFollows: (userId: string) => request<UserFollow[]>(`/community-extensions/follows/${userId}`),
   getUserSaves: (userId: string) => request<DesignSave[]>(`/community-extensions/saves/${userId}`),
   getUserBadges: (userId: string) => request<UserBadge[]>(`/community-extensions/badges/${userId}`),
@@ -1805,6 +1825,7 @@ export const api = {
   getOrderShipments: (orderId: string) => request<Shipment[]>(`/orders/${orderId}/shipments`),
   getOrderInvoices: (orderId: string) => request<Invoice[]>(`/orders/${orderId}/invoices`),
   getOrderRefunds: (orderId: string) => request<Refund[]>(`/orders/${orderId}/refunds`),
+  requestOrderRefund: (orderId: string, body: { amount: number; reason: string }) => request<Refund>(`/orders/${orderId}/refunds`, { method: 'POST', body }),
   getOrderCancellations: (orderId: string) => request<OrderCancellation[]>(`/orders/${orderId}/cancellations`),
   getOtpSessions: (userId: string) => request<OtpSession[]>(`/users/${userId}/otp-sessions`),
   getKycProfile: (userId: string) => request<KycProfile | null>(`/users/${userId}/kyc`),
@@ -1851,6 +1872,12 @@ export const api = {
       escrowRevenue: number
       latestGoldPrice: GoldPrice | null
     }>('/admin/stats'),
+  getAdminReports: () =>
+    request<{
+      revenue: { totalPaidPayments: number; paidPaymentCount: number; totalOrderValue: number; orderCount: number; escrowFees: number; refunds: number; refundCount: number; netOrderValue: number }
+      ordersByStatus: Array<{ status: string; count: number }>
+      generatedAt: string
+    }>('/admin/reports'),
   getAdminUsers: (limit = 100) => request<User[]>(`/admin/users?limit=${limit}`),
   getAdminOrders: (limit = 100, status?: string) =>
     request<Order[]>(`/admin/orders?limit=${limit}${status ? `&status=${status}` : ''}`),

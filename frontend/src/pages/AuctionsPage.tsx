@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Clock, Gavel, Plus, Search, Star, TrendingUp, UserCheck } from 'lucide-react'
 import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
@@ -21,12 +21,14 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
   const [search, setSearch] = useState('')
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null)
   const auth = getStoredAuth()
+  const queryClient = useQueryClient()
   const [bidForm, setBidForm] = useState({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
 
   const { data: auctions = [], isLoading: auctionsLoading, isError: auctionsError } = useQuery<Auction[]>({
     queryKey: ['auctions'],
     queryFn: api.getAuctions,
     initialData: [],
+    refetchInterval: 15000,
   })
 
   const { data: products = [] } = useQuery<Product[]>({
@@ -46,6 +48,22 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
     queryFn: () => (selectedAuction ? api.getAuctionBids(selectedAuction.id) : Promise.resolve([])),
     initialData: [],
     enabled: Boolean(selectedAuction),
+    refetchInterval: selectedAuction?.status === 'active' || selectedAuction?.status === 'extended' ? 10000 : false,
+  })
+
+  const bidMutation = useMutation({
+    mutationFn: ({ auctionId, amount }: { auctionId: string; amount: number }) =>
+      api.placeAuctionBid(auctionId, {
+        bidderId: auth?.user.id || '',
+        bidderName: auth?.user.name || '',
+        amount,
+      }),
+    onSuccess: (updated) => {
+      setSelectedAuction(updated)
+      setBidForm({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
+      queryClient.invalidateQueries({ queryKey: ['auctions'] })
+      queryClient.invalidateQueries({ queryKey: ['auction-bids', updated.id] })
+    },
   })
 
   const filteredAuctions = useMemo(() => {
@@ -122,7 +140,10 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 <AuctionList
                   auctions={filteredAuctions}
                   selectedAuction={selectedAuction}
-                  onSelect={setSelectedAuction}
+                onSelect={(auction) => {
+                  setSelectedAuction(auction)
+                  setBidForm({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
+                }}
                 />
               ) : activeTab === 'marketplace' && !listingsLoading && !listingsError ? (
                 <ListingList listings={filteredListings} />
@@ -137,14 +158,11 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 minimumBid={minimumBid}
                 onBidChange={setBidForm}
                 onSubmitBid={() => {
-                  if (!selectedAuction || !auth) return
-                  api.placeAuctionBid(selectedAuction.id, {
-                    bidderId: bidForm.bidderId,
-                    bidderName: bidForm.bidderName,
-                    amount: bidForm.amount,
-                  })
-                  setBidForm({ ...emptyBidder, bidderId: auth.user.id, bidderName: auth.user.name })
+                  if (!selectedAuction || !auth || bidForm.amount < minimumBid) return
+                  bidMutation.mutate({ auctionId: selectedAuction.id, amount: bidForm.amount })
                 }}
+                isSubmitting={bidMutation.isPending}
+                error={bidMutation.isError ? 'ثبت پیشنهاد انجام نشد؛ مبلغ یا وضعیت مزایده را بررسی کنید.' : undefined}
               />
               <AuctionRulesPanel />
             </aside>
@@ -260,6 +278,8 @@ function AuctionDetailPanel({
   minimumBid,
   onBidChange,
   onSubmitBid,
+  isSubmitting,
+  error,
 }: {
   auction: Auction | null
   bids: AuctionBid[]
@@ -267,6 +287,8 @@ function AuctionDetailPanel({
   minimumBid: number
   onBidChange: (form: AuctionBid) => void
   onSubmitBid: () => void
+  isSubmitting: boolean
+  error?: string
 }) {
   if (!auction) {
     return (
@@ -294,12 +316,7 @@ function AuctionDetailPanel({
       <div className="rounded-2xl bg-gray-50 p-4">
         <h3 className="font-bold mb-3">ثبت پیشنهاد جدید</h3>
         <div className="space-y-3">
-          <input
-            value={bidForm.bidderName}
-            onChange={(event) => onBidChange({ ...bidForm, bidderName: event.target.value })}
-            className="input"
-            placeholder="نام پیشنهاددهنده"
-          />
+          <p className="text-xs text-muted-foreground">پیشنهاد با حساب کاربری شما ثبت می‌شود.</p>
           <input
             type="number"
             value={bidForm.amount || ''}
@@ -307,9 +324,10 @@ function AuctionDetailPanel({
             className="input"
             placeholder={`حداقل ${formatPrice(minimumBid)} تومان`}
           />
-          <button onClick={onSubmitBid} className="btn btn-primary w-full">
+          <button disabled={isSubmitting || auction.status !== 'active' || bidForm.amount < minimumBid} onClick={onSubmitBid} className="btn btn-primary w-full disabled:opacity-50">
             ثبت پیشنهاد
           </button>
+          {error ? <p role="alert" className="text-xs text-red-700 mt-2">{error}</p> : null}
         </div>
       </div>
 

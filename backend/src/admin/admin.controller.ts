@@ -141,6 +141,6 @@ export class AdminController {
 
   private parseLimit(limit?: string) {
     const parsed = Number(limit || 100)
-    return Number.isFinite(parsed) ? parsed : 100
+    return Number.isFinite(parsed) && parsed > 0 ? Math.min(Math.floor(parsed), 500) : 100
   }
 }

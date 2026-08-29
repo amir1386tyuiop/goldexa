@@ -1,8 +1,9 @@
 import { BadRequestException } from '@nestjs/common'
 import { CartService } from './cart.service'
 import { Cart } from './cart.entity'
-import { CartItem } from './cart-item.entity'
 import { Product } from '../products/product.entity'
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 describe('CartService reservations', () => {
   const user = { sub: 'user-1', role: 'user', roleNames: [] } as any

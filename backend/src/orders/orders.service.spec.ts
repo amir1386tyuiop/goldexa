@@ -9,6 +9,7 @@ describe('OrdersService wallet checkout', () => {
   let service: OrdersService
   let walletService: any
   let pricingService: any
+  let dataSource: any
 
   beforeEach(() => {
     const orderDraft: any = { id: 'order-1' }
@@ -26,6 +27,7 @@ describe('OrdersService wallet checkout', () => {
     }
     walletService = { payOrderWithWallet: jest.fn(async () => ({ id: 'wallet-tx-1' })) }
     pricingService = { requireValidQuote: jest.fn(async () => ({ quoteId: 'Q-1', valid: true, total: 110 })) }
+    dataSource = { transaction: jest.fn() }
     const orderRepository: any = {
       manager: { connection: { createQueryRunner: jest.fn(() => queryRunner) } },
     }
@@ -41,6 +43,7 @@ describe('OrdersService wallet checkout', () => {
       {} as any,
       walletService,
       pricingService,
+      dataSource,
     )
   })
 

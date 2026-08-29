@@ -56,6 +56,12 @@ interface AdminStats {
   } | null
 }
 
+interface AdminReports {
+  revenue: { totalPaidPayments: number; paidPaymentCount: number; totalOrderValue: number; orderCount: number; escrowFees: number; refunds: number; refundCount: number; netOrderValue: number }
+  ordersByStatus: Array<{ status: string; count: number }>
+  generatedAt: string
+}
+
 const menuItems = [
   { id: 'dashboard', icon: <BarChart3 className="h-5 w-5" />, label: 'داشبورد' },
   { id: 'products', icon: <Package className="h-5 w-5" />, label: 'محصولات' },
@@ -122,6 +128,11 @@ export function AdminPage() {
     queryKey: ['admin-payments'],
     queryFn: () => api.getAdminPayments(100),
     initialData: [],
+  })
+
+  const { data: reports, isLoading: reportsLoading, isError: reportsError } = useQuery<AdminReports>({
+    queryKey: ['admin-reports'],
+    queryFn: api.getAdminReports,
   })
 
   const { data: settings = [] } = useQuery<SystemSetting[]>({
@@ -244,7 +255,7 @@ export function AdminPage() {
 
             {activeTab === 'ai' && <AiEnginePanel insidePage={false} />}
 
-            {activeTab === 'reports' && <ReportsPanel stats={stats} orders={adminOrders} users={adminUsers} />}
+            {activeTab === 'reports' && <ReportsPanel stats={stats} orders={adminOrders} users={adminUsers} reports={reports} loading={reportsLoading} error={reportsError} />}
 
             {activeTab === 'settings' && <AdminSettingsPanel settings={settings} />}
           </main>
@@ -538,10 +549,16 @@ function ReportsPanel({
   stats,
   orders,
   users,
+  reports,
+  loading,
+  error,
 }: {
   stats: AdminStats
   orders: Order[]
   users: User[]
+  reports?: AdminReports
+  loading: boolean
+  error: boolean
 }) {
   const paidOrders = orders.filter((order) => order.status === 'paid').length
   const conversionRate = users.length ? ((paidOrders / users.length) * 100).toFixed(1) : '۰'
@@ -554,6 +571,10 @@ function ReportsPanel({
         <StatCard icon={<CreditCard className="h-6 w-6" />} label="درآمد مزایده" value={`${formatPrice(stats.auctionRevenue)} تومان`} />
         <StatCard icon={<Users className="h-6 w-6" />} label="کاربران فعال" value={users.length} />
       </div>
+
+      {loading ? <div className="card p-5 text-sm text-muted-foreground" role="status">در حال دریافت گزارش مالی…</div> : null}
+      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800" role="alert">گزارش مالی در دسترس نیست؛ آمار عمومی همچنان نمایش داده می‌شود.</div> : null}
+      {reports ? <div className="card p-6"><h2 className="text-xl font-bold mb-4">گزارش مالی واقعی</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5"><StatCard icon={<CreditCard className="h-6 w-6" />} label="پرداخت‌های موفق" value={`${formatPrice(reports.revenue.totalPaidPayments)} تومان`} /><StatCard icon={<TrendingUp className="h-6 w-6" />} label="ارزش سفارش‌های معتبر" value={`${formatPrice(reports.revenue.totalOrderValue)} تومان`} /><StatCard icon={<ShieldCheck className="h-6 w-6" />} label="کارمزد escrow" value={`${formatPrice(reports.revenue.escrowFees)} تومان`} /><StatCard icon={<Activity className="h-6 w-6" />} label="بازپرداخت‌ها" value={`${formatPrice(reports.revenue.refunds)} تومان`} /><StatCard icon={<BarChart3 className="h-6 w-6" />} label="ارزش خالص سفارش‌ها" value={`${formatPrice(reports.revenue.netOrderValue)} تومان`} /></div><div className="mt-5 flex flex-wrap gap-2 text-sm text-muted-foreground">{reports.ordersByStatus.map((item) => <span key={item.status} className="rounded-full bg-slate-100 px-3 py-2">{getStatusText(item.status)}: {item.count}</span>)}</div><p className="mt-4 text-xs text-muted-foreground">آخرین محاسبه: {new Date(reports.generatedAt).toLocaleString('fa-IR')}</p></div> : null}
 
       <div className="card p-6">
         <h2 className="text-xl font-bold mb-4">آخرین قیمت طلا</h2>

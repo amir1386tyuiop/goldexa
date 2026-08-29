@@ -40,10 +40,11 @@ export function AuctionPage() {
     notes: '',
   })
 
-  const { data: auctions = [], isLoading } = useQuery({
+  const { data: auctions = [], isLoading, isError: auctionsError } = useQuery({
     queryKey: ['auctions'],
     queryFn: api.getAuctions,
     initialData: [],
+    refetchInterval: 15000,
   })
 
   const { data: products = [] } = useQuery({
@@ -104,6 +105,7 @@ export function AuctionPage() {
     queryFn: () => (selectedAuction ? api.getAuctionBids(selectedAuction.id) : Promise.resolve([])),
     initialData: [],
     enabled: Boolean(selectedAuction),
+    refetchInterval: selectedAuction?.status === 'active' || selectedAuction?.status === 'extended' ? 10000 : false,
   })
 
   const filteredAuctions = useMemo(() => {
@@ -204,6 +206,10 @@ export function AuctionPage() {
 
         {isLoading ? (
           <div className="text-center py-20 card">در حال بارگذاری مزایده‌ها...</div>
+        ) : auctionsError ? (
+          <div role="alert" className="text-center py-12 card border-red-200 bg-red-50 text-red-800">
+            دریافت مزایده‌ها ناموفق بود. لطفاً دوباره تلاش کنید.
+          </div>
         ) : filteredAuctions.length === 0 ? (
           <EmptyAuctionState />
         ) : (
@@ -246,6 +252,7 @@ export function AuctionPage() {
                   isBidding={placeBidMutation.isPending}
                   isSettling={settleAuctionMutation.isPending}
                   isCancelling={cancelAuctionMutation.isPending}
+                  error={placeBidMutation.isError ? 'ثبت پیشنهاد انجام نشد؛ مبلغ یا وضعیت مزایده را بررسی کنید.' : undefined}
                 />
               ) : (
                 <EmptyAuctionDetailState />
@@ -447,6 +454,7 @@ function AuctionDetailPanel({
   isBidding,
   isSettling,
   isCancelling,
+  error,
 }: {
   auction: Auction
   bids: AuctionBid[]
@@ -458,6 +466,7 @@ function AuctionDetailPanel({
   isBidding: boolean
   isSettling: boolean
   isCancelling: boolean
+  error?: string
 }) {
   const minimumBid = auction.currentPrice + auction.minimumBidIncrement
 
@@ -513,7 +522,7 @@ function AuctionDetailPanel({
         )}
       </div>
 
-      {auction.status === 'active' && (
+      {auction.status === 'active' || auction.status === 'extended' ? (
         <div className="mb-5">
           <label className="text-xs text-muted-foreground mb-1 block">مبلغ پیشنهاد جدید</label>
           <div className="flex gap-2">
@@ -540,7 +549,8 @@ function AuctionDetailPanel({
             </p>
           )}
         </div>
-      )}
+      ) : null}
+      {error ? <p role="alert" className="mt-2 text-xs text-red-700">{error}</p> : null}
 
       {auction.status === 'ended' && auction.winningBidderId && (
         <button

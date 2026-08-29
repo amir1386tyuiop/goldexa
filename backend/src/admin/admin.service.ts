@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Order, OrderStatus } from '../orders/order.entity'
+import { OrderStatusHistory } from '../orders/order-status-history.entity'
+import { Refund } from '../orders/refund.entity'
 import { User, UserRole } from '../users/user.entity'
 import { Product } from '../products/product.entity'
 import { GoldPrice } from '../gold-pricing/gold-price.entity'
@@ -31,6 +33,10 @@ export class AdminService {
   constructor(
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
+    @InjectRepository(OrderStatusHistory)
+    private orderStatusHistoryRepository: Repository<OrderStatusHistory>,
+    @InjectRepository(Refund)
+    private refundRepository: Repository<Refund>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
     @InjectRepository(Product)
@@ -231,6 +237,14 @@ export class AdminService {
       .createQueryBuilder('o')
       .select('COALESCE(SUM(o.totalAmount), 0)', 'total')
       .addSelect('COUNT(*)', 'count')
+      .where('o.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED] })
+      .getRawOne<{ total: string; count: string }>()
+
+    const refunds = await this.refundRepository
+      .createQueryBuilder('r')
+      .select('COALESCE(SUM(r.amount), 0)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .where('r.status IN (:...statuses)', { statuses: ['pending', 'approved', 'completed'] })
       .getRawOne<{ total: string; count: string }>()
 
     const escrow = await this.escrowRepository
@@ -252,6 +266,9 @@ export class AdminService {
         totalOrderValue: Number(orders?.total ?? 0),
         orderCount: Number(orders?.count ?? 0),
         escrowFees: Number(escrow?.total ?? 0),
+        refunds: Number(refunds?.total ?? 0),
+        refundCount: Number(refunds?.count ?? 0),
+        netOrderValue: Number(orders?.total ?? 0) - Number(refunds?.total ?? 0),
       },
       ordersByStatus: ordersByStatus.map((r) => ({ status: r.status, count: Number(r.count) })),
       // Revenue streams defined in the business model (populated as modules grow).
@@ -312,7 +329,11 @@ export class AdminService {
       throw new NotFoundException('سفارش یافت نشد')
     }
 
-    return this.orderRepository.save({ ...existing, status })
+    const updated = await this.orderRepository.save({ ...existing, status })
+    await this.orderStatusHistoryRepository.save(
+      this.orderStatusHistoryRepository.create({ orderId: id, status, note: 'به‌روزرسانی از پنل مدیریت' }),
+    )
+    return updated
   }
 
   async listPayments(limit = 100, status?: string) {
@@ -340,6 +361,12 @@ export class AdminService {
       throw new NotFoundException('پرداخت یافت نشد')
     }
 
+    if (status !== PaymentTransactionStatus.REFUNDED) {
+      throw new BadRequestException('وضعیت بازپرداخت نامعتبر است')
+    }
+    if (payment.status !== PaymentTransactionStatus.PAID) {
+      throw new BadRequestException('فقط پرداخت موفق قابل بازپرداخت است')
+    }
     return this.paymentTransactionRepository.save({ ...payment, status })
   }
 

@@ -25,6 +25,21 @@ export class SmartVaultService {
     return this.assetRepository.findBy({ userId })
   }
 
+  async getSummary(userId: string) {
+    const assets = await this.findAssets(userId)
+    const summary = assets.reduce(
+      (result, asset) => {
+        result.purchaseValue += Number(asset.purchasePrice)
+        result.currentValue += Number(asset.currentValue)
+        result.goldWeight += Number(asset.weight)
+        result.profitLoss += Number(asset.profitLoss)
+        return result
+      },
+      { assetCount: 0, purchaseValue: 0, currentValue: 0, goldWeight: 0, profitLoss: 0 },
+    )
+    return { ...summary, assetCount: assets.length, profitLossPercent: summary.purchaseValue ? (summary.profitLoss / summary.purchaseValue) * 100 : 0 }
+  }
+
   async findAsset(id: string, userId: string, isAdmin = false): Promise<SmartVaultAsset | null> {
     const asset = await this.assetRepository.findOneBy({ id })
     if (asset && !isAdmin && asset.userId !== userId) {

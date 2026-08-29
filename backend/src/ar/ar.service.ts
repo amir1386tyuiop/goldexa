@@ -32,7 +32,7 @@ export class ArService {
   }
 
   async findPreviews(modelId: string): Promise<ArPreview[]> {
-    return this.previewRepository.findBy({ modelId })
+    return this.previewRepository.findBy({ modelId, isShared: true })
   }
 
   async createPreview(data: CreateArPreviewDto): Promise<ArPreview> {

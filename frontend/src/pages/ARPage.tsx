@@ -1,4 +1,5 @@
-import { Camera, Sparkles, Smartphone } from 'lucide-react'
+import { Camera, ExternalLink, Sparkles, Smartphone } from 'lucide-react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { ArModel } from '@/types'
@@ -22,6 +23,8 @@ const arSteps = [
 ]
 
 export function ARPage() {
+  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const arEnabled = import.meta.env.VITE_AR_ENABLED === 'true'
   const { data: models = [], isLoading, isError } = useQuery<ArModel[]>({
     queryKey: ['ar-models'],
     queryFn: api.getArModels,
@@ -37,7 +40,7 @@ export function ARPage() {
           </h1>
           <p className="text-muted-foreground leading-relaxed">
             قبل از خرید، طلا را روی بدن خود ببینید و بررسی کنید.
-            این قابلیت در فاز ۲ به صورت کامل پیاده‌سازی می‌شود.
+            مدل‌های سه‌بعدی آماده را ببینید و در صورت فعال‌بودن سرویس WebAR، پرو مجازی را اجرا کنید.
           </p>
         </div>
 
@@ -55,14 +58,16 @@ export function ARPage() {
 
         <div className="card p-8 text-center">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gold-50 text-gold-700" aria-hidden="true"><Sparkles className="h-8 w-8" /></div>
-          <h2 className="text-2xl font-bold mb-4">این قابلیت در فاز ۲ فعال می‌شود</h2>
+          <h2 className="text-2xl font-bold mb-4">{arEnabled ? 'آماده‌سازی پرو مجازی' : 'پرو مجازی فعلاً غیرفعال است'}</h2>
           <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
             تکنولوژی WebAR با MediaPipe برای تشخیص اعضای بدن و نمایش مدل‌های سه‌بعدی طلا
             با فریم‌ریت حداقل ۲۵ FPS روی گوشی‌های میان‌رده
           </p>
-          <button type="button" className="btn btn-primary min-h-11" disabled>
-            اطلاع‌رسانی زمان فعال‌سازی
+          <button type="button" className="btn btn-primary min-h-11" disabled={!arEnabled || !models.length} onClick={() => setSelectedModel(models[0]?.id || null)}>
+            {arEnabled ? 'شروع پرو مجازی' : 'در انتظار فعال‌سازی سرویس'}
           </button>
+          {models.length > 0 && <div className="mt-8 grid gap-4 text-right sm:grid-cols-2">{models.map((model) => <button type="button" key={model.id} onClick={() => setSelectedModel(model.id)} className={`rounded-2xl border p-4 text-right transition ${selectedModel === model.id ? 'border-amber-600 bg-amber-50' : 'border-stone-200 hover:border-amber-400'}`}><span className="flex items-center justify-between gap-3"><span className="font-bold">{model.name}</span><ExternalLink className="h-4 w-4 text-amber-700" aria-hidden="true" /></span><span className="mt-2 block text-xs text-stone-500">مدل سه‌بعدی {model.modelUrl ? 'آماده' : 'ثبت نشده'}</span></button>)}</div>}
+          {selectedModel && <p className="mt-4 text-sm text-amber-800" role="status">مدل انتخاب شد. اتصال به سرویس WebAR با feature flag انجام می‌شود.</p>}
           <div className="mt-6 text-right" aria-live="polite">
             {isLoading ? <p className="text-sm text-muted-foreground">در حال بررسی مدل‌های AR...</p> : null}
             {isError ? <p role="alert" className="text-sm text-red-700">مدل‌های AR فعلاً در دسترس نیستند.</p> : null}

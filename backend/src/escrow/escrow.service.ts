@@ -31,8 +31,10 @@ export class EscrowService {
     private readonly walletService: WalletService,
   ) {}
 
-  async findPayments(): Promise<EscrowPayment[]> {
-    return this.escrowRepository.find({ order: { createdAt: 'DESC' } })
+  async findPayments(userId?: string, isAdmin = false): Promise<EscrowPayment[]> {
+    if (!isAdmin && !userId) throw new BadRequestException('کاربر احراز هویت نشده است')
+    const where = isAdmin ? undefined : [{ buyerId: userId }, { sellerId: userId }]
+    return this.escrowRepository.find({ where, order: { createdAt: 'DESC' } })
   }
 
   async findPayment(id: string, userId: string, isAdmin = false): Promise<EscrowPayment | null> {
@@ -58,11 +60,20 @@ export class EscrowService {
     if (data.listingId && data.auctionId) {
       throw new BadRequestException('پرداخت امانی نمی‌تواند هم‌زمان به listing و auction متصل باشد')
     }
+    if (!Number.isFinite(data.amount) || data.amount <= 0 || !Number.isFinite(data.fee ?? 0) || (data.fee ?? 0) < 0 || (data.fee ?? 0) >= data.amount) {
+      throw new BadRequestException('مبلغ یا کارمزد escrow نامعتبر است')
+    }
 
     const sellerId = await this.resolveSellerId(data)
     if (data.buyerId === sellerId) {
       throw new BadRequestException('خریدار و فروشنده نمی‌توانند یک کاربر باشند')
     }
+    const existing = await this.escrowRepository.findOne({
+      where: data.listingId
+        ? { listingId: data.listingId, buyerId: data.buyerId, status: EscrowPaymentStatus.INITIATED }
+        : { auctionId: data.auctionId, buyerId: data.buyerId, status: EscrowPaymentStatus.INITIATED },
+    })
+    if (existing) throw new BadRequestException('برای این معامله یک escrow فعال از قبل وجود دارد')
 
     return this.escrowRepository.save(
       this.escrowRepository.create({
@@ -175,6 +186,12 @@ export class EscrowService {
   }
 
   async createRating(data: CreateMarketplaceRatingDto): Promise<MarketplaceRating> {
+    if (!data.reviewerId || data.reviewerId === data.revieweeId) {
+      throw new BadRequestException('ثبت امتیاز برای خود یا بدون کاربر معتبر مجاز نیست')
+    }
+    if (!data.listingId && !data.orderId) {
+      throw new BadRequestException('امتیاز باید به listing یا order متصل باشد')
+    }
     return this.ratingRepository.save(
       this.ratingRepository.create({
         ...data,

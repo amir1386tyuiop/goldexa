@@ -59,16 +59,25 @@ export class UsedGoldListingsService {
       throw new NotFoundException('فروشنده یافت نشد')
     }
 
-    if (data.saleType === UsedGoldListingSaleType.DIRECT && !data.fixedPrice) {
+    if (!Number.isFinite(data.weight) || data.weight <= 0 || !Number.isInteger(data.karat) || data.karat < 1 || data.karat > 24) {
+      throw new BadRequestException('وزن و عیار آگهی نامعتبر است')
+    }
+
+    if (data.saleType === UsedGoldListingSaleType.DIRECT && (!Number.isFinite(data.fixedPrice) || (data.fixedPrice ?? 0) <= 0)) {
       throw new BadRequestException('برای فروش مستقیم قیمت ثابت الزامی است')
     }
 
-    if (data.saleType === UsedGoldListingSaleType.AUCTION && !data.startingPrice) {
+    if (data.saleType === UsedGoldListingSaleType.AUCTION && (!Number.isFinite(data.startingPrice) || (data.startingPrice ?? 0) <= 0)) {
       throw new BadRequestException('برای مزایده قیمت پایه الزامی است')
+    }
+    if (data.saleType === UsedGoldListingSaleType.AUCTION && (!Number.isFinite(data.minimumBidIncrement) || (data.minimumBidIncrement ?? 0) <= 0)) {
+      throw new BadRequestException('حداقل افزایش مزایده الزامی است')
     }
 
     const listing = this.listingRepository.create({
       ...data,
+      sellerId: seller.id,
+      sellerName: seller.name,
       images: data.images ?? [],
       stones: data.stones ?? null,
       dimensions: data.dimensions ?? null,
@@ -86,7 +95,7 @@ export class UsedGoldListingsService {
       commissionRate: data.commissionRate ?? 0,
       qualityStatus: UsedGoldQualityStatus.NOT_SENT,
       qualityBadge: false,
-      status: data.status ?? UsedGoldListingStatus.PENDING_REVIEW,
+      status: UsedGoldListingStatus.PENDING_REVIEW,
     })
 
     return this.listingRepository.save(listing)

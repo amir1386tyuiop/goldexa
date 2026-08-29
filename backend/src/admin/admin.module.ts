@@ -9,6 +9,8 @@ import { SubscriptionPlan } from '../subscriptions/subscription-plan.entity'
 import { AdminController } from './admin.controller'
 import { AdminService } from './admin.service'
 import { Order } from '../orders/order.entity'
+import { OrderStatusHistory } from '../orders/order-status-history.entity'
+import { Refund } from '../orders/refund.entity'
 import { User } from '../users/user.entity'
 import { Product } from '../products/product.entity'
 import { GoldPrice } from '../gold-pricing/gold-price.entity'
@@ -41,6 +43,8 @@ import { RoleService } from '../auth/role.service'
     }),
     TypeOrmModule.forFeature([
       Order,
+      OrderStatusHistory,
+      Refund,
       User,
       Product,
       GoldPrice,
