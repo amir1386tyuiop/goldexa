@@ -10,7 +10,7 @@ export interface AuthTokenPayload {
 
 export interface OtpResponse {
   phone: string
-  otp: string
+  otp?: string
   expiresAt: string
   message: string
 }
