@@ -174,7 +174,7 @@ export class GoldPricingService implements OnModuleInit {
    */
   private async fetchFromTgju(): Promise<GoldPrice[]> {
     const url = this.configService.get<string>('GOLD_PRICE_API_URL') || 'https://call.tgju.org/ajax.json'
-    const divisor = Number(this.configService.get<string>('GOLD_PRICE_TGJU_DIVISOR')) || 1
+    const localCurrencyDivisor = Number(this.configService.get<string>('GOLD_PRICE_TGJU_DIVISOR')) || 10
     const { data } = await axios.get(url, { timeout: 8000 })
     const current = (data?.current ?? data) as Record<string, { p?: string; d?: string; dp?: string }>
 
@@ -190,6 +190,8 @@ export class GoldPricingService implements OnModuleInit {
     for (const { key, type } of map) {
       const node = current?.[key]
       if (!node) continue
+      // TGJU reports Iranian market values in ریال, while the global ounce is USD.
+      const divisor = type === GoldPriceType.OUNCE ? 1 : localCurrencyDivisor
       prices.push({
         type,
         value: toNum(node.p) / divisor,
