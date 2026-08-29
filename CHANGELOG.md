@@ -36,3 +36,4 @@
 - Cart reservations, product pricing, wallet holds, escrow transitions, and refunds use transactional/pessimistic locking paths to prevent races and forged client totals.
 - Payment transaction and order-tracking reads are JWT-scoped; notification, smart-vault, custom-builder, subscription, audit, and public user-registration routes no longer trust arbitrary user IDs or roles from request bodies/paths.
 - Legacy cart price/name fields remain accepted for client compatibility but are ignored by the backend.
+- Reinstalled dependencies from clean lockfiles and verified zero vulnerabilities with npm audit for runtime and full dependency trees.

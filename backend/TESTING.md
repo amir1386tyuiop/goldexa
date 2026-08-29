@@ -70,6 +70,17 @@ The current backend contract hardening also verifies that checkout carries quote
 IDs into order validation, online checkout requests a gateway transaction, and
 cart price/name values cannot override the locked product row.
 
+## Dependency audit
+
+After a clean `npm ci`, verify the runtime dependency tree with:
+
+```powershell
+npm audit --omit=dev --offline --json
+```
+
+The current backend lockfile reports zero vulnerabilities. Run the same audit
+without `--omit=dev` before shipping development tooling changes.
+
 ## E2E smoke
 
 backend را روی test database اجرا کنید و سپس:
