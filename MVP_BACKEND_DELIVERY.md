@@ -71,6 +71,7 @@
 - `POST /marketplace/listings/:id/purchase` خرید مستقیم آگهی با کیف پول را در یک transaction انجام می‌دهد؛ listing با قفل سطر بررسی می‌شود، order و escrow ساخته می‌شوند، مبلغ با `holdEscrow` قفل می‌شود و listing به‌صورت اتمیک `sold` می‌شود.
 - خرید تکراری همان listing با بررسی escrow/order رد یا به نتیجه‌ی قبلی همان معامله هدایت می‌شود.
 - `idempotencyKey` خرید مستقیم در escrow ذخیره و unique شده است؛ retry همان خریدار و listing همان order/escrow قبلی را برمی‌گرداند و reuse کلید برای معامله‌ی دیگر رد می‌شود.
+- امتیاز marketplace اکنون فقط پس از escrow `released` و فقط توسط یکی از طرفین واقعی همان معامله پذیرفته می‌شود؛ برای هر طرف/معامله unique index و کنترل تکرار وجود دارد.
 - `PATCH /marketplace/listings/:id/cancel` برای لغو آگهی توسط فروشنده اضافه شد؛ مالکیت و وضعیت نهایی قبل از تغییر بررسی می‌شود.
 - `PATCH /escrow/payments/:id/ship` فقط توسط فروشنده‌ی همان escrow و با کد رهگیری معتبر قابل اجراست.
 - `POST /escrow/payments/:id/confirm-delivery` فقط توسط خریدار همان escrow اجرا می‌شود و release atomic مبلغ را انجام می‌دهد.

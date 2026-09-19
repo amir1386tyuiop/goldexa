@@ -12,6 +12,7 @@ import { WalletService } from '../wallet/wallet.service'
 describe('EscrowService security boundaries', () => {
   let service: EscrowService
   let escrowRepository: { find: jest.Mock; findOne: jest.Mock; findOneBy: jest.Mock; create: jest.Mock; save: jest.Mock }
+  let ratingRepository: { find: jest.Mock; findBy: jest.Mock; create: jest.Mock; save: jest.Mock }
   let listingRepository: { findOneBy: jest.Mock }
   let auctionRepository: { findOneBy: jest.Mock }
   let walletService: { ensureWalletForUser: jest.Mock; holdEscrow: jest.Mock; releaseEscrow: jest.Mock; refundEscrow: jest.Mock }
@@ -28,6 +29,7 @@ describe('EscrowService security boundaries', () => {
     }
     listingRepository = { findOneBy: jest.fn() }
     auctionRepository = { findOneBy: jest.fn() }
+    ratingRepository = { find: jest.fn(), findBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
     walletService = {
       ensureWalletForUser: jest.fn(),
       holdEscrow: jest.fn(),
@@ -48,7 +50,7 @@ describe('EscrowService security boundaries', () => {
       providers: [
         EscrowService,
         { provide: getRepositoryToken(EscrowPayment), useValue: escrowRepository },
-        { provide: getRepositoryToken(MarketplaceRating), useValue: { find: jest.fn(), findBy: jest.fn(), create: jest.fn(), save: jest.fn() } },
+        { provide: getRepositoryToken(MarketplaceRating), useValue: ratingRepository },
         { provide: getRepositoryToken(UsedGoldListing), useValue: listingRepository },
         { provide: getRepositoryToken(Auction), useValue: auctionRepository },
         { provide: DataSource, useValue: dataSource },
@@ -134,6 +136,36 @@ describe('EscrowService security boundaries', () => {
     await expect(service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.RELEASED }))
       .resolves.toMatchObject({ status: EscrowPaymentStatus.RELEASED })
     expect(walletService.releaseEscrow).toHaveBeenCalledWith('seller-1', 'escrow-1', 95, expect.anything())
+  })
+
+  it('accepts ratings only from a completed trade and blocks duplicates', async () => {
+    escrowRepository.find.mockResolvedValue([{
+      status: EscrowPaymentStatus.RELEASED,
+      buyerId: 'buyer-1',
+      sellerId: 'seller-1',
+      listingId: 'listing-1',
+      orderId: 'order-1',
+    }])
+    ratingRepository.find.mockResolvedValue([])
+
+    const rating = await service.createRating({
+      reviewerId: 'buyer-1', revieweeId: 'seller-1', listingId: 'listing-1',
+      rating: 5, category: 'delivery', body: 'عالی',
+    })
+    expect(rating.reviewerId).toBe('buyer-1')
+    expect(ratingRepository.save).toHaveBeenCalled()
+
+    ratingRepository.find.mockResolvedValue([{ listingId: 'listing-1', orderId: null }])
+    await expect(service.createRating({
+      reviewerId: 'buyer-1', revieweeId: 'seller-1', listingId: 'listing-1',
+      rating: 4, category: 'delivery',
+    })).rejects.toThrow('قبلاً امتیاز')
+
+    escrowRepository.find.mockResolvedValue([])
+    await expect(service.createRating({
+      reviewerId: 'stranger', revieweeId: 'seller-1', listingId: 'listing-1',
+      rating: 1, category: 'delivery',
+    })).rejects.toThrow(ForbiddenException)
   })
 
   it('applies wallet hold and refund exactly once across escrow transitions', async () => {

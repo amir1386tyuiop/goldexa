@@ -319,6 +319,30 @@ export class EscrowService {
     if (!data.listingId && !data.orderId) {
       throw new BadRequestException('امتیاز باید به listing یا order متصل باشد')
     }
+
+    const escrows = await this.escrowRepository.find({
+      where: data.listingId ? { listingId: data.listingId } : { orderId: data.orderId },
+      order: { createdAt: 'DESC' },
+    })
+    const completedTrade = escrows.find((payment) =>
+      payment.status === EscrowPaymentStatus.RELEASED &&
+      ((payment.buyerId === data.reviewerId && payment.sellerId === data.revieweeId) ||
+        (payment.sellerId === data.reviewerId && payment.buyerId === data.revieweeId)),
+    )
+    if (!completedTrade) {
+      throw new ForbiddenException('فقط طرفین یک معامله‌ی تسویه‌شده می‌توانند امتیاز بدهند')
+    }
+
+    const duplicate = await this.ratingRepository.find({
+      where: { reviewerId: data.reviewerId, revieweeId: data.revieweeId },
+    })
+    if (duplicate.some((rating) =>
+      (data.listingId && rating.listingId === data.listingId) ||
+      (data.orderId && rating.orderId === data.orderId),
+    )) {
+      throw new BadRequestException('برای این معامله قبلاً امتیاز ثبت شده است')
+    }
+
     return this.ratingRepository.save(
       this.ratingRepository.create({
         ...data,

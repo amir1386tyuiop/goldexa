@@ -614,6 +614,10 @@ CREATE TABLE marketplace_ratings (
     category VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX idx_marketplace_ratings_trade_reviewer
+    ON marketplace_ratings (reviewer_id, reviewee_id,
+      COALESCE(listing_id, '00000000-0000-0000-0000-000000000000'::uuid),
+      COALESCE(order_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 -- Payments and Tracking
 CREATE TABLE payment_transactions (
