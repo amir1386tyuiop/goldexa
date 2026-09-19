@@ -42,6 +42,8 @@ class DesignRecommendationRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=100)
     user_history: List[str] = Field(..., max_length=500)
     candidate_designs: List[DesignCandidate] = Field(default_factory=list, max_length=100)
+    budget: Optional[float] = Field(default=None, gt=0)
+    style: Optional[str] = Field(default=None, max_length=100)
 
     @field_validator("user_history")
     @classmethod
@@ -105,19 +107,34 @@ def _linear_baseline(prices: List[float], days_ahead: int) -> Dict[str, Any]:
     return {"predicted_price": round(max(0.01, predicted), 2), "confidence": round(max(0.0, min(1.0, confidence)), 3), "trend_per_day": round(slope, 2), "r_squared": round(r_squared, 3), "volatility": round(volatility, 5)}
 
 
-def _recommendations(history: List[str], candidates: List[DesignCandidate]) -> List[Dict[str, Any]]:
+def _recommendations(
+    history: List[str],
+    candidates: List[DesignCandidate],
+    budget: Optional[float] = None,
+    style: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     history_tokens = [_tokens(item) for item in history]
     counts = Counter(token for item in history_tokens for token in item)
+    style_tokens = _tokens(style or "")
     catalog = candidates or DEFAULT_DESIGNS
     results = []
     for index, design in enumerate(catalog):
         design_tokens = set(design.tags) | _tokens(design.name)
         overlap = sorted(design_tokens & set(counts))
+        style_overlap = sorted(design_tokens & style_tokens)
         preference_score = sum(counts[token] for token in overlap) / max(1, sum(counts.values()))
+        style_score = len(style_overlap) / max(1, len(style_tokens)) if style_tokens else 0.5
+        budget_score = 0.5
+        if budget and design.price:
+            budget_score = 1.0 if design.price <= budget else max(0.0, budget / design.price)
         novelty = 0.03 * (1 - index / max(1, len(catalog)))
-        score = min(1.0, 0.15 + 0.75 * preference_score + novelty)
-        reason = f"اشتراک با سابقه کاربر در ویژگی‌های: {', '.join(overlap)}" if overlap else "سابقه‌ی مستقیم برای این طرح پیدا نشد؛ امتیاز پایه‌ی تنوع اعمال شد"
-        results.append({"product_id": design.product_id, "score": round(score, 3), "reason": reason, "matched_features": overlap})
+        score = min(1.0, 0.12 + 0.55 * preference_score + 0.15 * style_score + 0.15 * budget_score + novelty)
+        reasons = [f"اشتراک با سابقه کاربر در ویژگی‌های: {', '.join(overlap)}" if overlap else "سابقه‌ی مستقیم برای این طرح پیدا نشد"]
+        if style_tokens:
+            reasons.append(f"تناسب سبک: {', '.join(style_overlap)}" if style_overlap else "سبک انتخابی تطابق مستقیمی نداشت")
+        if budget and design.price:
+            reasons.append("قیمت طرح داخل بودجه است" if design.price <= budget else "قیمت طرح بالاتر از بودجه است و امتیاز متناسب کاهش یافت")
+        results.append({"product_id": design.product_id, "score": round(score, 3), "reason": "؛ ".join(reasons), "matched_features": overlap, "style_matches": style_overlap, "budget_score": round(budget_score, 3)})
     return sorted(results, key=lambda item: (-item["score"], item["product_id"]))[:10]
 
 
@@ -137,7 +154,7 @@ async def predict_price(request: PricePredictionRequest) -> Dict[str, Any]:
 
 @app.post("/recommend-designs")
 async def recommend_designs(request: DesignRecommendationRequest) -> Dict[str, Any]:
-    return {"recommendations": _recommendations(request.user_history, request.candidate_designs), "user_id": request.user_id, "method": "token-overlap preference scoring with deterministic diversity prior", "disclaimer": "این توصیه‌گر محلی و مبتنی بر سابقه‌ی ارسال‌شده است؛ مدل collaborative filtering آموزش‌دیده نیست."}
+    return {"recommendations": _recommendations(request.user_history, request.candidate_designs, request.budget, request.style), "user_id": request.user_id, "method": "explainable history, style and budget scoring with deterministic diversity prior", "disclaimer": "این توصیه‌گر محلی و مبتنی بر داده‌ی ارسالی است؛ مدل collaborative filtering آموزش‌دیده نیست."}
 
 
 @app.post("/match-market")

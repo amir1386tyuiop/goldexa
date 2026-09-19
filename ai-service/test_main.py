@@ -45,6 +45,16 @@ class AiServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result[0]["matched_features"], ["gold", "ring"])
         self.assertIn("reason", result[0])
 
+    def test_recommendations_use_budget_and_style(self):
+        candidates = [
+            DesignCandidate(product_id="cheap", name="Modern Ring", tags=["ring", "modern"], price=100),
+            DesignCandidate(product_id="expensive", name="Modern Ring", tags=["ring", "modern"], price=1000),
+        ]
+        result = _recommendations(["ring"], candidates, budget=200, style="modern")
+        self.assertEqual(result[0]["product_id"], "cheap")
+        self.assertEqual(result[0]["style_matches"], ["modern"])
+        self.assertEqual(result[0]["budget_score"], 1.0)
+
     async def test_recommendation_response_keeps_existing_contract(self):
         result = await recommend_designs(DesignRecommendationRequest(user_id="u1", user_history=["ring"]))
         self.assertIn("recommendations", result)
