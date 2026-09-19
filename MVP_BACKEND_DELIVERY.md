@@ -77,6 +77,7 @@
 - `POST /escrow/payments/:id/dispute` توسط خریدار یا فروشنده اختلاف را ثبت و مبلغ را در وضعیت `disputed` نگه می‌دارد؛ resolution ادمین برای release/refund نیازمند یادداشت اجباری است.
 - پنل ادمین اکنون `GET /admin/escrow/disputes` و `PATCH /admin/escrow/:id/resolve` دارد؛ فهرست اختلاف‌ها، دلیل، طرفین و دو مسیر release/refund با یادداشت تصمیم در UI مدیریت نمایش داده می‌شود.
 - پایان مزایده دیگر به‌اشتباه `settled/completed` نمی‌شود؛ تا زمان پرداخت برنده در `awaiting_payment` می‌ماند و بعد از پرداخت به escrow متصل می‌شود.
+- هنگام `HELD` شدن escrow، مزایده به `escrow_held` و هنگام release به‌صورت transactional به `completed/settled` می‌رود؛ refund نیز مزایده را `failed/refunded` می‌کند تا کیف پول، escrow، سفارش و گزارش مزایده از هم جدا نشوند.
 - مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ تست E2E ایزوله‌ی PostgreSQL نیز خرید مستقیم، hold کیف پول، ارسال، release و بازکردن dispute را پوشش می‌دهد.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)

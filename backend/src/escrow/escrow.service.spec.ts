@@ -16,6 +16,7 @@ describe('EscrowService security boundaries', () => {
   let auctionRepository: { findOneBy: jest.Mock }
   let walletService: { ensureWalletForUser: jest.Mock; holdEscrow: jest.Mock; releaseEscrow: jest.Mock; refundEscrow: jest.Mock }
   let dataSource: { transaction: jest.Mock }
+  let transactionManager: { findOne: jest.Mock; save: jest.Mock; update: jest.Mock }
 
   beforeEach(async () => {
     escrowRepository = {
@@ -33,12 +34,15 @@ describe('EscrowService security boundaries', () => {
       releaseEscrow: jest.fn(),
       refundEscrow: jest.fn(),
     }
-    dataSource = {
-      transaction: jest.fn(async (callback) => callback({
-        findOne: jest.fn(async (_entity, options) => escrowRepository.findOneBy(options.where)),
-        save: jest.fn(async (value) => value),
-      })),
+    transactionManager = {
+      findOne: jest.fn(async (entity, options) =>
+        entity === Auction
+          ? null
+          : escrowRepository.findOneBy(options.where)),
+      save: jest.fn(async (...args) => args.length === 2 ? args[1] : args[0]),
+      update: jest.fn(),
     }
+    dataSource = { transaction: jest.fn(async (callback) => callback(transactionManager)) }
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -167,5 +171,36 @@ describe('EscrowService security boundaries', () => {
     })
     expect(resolved?.status).toBe(EscrowPaymentStatus.REFUNDED)
     expect(resolved?.resolutionNote).toContain('refund')
+  })
+
+  it('settles the related auction in the same transaction as escrow release', async () => {
+    const payment = {
+      id: 'escrow-auction-1',
+      auctionId: 'auction-1',
+      status: EscrowPaymentStatus.HELD,
+      buyerId: 'winner-1',
+      sellerId: 'seller-1',
+      amount: 250,
+      fee: 5,
+    }
+    const auction = {
+      id: 'auction-1',
+      status: AuctionStatus.AWAITING_PAYMENT,
+      paymentStatus: 'unpaid',
+      winningBidderId: 'winner-1',
+      winningAmount: 250,
+      paymentDeadlineAt: new Date(),
+    }
+    escrowRepository.findOneBy.mockResolvedValue(payment)
+    transactionManager.findOne.mockImplementation(async (entity) => entity === Auction ? auction : payment)
+
+    const released = await service.updatePaymentStatus(payment.id, { status: EscrowPaymentStatus.RELEASED })
+
+    expect(walletService.releaseEscrow).toHaveBeenCalledWith('seller-1', payment.id, 245, expect.anything())
+    expect(auction.status).toBe(AuctionStatus.COMPLETED)
+    expect(auction.paymentStatus).toBe('settled')
+    expect(auction.paymentDeadlineAt).toBeNull()
+    expect(transactionManager.save).toHaveBeenCalledWith(Auction, auction)
+    expect(released?.status).toBe(EscrowPaymentStatus.RELEASED)
   })
 })

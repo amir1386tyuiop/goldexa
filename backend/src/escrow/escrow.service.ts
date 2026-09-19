@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { DataSource, Repository } from 'typeorm'
+import { DataSource, EntityManager, Repository } from 'typeorm'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
 import { MarketplaceRating } from './marketplace-rating.entity'
 import {
@@ -8,7 +8,8 @@ import {
   UsedGoldListingSaleType,
   UsedGoldListingStatus,
 } from '../marketplace/used-gold-listing.entity'
-import { Auction, AuctionStatus } from '../auctions/auction.entity'
+import { Auction, AuctionPaymentStatus, AuctionStatus } from '../auctions/auction.entity'
+import { Order, OrderStatus } from '../orders/order.entity'
 import { WalletService } from '../wallet/wallet.service'
 import {
   CreateEscrowPaymentDto,
@@ -181,6 +182,8 @@ export class EscrowService {
         await this.walletService.refundEscrow(payment.buyerId, payment.id, Number(payment.amount), manager)
       }
 
+      await this.syncRelatedState(manager, payment, nextStatus)
+
       payment.status = nextStatus
       payment.trackingCode = data.trackingCode ?? payment.trackingCode
       if (payment.status === EscrowPaymentStatus.RELEASED || payment.status === EscrowPaymentStatus.REFUNDED) {
@@ -189,6 +192,56 @@ export class EscrowService {
       }
       return manager.save(payment)
     })
+  }
+
+  /**
+   * Escrow is the source of truth for settlement. Keep the related order and
+   * auction in the same database transaction as the wallet ledger so a
+   * successful release can never leave the UI/reporting state behind.
+   */
+  private async syncRelatedState(
+    manager: EntityManager,
+    payment: EscrowPayment,
+    nextStatus: EscrowPaymentStatus,
+  ): Promise<void> {
+    if (payment.orderId) {
+      const orderStatus = nextStatus === EscrowPaymentStatus.RELEASED
+        ? OrderStatus.DELIVERED
+        : nextStatus === EscrowPaymentStatus.REFUNDED
+          ? OrderStatus.CANCELLED
+          : nextStatus === EscrowPaymentStatus.HELD
+            ? OrderStatus.PAID
+            : null
+      if (orderStatus) {
+        await manager.update(Order, payment.orderId, {
+          status: orderStatus,
+          ...(payment.trackingCode ? { trackingCode: payment.trackingCode } : {}),
+        })
+      }
+    }
+
+    if (!payment.auctionId) return
+
+    const auction = await manager.findOne(Auction, {
+      where: { id: payment.auctionId },
+      lock: { mode: 'pessimistic_write' },
+    })
+    if (!auction) throw new NotFoundException('مزایده مرتبط با escrow یافت نشد')
+    if (auction.winningBidderId !== payment.buyerId || Number(auction.winningAmount) !== Number(payment.amount)) {
+      throw new BadRequestException('escrow با برنده یا مبلغ مزایده مطابقت ندارد')
+    }
+
+    if (nextStatus === EscrowPaymentStatus.HELD) {
+      auction.paymentStatus = AuctionPaymentStatus.ESCROW_HELD
+    } else if (nextStatus === EscrowPaymentStatus.RELEASED) {
+      auction.paymentStatus = AuctionPaymentStatus.SETTLED
+      auction.status = AuctionStatus.COMPLETED
+      auction.paymentDeadlineAt = null
+    } else if (nextStatus === EscrowPaymentStatus.REFUNDED) {
+      auction.paymentStatus = AuctionPaymentStatus.REFUNDED
+      auction.status = AuctionStatus.FAILED
+    }
+    await manager.save(Auction, auction)
   }
 
   async openDispute(id: string, userId: string, reason: string): Promise<EscrowPayment> {
