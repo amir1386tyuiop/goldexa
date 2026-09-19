@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common'
 import { AuctionsService } from './auctions.service'
-import { AuctionStatus, BidIncrementType } from './auction.entity'
+import { AuctionPaymentStatus, AuctionStatus, BidIncrementType } from './auction.entity'
 
 describe('AuctionsService', () => {
   const noOpQueryBuilder = () => ({
@@ -52,5 +52,36 @@ describe('AuctionsService', () => {
       { transaction: jest.fn(async (callback) => callback(manager)) } as never,
     )
     await expect(service.placeBid('auction-1', { amount: 1050 }, 'buyer-1')).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('promotes an eligible second winner after the first winner misses payment', async () => {
+    const expired = {
+      id: 'auction-1', status: AuctionStatus.AWAITING_PAYMENT,
+      paymentDeadlineAt: new Date(Date.now() - 1000), paymentWindowMinutes: 60,
+      winningBidderId: 'winner-1', winningBidderName: 'برنده اول', winningAmount: 200,
+      secondWinnerId: 'winner-2', secondWinnerName: 'برنده دوم', secondWinnerAmount: 180,
+      reservePrice: 150, currentPrice: 200, reserveMet: true,
+      paymentStatus: AuctionPaymentStatus.UNPAID,
+    }
+    const auctionRepository = {
+      createQueryBuilder: noOpQueryBuilder,
+      find: jest.fn().mockResolvedValueOnce([expired]).mockResolvedValueOnce([]),
+      save: jest.fn(async (value) => value),
+    }
+    const service = new AuctionsService(
+      auctionRepository as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    )
+
+    await (service as unknown as { syncStatuses: () => Promise<void> }).syncStatuses()
+
+    expect(expired.status).toBe(AuctionStatus.AWAITING_PAYMENT)
+    expect(expired.winningBidderId).toBe('winner-2')
+    expect(expired.winningAmount).toBe(180)
+    expect(expired.paymentStatus).toBe(AuctionPaymentStatus.UNPAID)
+    expect(auctionRepository.save).toHaveBeenCalledWith(expired)
   })
 })

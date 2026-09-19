@@ -348,13 +348,34 @@ export class AuctionsService {
       .andWhere('payment_status = :unpaid', { unpaid: AuctionPaymentStatus.UNPAID })
       .execute()
 
-    await this.auctionRepository
-      .createQueryBuilder()
-      .update(Auction)
-      .set({ status: AuctionStatus.FAILED })
-      .where('status = :awaitingPayment', { awaitingPayment: AuctionStatus.AWAITING_PAYMENT })
-      .andWhere('payment_deadline_at <= :now', { now })
-      .execute()
+    const expiredPayments = await this.auctionRepository.find({
+      where: { status: AuctionStatus.AWAITING_PAYMENT },
+    })
+
+    for (const auction of expiredPayments) {
+      if (!auction.paymentDeadlineAt || auction.paymentDeadlineAt > now) continue
+
+      const secondAmount = Number(auction.secondWinnerAmount ?? 0)
+      const secondWinnerIsEligible = Boolean(
+        auction.secondWinnerId && secondAmount > 0 &&
+        (!auction.reservePrice || secondAmount >= Number(auction.reservePrice)),
+      )
+
+      if (secondWinnerIsEligible) {
+        auction.winningBidderId = auction.secondWinnerId
+        auction.winningBidderName = auction.secondWinnerName
+        auction.winningAmount = secondAmount
+        auction.currentPrice = secondAmount
+        auction.reserveMet = true
+        auction.paymentStatus = AuctionPaymentStatus.UNPAID
+        auction.paymentDeadlineAt = this.addMinutes(now, auction.paymentWindowMinutes)
+        await this.auctionRepository.save(auction)
+      } else {
+        auction.status = AuctionStatus.FAILED
+        auction.paymentStatus = AuctionPaymentStatus.FAILED
+        await this.auctionRepository.save(auction)
+      }
+    }
 
     const endedWithWinner = await this.auctionRepository.find({
       where: {
