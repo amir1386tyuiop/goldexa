@@ -1,7 +1,7 @@
 import { SmartVaultService } from './smart-vault.service'
 
 describe('SmartVaultService', () => {
-  const assets = { findBy: jest.fn(), findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
+  const assets = { find: jest.fn(), findBy: jest.fn(), findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
   const snapshots = { findBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
   const alerts = { findBy: jest.fn(), findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn((value) => Promise.resolve(value)) }
 
@@ -25,5 +25,18 @@ describe('SmartVaultService', () => {
       userId: 'u1', name: 'جعلی', weight: 2, karat: 18, purchasePrice: 100,
       purchaseDate: new Date(), orderId: null,
     })).rejects.toThrow('سفارش تحویل‌شده')
+  })
+
+  it('refreshes digital-twin values and triggers a matching alert once', async () => {
+    assets.find.mockResolvedValue([{ id: 'a1', userId: 'u1', weight: 2, karat: 18, purchasePrice: 100, currentValue: 100 }])
+    alerts.findBy.mockResolvedValue([{ id: 'alert-1', userId: 'u1', targetType: 'gold_price', targetId: null, targetPrice: 50, triggerCondition: 'greater_than_or_equal', isActive: true, notifiedAt: null }])
+    const notifications = { create: jest.fn().mockResolvedValue({ id: 'notification-1' }) }
+    const pricing = { getPriceByType: jest.fn().mockResolvedValue({ value: 60 }) }
+    const service = new SmartVaultService(assets as never, snapshots as never, alerts as never, pricing as never, undefined, notifications as never)
+
+    await expect(service.refreshValuations()).resolves.toEqual({ updatedAssets: 1, triggeredAlerts: 1 })
+    expect(snapshots.save).toHaveBeenCalledWith(expect.objectContaining({ rawGoldValue: 120, totalValue: 120, profitLoss: 20 }))
+    expect(notifications.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'price_alert', userId: 'u1' }))
+    expect(alerts.save).toHaveBeenCalledWith(expect.objectContaining({ notifiedAt: expect.any(Date) }))
   })
 })

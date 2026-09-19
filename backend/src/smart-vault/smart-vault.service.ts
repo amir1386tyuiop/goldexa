@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SmartVaultAsset } from './smart-vault-asset.entity'
@@ -12,6 +13,7 @@ import {
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 import { GoldPriceType } from '../gold-pricing/gold-price.entity'
 import { Order, OrderStatus } from '../orders/order.entity'
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Injectable()
 export class SmartVaultService {
@@ -24,7 +26,80 @@ export class SmartVaultService {
     private alertRepository: Repository<PriceAlert>,
     @Optional() private readonly goldPricing?: GoldPricingService,
     @Optional() @InjectRepository(Order) private readonly orderRepository?: Repository<Order>,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
+
+  /**
+   * Refresh the Digital Twin from the latest 18k price. A snapshot is only
+   * recorded from a valid price source; stale/fallback zero values must never
+   * overwrite the user's valuation.
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async refreshValuations(): Promise<{ updatedAssets: number; triggeredAlerts: number }> {
+    const goldPrice = this.goldPricing
+      ? Number((await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18))?.value || 0)
+      : 0
+    if (!Number.isFinite(goldPrice) || goldPrice <= 0) return { updatedAssets: 0, triggeredAlerts: 0 }
+
+    const assets = await this.assetRepository.find()
+    const portfolioByUser = new Map<string, number>()
+    for (const asset of assets) {
+      const rawGoldValue = goldPrice * Number(asset.weight) * (Number(asset.karat || 18) / 18)
+      const profitLoss = rawGoldValue - Number(asset.purchasePrice)
+      const profitLossPercent = Number(asset.purchasePrice) > 0
+        ? (profitLoss / Number(asset.purchasePrice)) * 100
+        : 0
+      await this.assetRepository.save({
+        ...asset,
+        currentRawGoldValue: rawGoldValue,
+        currentValue: rawGoldValue,
+        profitLoss,
+        profitLossPercent,
+      })
+      await this.snapshotRepository.save(this.snapshotRepository.create({
+        assetId: asset.id,
+        userId: asset.userId,
+        rawGoldValue,
+        totalValue: rawGoldValue,
+        profitLoss,
+        goldPrice,
+      }))
+      portfolioByUser.set(asset.userId, (portfolioByUser.get(asset.userId) || 0) + rawGoldValue)
+    }
+
+    const alerts = await this.alertRepository.findBy({ isActive: true })
+    let triggeredAlerts = 0
+    for (const alert of alerts) {
+      if (alert.notifiedAt) continue
+      const observed = alert.targetType === PriceAlertTargetType.GOLD_PRICE
+        ? goldPrice
+        : alert.targetType === PriceAlertTargetType.ASSET
+          ? Number(assets.find((asset) => asset.id === alert.targetId)?.currentValue || 0)
+          : Number(portfolioByUser.get(alert.userId) || 0)
+      if (!this.matchesAlert(observed, Number(alert.targetPrice), alert.triggerCondition)) continue
+
+      if (this.notifications) {
+        await this.notifications.create({
+          userId: alert.userId,
+          type: 'price_alert',
+          title: 'هشدار قیمت خزانه هوشمند',
+          message: `قیمت مشاهده‌شده به ${Math.round(observed).toLocaleString('fa-IR')} تومان رسید.`,
+          metadata: { alertId: alert.id, observed, targetPrice: Number(alert.targetPrice), targetType: alert.targetType },
+        })
+      }
+      alert.notifiedAt = new Date()
+      await this.alertRepository.save(alert)
+      triggeredAlerts += 1
+    }
+    return { updatedAssets: assets.length, triggeredAlerts }
+  }
+
+  private matchesAlert(observed: number, target: number, condition: string): boolean {
+    if (!Number.isFinite(observed) || !Number.isFinite(target)) return false
+    if (condition === 'less_than_or_equal') return observed <= target
+    if (condition === 'equal') return observed === target
+    return observed >= target
+  }
 
   async findAssets(userId: string): Promise<SmartVaultAsset[]> {
     return this.assetRepository.findBy({ userId })
@@ -102,7 +177,15 @@ export class SmartVaultService {
     const asset = await this.assetRepository.findOneBy({ id: data.assetId })
     if (!asset) throw new NotFoundException('دارایی یافت نشد')
     if (asset.userId !== data.userId) throw new ForbiddenException('به این دارایی دسترسی ندارید')
-    return this.snapshotRepository.save(this.snapshotRepository.create(data))
+    const snapshot = await this.snapshotRepository.save(this.snapshotRepository.create(data))
+    await this.assetRepository.save({
+      ...asset,
+      currentRawGoldValue: data.rawGoldValue,
+      currentValue: data.totalValue,
+      profitLoss: data.profitLoss,
+      profitLossPercent: Number(asset.purchasePrice) > 0 ? (data.profitLoss / Number(asset.purchasePrice)) * 100 : 0,
+    })
+    return snapshot
   }
 
   async findAlerts(userId: string): Promise<PriceAlert[]> {
