@@ -93,6 +93,21 @@ export function AuctionPage() {
     },
   })
 
+  const payAuctionMutation = useMutation({
+    mutationFn: async (auction: Auction) => {
+      if (!auth?.user.id || !auction.winningAmount) throw new Error('برنده معتبر نیست')
+      const escrow = await api.createEscrowPayment({
+        auctionId: auction.id,
+        buyerId: auth.user.id,
+        sellerId: auction.sellerId,
+        amount: Number(auction.winningAmount),
+        fee: Number(auction.commissionAmount || 0),
+      })
+      return api.payEscrowFromWallet(escrow.id)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auctions'] }),
+  })
+
   const cancelAuctionMutation = useMutation({
     mutationFn: api.cancelAuction,
     onSuccess: () => {
@@ -251,6 +266,9 @@ export function AuctionPage() {
                   onCancel={() => cancelAuctionMutation.mutate(selectedAuction.id)}
                   isBidding={placeBidMutation.isPending}
                   isSettling={settleAuctionMutation.isPending}
+                  isPaying={payAuctionMutation.isPending}
+                  canManage={auth?.user.role === 'admin'}
+                  onPay={() => payAuctionMutation.mutate(selectedAuction)}
                   isCancelling={cancelAuctionMutation.isPending}
                   error={placeBidMutation.isError ? 'ثبت پیشنهاد انجام نشد؛ مبلغ یا وضعیت مزایده را بررسی کنید.' : undefined}
                 />
@@ -453,6 +471,9 @@ function AuctionDetailPanel({
   onCancel,
   isBidding,
   isSettling,
+  isPaying,
+  canManage,
+  onPay,
   isCancelling,
   error,
 }: {
@@ -465,6 +486,9 @@ function AuctionDetailPanel({
   onCancel: () => void
   isBidding: boolean
   isSettling: boolean
+  isPaying: boolean
+  canManage: boolean
+  onPay: () => void
   isCancelling: boolean
   error?: string
 }) {
@@ -552,14 +576,21 @@ function AuctionDetailPanel({
       ) : null}
       {error ? <p role="alert" className="mt-2 text-xs text-red-700">{error}</p> : null}
 
-      {auction.status === 'ended' && auction.winningBidderId && (
+      {auction.status === 'ended' && auction.winningBidderId && canManage && (
         <button
           disabled={isSettling || auction.paymentStatus === 'paid'}
           onClick={onSettle}
           className="btn btn-primary w-full gap-2"
         >
           <CheckCircle2 className="h-5 w-5" />
-          {auction.paymentStatus === 'paid' ? 'تسویه انجام شده' : 'ثبت پرداخت برنده'}
+          بازکردن پنجره پرداخت برنده
+        </button>
+      )}
+
+      {auction.status === 'awaiting_payment' && auction.winningBidderId === getStoredAuth()?.user.id && (
+        <button disabled={isPaying} onClick={onPay} className="btn btn-primary w-full gap-2">
+          <CreditCard className="h-5 w-5" />
+          {isPaying ? 'در حال پرداخت از کیف پول…' : 'پرداخت مبلغ برنده از کیف پول'}
         </button>
       )}
 
