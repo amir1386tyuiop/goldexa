@@ -854,8 +854,25 @@ export interface WalletTransaction {
   amount: number
   orderId?: string | null
   escrowId?: string | null
+  payoutRequestId?: string | null
   description?: string | null
   createdAt: string
+}
+
+export type PayoutRequestStatus = 'pending' | 'approved' | 'processing' | 'paid' | 'rejected' | 'failed'
+
+export interface PayoutRequest {
+  id: string
+  userId: string
+  bankAccountId: string
+  amount: number
+  status: PayoutRequestStatus
+  idempotencyKey: string
+  providerReference?: string | null
+  failureReason?: string | null
+  createdAt: string
+  updatedAt: string
+  paidAt?: string | null
 }
 
 export interface PricingRule {

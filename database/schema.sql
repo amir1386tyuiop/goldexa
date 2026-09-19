@@ -759,8 +759,25 @@ CREATE TABLE wallet_transactions (
     amount_grams DECIMAL(15,4) DEFAULT 0,
     order_id UUID,
     escrow_id UUID,
+    payout_request_id UUID,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE payout_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    bank_account_id UUID NOT NULL REFERENCES user_bank_accounts(id),
+    amount DECIMAL(15,2) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    provider_reference VARCHAR(255),
+    failure_reason VARCHAR(255),
+    reviewed_by UUID REFERENCES users(id),
+    reviewed_at TIMESTAMP,
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Pricing Rules

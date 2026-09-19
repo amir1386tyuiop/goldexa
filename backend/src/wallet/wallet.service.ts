@@ -23,6 +23,7 @@ type LedgerParams = {
   goldDelta?: number
   orderId?: string | null
   escrowId?: string | null
+  payoutRequestId?: string | null
   description?: string | null
 }
 
@@ -190,6 +191,7 @@ export class WalletService {
       amountGrams: params.goldDelta ?? 0,
       orderId: params.orderId ?? null,
       escrowId: params.escrowId ?? null,
+      payoutRequestId: params.payoutRequestId ?? null,
       description: params.description ?? null,
     })
     return manager.save(tx)
@@ -337,6 +339,32 @@ export class WalletService {
       rialDelta: Math.abs(amount),
       escrowId,
       description: 'بازپرداخت مبلغ escrow به خریدار',
+    })
+  }
+
+  async holdPayout(userId: string, payoutRequestId: string, amount: number, manager: EntityManager): Promise<WalletTransaction> {
+    if (!payoutRequestId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات برداشت نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId,
+      type: WalletTransactionType.PAYOUT_HOLD,
+      rialDelta: -Math.abs(amount),
+      payoutRequestId,
+      description: 'رزرو مبلغ درخواست برداشت',
+    })
+  }
+
+  async refundPayout(userId: string, payoutRequestId: string, amount: number, manager: EntityManager): Promise<WalletTransaction> {
+    if (!payoutRequestId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات بازگشت برداشت نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId,
+      type: WalletTransactionType.PAYOUT_REFUND,
+      rialDelta: Math.abs(amount),
+      payoutRequestId,
+      description: 'بازگشت مبلغ درخواست برداشت',
     })
   }
 

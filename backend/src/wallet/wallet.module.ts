@@ -8,18 +8,22 @@ import { WalletTransaction } from './wallet-transaction.entity'
 import { GoldPricingModule } from '../gold-pricing/gold-pricing.module'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { OwnerGuard } from '../common/guards/owner.guard'
+import { PayoutRequest } from './payout-request.entity'
+import { PayoutController } from './payout.controller'
+import { PayoutService } from './payout.service'
+import { UserBankAccount } from '../users/user-bank-account.entity'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Wallet, WalletTransaction]),
+    TypeOrmModule.forFeature([Wallet, WalletTransaction, PayoutRequest, UserBankAccount]),
     GoldPricingModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
     }),
   ],
-  controllers: [WalletController],
-  providers: [WalletService, JwtAuthGuard, OwnerGuard],
+  controllers: [WalletController, PayoutController],
+  providers: [WalletService, PayoutService, JwtAuthGuard, OwnerGuard],
   exports: [WalletService],
 })
 export class WalletModule {}

@@ -26,7 +26,7 @@ import {
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { AiEnginePanel } from './AiEnginePage'
-import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, Refund, Role, SystemSetting, User, Permission } from '@/types'
+import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission } from '@/types'
 
 interface AdminStats {
   totalUsers: number
@@ -68,6 +68,7 @@ const menuItems = [
   { id: 'orders', icon: <ShoppingCart className="h-5 w-5" />, label: 'سفارشات' },
   { id: 'payments', icon: <CreditCard className="h-5 w-5" />, label: 'پرداخت‌ها' },
   { id: 'refunds', icon: <Wallet className="h-5 w-5" />, label: 'درخواست‌های بازپرداخت' },
+  { id: 'payouts', icon: <Wallet className="h-5 w-5" />, label: 'برداشت‌های بانکی' },
   { id: 'disputes', icon: <ShieldCheck className="h-5 w-5" />, label: 'اختلاف‌های escrow' },
   { id: 'auctions', icon: <Gavel className="h-5 w-5" />, label: 'مزایده‌ها' },
   { id: 'users', icon: <Users className="h-5 w-5" />, label: 'کاربران' },
@@ -136,6 +137,12 @@ export function AdminPage() {
   const { data: refunds = [] } = useQuery<Refund[]>({
     queryKey: ['admin-refunds'],
     queryFn: () => api.getAdminRefunds(100, 'pending'),
+    initialData: [],
+  })
+
+  const { data: payouts = [] } = useQuery<PayoutRequest[]>({
+    queryKey: ['admin-payouts'],
+    queryFn: () => api.getAdminPayouts(100, 'pending'),
     initialData: [],
   })
 
@@ -267,6 +274,8 @@ export function AdminPage() {
             {activeTab === 'payments' && <PaymentsTable payments={payments} />}
 
             {activeTab === 'refunds' && <RefundsPanel refunds={refunds} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-refunds'] })} />}
+
+            {activeTab === 'payouts' && <PayoutsPanel payouts={payouts} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-payouts'] })} />}
 
             {activeTab === 'disputes' && <DisputesPanel disputes={escrowDisputes} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-escrow-disputes'] })} />}
 
@@ -603,6 +612,15 @@ function RefundsPanel({ refunds, onResolved }: { refunds: Refund[]; onResolved: 
       {resolveMutation.isError && <p className="mt-3 text-sm text-red-700" role="alert">تعیین تکلیف بازپرداخت انجام نشد؛ روش پرداخت سفارش را بررسی کنید.</p>}
     </article>)}
   </div>
+}
+
+function PayoutsPanel({ payouts, onResolved }: { payouts: PayoutRequest[]; onResolved: () => void }) {
+  const [references, setReferences] = useState<Record<string, string>>({})
+  const approve = useMutation({ mutationFn: api.approvePayout, onSuccess: onResolved })
+  const reject = useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => api.rejectPayout(id, reason), onSuccess: onResolved })
+  const paid = useMutation({ mutationFn: ({ id, reference }: { id: string; reference: string }) => api.markPayoutPaid(id, reference), onSuccess: onResolved })
+  if (!payouts.length) return <div className="card p-10 text-center"><Wallet className="mx-auto h-10 w-10 text-emerald-600" /><h2 className="mt-4 text-xl font-black">برداشت معلقی وجود ندارد</h2><p className="mt-2 text-sm text-muted-foreground">درخواست‌های برداشت از کیف پول پس از ثبت اینجا نمایش داده می‌شوند.</p></div>
+  return <div className="space-y-4">{payouts.map((payout) => <article key={payout.id} className="card p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-bold text-amber-700">PAYOUT · {payout.id.slice(0, 8)}</p><h3 className="mt-2 text-xl font-black">{formatPrice(payout.amount)} تومان</h3><p className="mt-1 text-xs text-stone-500">کاربر: {payout.userId.slice(0, 8)} · حساب: {payout.bankAccountId.slice(0, 8)}</p></div><span className="badge badge-warning">در انتظار بررسی</span></div><input className="input mt-4" aria-label={`شماره مرجع برداشت ${payout.id}`} placeholder="شماره مرجع بانکی" value={references[payout.id] || ''} onChange={(event) => setReferences((current) => ({ ...current, [payout.id]: event.target.value }))} /><div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={approve.isPending} onClick={() => approve.mutate(payout.id)}>تأیید برداشت</button><button type="button" className="btn btn-outline border-red-300 text-red-800" disabled={reject.isPending} onClick={() => reject.mutate({ id: payout.id, reason: 'حساب بانکی نیازمند بررسی است' })}>رد و بازگشت وجه</button><button type="button" className="btn btn-outline" disabled={paid.isPending || !references[payout.id]?.trim()} onClick={() => paid.mutate({ id: payout.id, reference: references[payout.id].trim() })}>ثبت پرداخت بانکی</button></div></article>)}</div>
 }
 
 function AdminInfoPill({ label, value }: { label: string; value: string }) {

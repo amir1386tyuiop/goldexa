@@ -8,6 +8,8 @@ export enum WalletTransactionType {
   SELL = 'sell',
   ESCROW_HOLD = 'escrow_hold',
   ESCROW_RELEASE = 'escrow_release',
+  PAYOUT_HOLD = 'payout_hold',
+  PAYOUT_REFUND = 'payout_refund',
 }
 
 @Entity('wallet_transactions')
@@ -38,6 +40,9 @@ export class WalletTransaction {
 
   @Column({ name: 'escrow_id', nullable: true })
   escrowId: string | null
+
+  @Column({ name: 'payout_request_id', nullable: true })
+  payoutRequestId: string | null
 
   @Column({ nullable: true })
   description: string | null

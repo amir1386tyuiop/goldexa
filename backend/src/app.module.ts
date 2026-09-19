@@ -90,6 +90,7 @@ import { Cart } from './cart/cart.entity'
 import { CartItem } from './cart/cart-item.entity'
 import { Wallet } from './wallet/wallet.entity'
 import { WalletTransaction } from './wallet/wallet-transaction.entity'
+import { PayoutRequest } from './wallet/payout-request.entity'
 import { PricingRule } from './pricing/pricing-rule.entity'
 import { PricingSpread } from './pricing/pricing-spread.entity'
 import { TaxRule } from './pricing/tax-rule.entity'
@@ -185,6 +186,7 @@ import { OrderCancellation } from './orders/order-cancellation.entity'
         CartItem,
         Wallet,
         WalletTransaction,
+        PayoutRequest,
         PricingRule,
         PricingSpread,
         TaxRule,

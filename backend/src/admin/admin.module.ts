@@ -36,6 +36,7 @@ import { RolePermissionMapping } from '../auth/role-permission-mapping.entity'
 import { RoleService } from '../auth/role.service'
 import { EscrowModule } from '../escrow/escrow.module'
 import { OrdersModule } from '../orders/orders.module'
+import { PayoutRequest } from '../wallet/payout-request.entity'
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { OrdersModule } from '../orders/orders.module'
       Permission,
       UserRoleMapping,
       RolePermissionMapping,
+      PayoutRequest,
     ]),
     EscrowModule,
     OrdersModule,

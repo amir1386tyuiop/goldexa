@@ -1,4 +1,6 @@
 import { Controller, Get, UseGuards, Query, Patch, Param, Body } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
 import { AdminService } from './admin.service'
 import { PermissionsGuard } from '../common/guards/permissions.guard'
 import { Permissions } from '../common/decorators/permissions.decorator'
@@ -10,12 +12,14 @@ import {
 } from './admin.dto'
 import { EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
 import { OrdersService } from '../orders/orders.service'
+import { PayoutRequest } from '../wallet/payout-request.entity'
 
 @Controller('admin')
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly ordersService: OrdersService,
+    @InjectRepository(PayoutRequest) private readonly payoutRepository: Repository<PayoutRequest>,
   ) {}
 
   @UseGuards(PermissionsGuard)
@@ -86,6 +90,18 @@ export class AdminController {
   @Get('refunds')
   async getRefunds(@Query('limit') limit?: string, @Query('status') status?: string) {
     return this.adminService.listRefunds(this.parseLimit(limit), status)
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('VIEW_PAYMENTS')
+  @Get('payouts')
+  async getPayouts(@Query('limit') limit?: string, @Query('status') status?: string) {
+    const take = this.parseLimit(limit)
+    return this.payoutRepository.find({
+      where: status ? { status: status as PayoutRequest['status'] } : undefined,
+      order: { createdAt: 'DESC' },
+      take,
+    })
   }
 
   @UseGuards(PermissionsGuard)

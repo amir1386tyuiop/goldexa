@@ -72,6 +72,8 @@
 - خرید تکراری همان listing با بررسی escrow/order رد یا به نتیجه‌ی قبلی همان معامله هدایت می‌شود.
 - `idempotencyKey` خرید مستقیم در escrow ذخیره و unique شده است؛ retry همان خریدار و listing همان order/escrow قبلی را برمی‌گرداند و reuse کلید برای معامله‌ی دیگر رد می‌شود.
 - امتیاز marketplace اکنون فقط پس از escrow `released` و فقط توسط یکی از طرفین واقعی همان معامله پذیرفته می‌شود؛ برای هر طرف/معامله unique index و کنترل تکرار وجود دارد.
+- چرخه‌ی برداشت فروش طلای دیجیتال اضافه شد: `POST /wallet/payouts` حساب بانکی کاربر را بررسی و مبلغ را با ledger نوع `payout_hold` رزرو می‌کند؛ ادمین می‌تواند approve/reject/paid کند و reject/failed به‌صورت atomic با `payout_refund` مبلغ را برمی‌گرداند. درخواست‌ها idempotent و قابل رهگیری هستند.
+- پنل کاربر فرم درخواست برداشت و تاریخچه‌ی وضعیت را نشان می‌دهد؛ پنل ادمین نیز فهرست برداشت‌های pending، تأیید، رد/بازگشت وجه و ثبت reference بانکی را دارد.
 - `PATCH /marketplace/listings/:id/cancel` برای لغو آگهی توسط فروشنده اضافه شد؛ مالکیت و وضعیت نهایی قبل از تغییر بررسی می‌شود.
 - `PATCH /escrow/payments/:id/ship` فقط توسط فروشنده‌ی همان escrow و با کد رهگیری معتبر قابل اجراست.
 - `POST /escrow/payments/:id/confirm-delivery` فقط توسط خریدار همان escrow اجرا می‌شود و release atomic مبلغ را انجام می‌دهد.

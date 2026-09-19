@@ -1809,6 +1809,9 @@ export const api = {
   clearCart: (cartId: string) => request<void>(`/cart/${cartId}/clear`, { method: 'POST', body: {} }),
   getWallet: (userId: string) => request<Wallet | null>(`/wallet/user/${userId}`),
   getWalletTransactions: (userId: string) => request<WalletTransaction[]>(`/wallet/user/${userId}/transactions`),
+  getWalletPayouts: (userId: string) => request<import('@/types').PayoutRequest[]>(`/wallet/payouts/user/${userId}`),
+  createWalletPayout: (body: { amount: number; bankAccountId?: string; idempotencyKey: string }) =>
+    request<import('@/types').PayoutRequest>('/wallet/payouts', { method: 'POST', body }),
   buyWalletGold: (body: { userId: string; amountGrams: number }) => request<WalletTransaction>('/wallet/gold/buy', { method: 'POST', body }),
   sellWalletGold: (body: { userId: string; amountGrams: number }) => request<WalletTransaction>('/wallet/gold/sell', { method: 'POST', body }),
   getPricingRules: () => request<PricingRule[]>('/pricing/rules'),
@@ -1905,6 +1908,11 @@ export const api = {
     request<PaymentTransaction[]>(`/admin/payments?limit=${limit}${status ? `&status=${status}` : ''}`),
   getAdminRefunds: (limit = 100, status?: string) =>
     request<Refund[]>(`/admin/refunds?limit=${limit}${status ? `&status=${status}` : ''}`),
+  getAdminPayouts: (limit = 100, status?: string) =>
+    request<import('@/types').PayoutRequest[]>(`/admin/payouts?limit=${limit}${status ? `&status=${status}` : ''}`),
+  approvePayout: (id: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/approve`, { method: 'PATCH' }),
+  rejectPayout: (id: string, reason: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/reject`, { method: 'PATCH', body: { reason } }),
+  markPayoutPaid: (id: string, providerReference: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/paid`, { method: 'PATCH', body: { providerReference } }),
   resolveAdminRefund: (id: string, status: 'approved' | 'rejected') =>
     request<Refund>(`/admin/refunds/${id}`, { method: 'PATCH', body: { status } }),
   getAdminEscrowDisputes: (limit = 100) => request<EscrowPayment[]>(`/admin/escrow/disputes?limit=${limit}`),
