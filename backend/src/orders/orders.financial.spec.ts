@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common'
 import { OrdersService } from './orders.service'
-import { OrderStatus } from './order.entity'
+import { OrderStatus, PaymentMethod } from './order.entity'
+import { Refund } from './refund.entity'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -35,5 +36,28 @@ describe('OrdersService invoice and refund guards', () => {
       lock: { mode: 'pessimistic_write' },
     })
     expect(manager.save).not.toHaveBeenCalled()
+  })
+
+  it('approves a wallet refund exactly once and rejects online approval without a provider', async () => {
+    const service = Object.create(OrdersService.prototype) as any
+    const refund = { id: 'refund-1', orderId: 'order-1', amount: 250, status: 'pending' }
+    const order = { id: 'order-1', userId: 'user-1', paymentMethod: PaymentMethod.WALLET }
+    const manager = {
+      findOne: jest.fn(async (entity: unknown) => entity === Refund ? refund : order),
+      save: jest.fn(async (_entity: unknown, value: unknown) => value),
+    }
+    service.dataSource = { transaction: jest.fn((callback: (value: unknown) => unknown) => callback(manager)) }
+    service.walletService = { refundOrderToWallet: jest.fn() }
+
+    await expect(service.resolveRefund('refund-1', 'approved')).resolves.toMatchObject({ status: 'approved' })
+    expect(service.walletService.refundOrderToWallet).toHaveBeenCalledWith('user-1', 'order-1', 250, manager)
+
+    refund.status = 'approved'
+    await expect(service.resolveRefund('refund-1', 'approved')).rejects.toThrow('قبلاً تعیین تکلیف')
+
+    refund.status = 'pending'
+    order.paymentMethod = PaymentMethod.ONLINE
+    await expect(service.resolveRefund('refund-1', 'approved')).rejects.toThrow('provider واقعی')
+    expect(refund.status).toBe('pending')
   })
 })

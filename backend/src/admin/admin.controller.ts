@@ -9,10 +9,14 @@ import {
   UpdateSettingDto,
 } from './admin.dto'
 import { EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
+import { OrdersService } from '../orders/orders.service'
 
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly ordersService: OrdersService,
+  ) {}
 
   @UseGuards(PermissionsGuard)
   @Permissions('VIEW_REPORTS')
@@ -79,6 +83,13 @@ export class AdminController {
 
   @UseGuards(PermissionsGuard)
   @Permissions('VIEW_PAYMENTS')
+  @Get('refunds')
+  async getRefunds(@Query('limit') limit?: string, @Query('status') status?: string) {
+    return this.adminService.listRefunds(this.parseLimit(limit), status)
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('VIEW_PAYMENTS')
   @Get('escrow/disputes')
   async getEscrowDisputes(@Query('limit') limit?: string) {
     return this.adminService.listDisputedEscrows(this.parseLimit(limit))
@@ -106,6 +117,13 @@ export class AdminController {
   @Patch('payments/:id/refund')
   async refundPayment(@Param('id') id: string, @Body() body: UpdatePaymentStatusDto) {
     return this.adminService.refundPayment(id, body.status)
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('REFUND_PAYMENT')
+  @Patch('refunds/:id')
+  async resolveOrderRefund(@Param('id') id: string, @Body() body: { status: 'approved' | 'rejected' }) {
+    return this.ordersService.resolveRefund(id, body.status)
   }
 
   @UseGuards(PermissionsGuard)

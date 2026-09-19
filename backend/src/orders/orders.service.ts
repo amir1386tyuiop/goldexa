@@ -230,6 +230,40 @@ export class OrdersService {
     })
   }
 
+  /** Approves or rejects a refund request with an atomic wallet credit. */
+  async resolveRefund(refundId: string, status: 'approved' | 'rejected'): Promise<Refund> {
+    if (!['approved', 'rejected'].includes(status)) {
+      throw new BadRequestException('وضعیت بازپرداخت نامعتبر است')
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const refund = await manager.findOne(Refund, {
+        where: { id: refundId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!refund) throw new NotFoundException('درخواست بازپرداخت یافت نشد')
+      if (refund.status !== 'pending') {
+        throw new BadRequestException('این درخواست قبلاً تعیین تکلیف شده است')
+      }
+
+      const order = await manager.findOne(Order, {
+        where: { id: refund.orderId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!order) throw new NotFoundException('سفارش بازپرداخت یافت نشد')
+
+      if (status === 'approved') {
+        if (order.paymentMethod !== PaymentMethod.WALLET) {
+          throw new BadRequestException('بازپرداخت آنلاین تا اتصال provider واقعی باید از پنل درگاه انجام شود')
+        }
+        await this.walletService.refundOrderToWallet(order.userId, order.id, Number(refund.amount), manager)
+      }
+
+      refund.status = status
+      return manager.save(Refund, refund)
+    })
+  }
+
   async requestCancellation(orderId: string, reason: string, userId: string, isAdmin = false): Promise<OrderCancellation> {
     await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.cancellationRepository.save(

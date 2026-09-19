@@ -26,7 +26,7 @@ import {
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { AiEnginePanel } from './AiEnginePage'
-import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, Role, SystemSetting, User, Permission } from '@/types'
+import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, Refund, Role, SystemSetting, User, Permission } from '@/types'
 
 interface AdminStats {
   totalUsers: number
@@ -67,6 +67,7 @@ const menuItems = [
   { id: 'products', icon: <Package className="h-5 w-5" />, label: 'محصولات' },
   { id: 'orders', icon: <ShoppingCart className="h-5 w-5" />, label: 'سفارشات' },
   { id: 'payments', icon: <CreditCard className="h-5 w-5" />, label: 'پرداخت‌ها' },
+  { id: 'refunds', icon: <Wallet className="h-5 w-5" />, label: 'درخواست‌های بازپرداخت' },
   { id: 'disputes', icon: <ShieldCheck className="h-5 w-5" />, label: 'اختلاف‌های escrow' },
   { id: 'auctions', icon: <Gavel className="h-5 w-5" />, label: 'مزایده‌ها' },
   { id: 'users', icon: <Users className="h-5 w-5" />, label: 'کاربران' },
@@ -129,6 +130,12 @@ export function AdminPage() {
   const { data: payments = [] } = useQuery<PaymentTransaction[]>({
     queryKey: ['admin-payments'],
     queryFn: () => api.getAdminPayments(100),
+    initialData: [],
+  })
+
+  const { data: refunds = [] } = useQuery<Refund[]>({
+    queryKey: ['admin-refunds'],
+    queryFn: () => api.getAdminRefunds(100, 'pending'),
     initialData: [],
   })
 
@@ -258,6 +265,8 @@ export function AdminPage() {
             {activeTab === 'users' && <UsersTable users={adminUsers} />}
 
             {activeTab === 'payments' && <PaymentsTable payments={payments} />}
+
+            {activeTab === 'refunds' && <RefundsPanel refunds={refunds} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-refunds'] })} />}
 
             {activeTab === 'disputes' && <DisputesPanel disputes={escrowDisputes} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-escrow-disputes'] })} />}
 
@@ -573,6 +582,25 @@ function DisputesPanel({ disputes, onResolved }: { disputes: EscrowPayment[]; on
       <textarea className="input mt-4 min-h-24" aria-label={`یادداشت حل اختلاف ${dispute.id}`} placeholder="یادداشت تصمیم ادمین" value={notes[dispute.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [dispute.id]: event.target.value }))} />
       <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={!notes[dispute.id]?.trim() || resolveMutation.isPending} onClick={() => resolveMutation.mutate({ id: dispute.id, status: 'released' })}>حل به نفع فروشنده · Release</button><button type="button" className="btn btn-outline border-red-300 text-red-800" disabled={!notes[dispute.id]?.trim() || resolveMutation.isPending} onClick={() => resolveMutation.mutate({ id: dispute.id, status: 'refunded' })}>حل به نفع خریدار · Refund</button></div>
       {resolveMutation.isError && <p className="mt-3 text-sm text-red-700" role="alert">حل اختلاف انجام نشد؛ وضعیت escrow و دسترسی ادمین را بررسی کنید.</p>}
+    </article>)}
+  </div>
+}
+
+function RefundsPanel({ refunds, onResolved }: { refunds: Refund[]; onResolved: () => void }) {
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => api.resolveAdminRefund(id, status),
+    onSuccess: onResolved,
+  })
+
+  if (!refunds.length) return <div className="card p-10 text-center"><Wallet className="mx-auto h-10 w-10 text-emerald-600" /><h2 className="mt-4 text-xl font-black">درخواست بازپرداختی در انتظار نیست</h2><p className="mt-2 text-sm text-muted-foreground">درخواست‌های جدید پس از ثبت توسط مشتری اینجا نمایش داده می‌شوند.</p></div>
+
+  return <div className="space-y-4">
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">تأیید بازپرداخت سفارش‌های پرداخت‌شده با کیف پول، مبلغ را به‌صورت atomic به کیف پول مشتری برمی‌گرداند. پرداخت آنلاین تا اتصال provider واقعی قابل تأیید نیست.</div>
+    {refunds.map((refund) => <article key={refund.id} className="card p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><p className="text-xs font-bold text-amber-700">REFUND REQUEST · {refund.id.slice(0, 8)}</p><h3 className="mt-2 font-black">دلیل درخواست</h3><p className="mt-1 text-sm leading-7 text-stone-700">{refund.reason}</p></div><span className="badge badge-warning">در انتظار بررسی</span></div>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><AdminInfoPill label="مبلغ" value={`${formatPrice(refund.amount)} تومان`} /><AdminInfoPill label="سفارش" value={refund.orderId.slice(0, 8)} /><AdminInfoPill label="ثبت" value={new Date(refund.createdAt).toLocaleString('fa-IR')} /></div>
+      <div className="mt-4 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={resolveMutation.isPending} onClick={() => resolveMutation.mutate({ id: refund.id, status: 'approved' })}>تأیید و بازگشت وجه</button><button type="button" className="btn btn-outline border-red-300 text-red-800" disabled={resolveMutation.isPending} onClick={() => resolveMutation.mutate({ id: refund.id, status: 'rejected' })}>رد درخواست</button></div>
+      {resolveMutation.isError && <p className="mt-3 text-sm text-red-700" role="alert">تعیین تکلیف بازپرداخت انجام نشد؛ روش پرداخت سفارش را بررسی کنید.</p>}
     </article>)}
   </div>
 }

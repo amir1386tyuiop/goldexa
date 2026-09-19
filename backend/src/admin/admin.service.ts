@@ -361,6 +361,14 @@ export class AdminService {
     })
   }
 
+  async listRefunds(limit = 100, status?: string) {
+    return this.refundRepository.find({
+      where: status ? { status } : undefined,
+      order: { createdAt: 'DESC' },
+      take: Math.min(limit, 500),
+    })
+  }
+
   async verifyPayment(id: string) {
     const payment = await this.paymentTransactionRepository.findOneBy({ id })
 
