@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { DataSource, Repository } from 'typeorm'
 import {
   UsedGoldListing,
   UsedGoldListingSaleType,
@@ -11,8 +11,13 @@ import {
   CreateUsedGoldListingDto,
   ReviewUsedGoldListingDto,
   UpdateUsedGoldListingStatusDto,
+  PurchaseUsedGoldListingDto,
 } from './create-used-gold-listing.dto'
 import { User } from '../users/user.entity'
+import { Order, OrderStatus, PaymentMethod } from '../orders/order.entity'
+import { EscrowPayment, EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
+import { WalletService } from '../wallet/wallet.service'
+import { randomUUID } from 'crypto'
 
 @Injectable()
 export class UsedGoldListingsService {
@@ -21,6 +26,8 @@ export class UsedGoldListingsService {
     private listingRepository: Repository<UsedGoldListing>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly dataSource: DataSource,
+    private readonly walletService: WalletService,
   ) {}
 
   async findAll(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
@@ -122,5 +129,106 @@ export class UsedGoldListingsService {
   ): Promise<UsedGoldListing | null> {
     await this.listingRepository.update(id, { status: data.status })
     return this.listingRepository.findOneBy({ id })
+  }
+
+  async cancelOwnListing(id: string, sellerId: string): Promise<UsedGoldListing> {
+    const listing = await this.listingRepository.findOneBy({ id })
+    if (!listing) throw new NotFoundException('آگهی موردنظر یافت نشد')
+    if (listing.sellerId !== sellerId) throw new BadRequestException('این آگهی متعلق به شما نیست')
+    if ([UsedGoldListingStatus.SOLD, UsedGoldListingStatus.CANCELLED].includes(listing.status)) {
+      throw new BadRequestException('آگهی در وضعیت قابل لغو نیست')
+    }
+    listing.status = UsedGoldListingStatus.CANCELLED
+    return this.listingRepository.save(listing)
+  }
+
+  /**
+   * Atomically purchases a direct-sale listing with the buyer's wallet.
+   * The listing lock, order, escrow hold and sold transition are one unit:
+   * a retry can never buy the same listing twice.
+   */
+  async purchaseDirect(
+    id: string,
+    data: PurchaseUsedGoldListingDto,
+    buyerId: string,
+  ): Promise<{ order: Order; escrow: EscrowPayment; listing: UsedGoldListing }> {
+    if (!buyerId) throw new BadRequestException('خریدار معتبر نیست')
+
+    return this.dataSource.transaction(async (manager) => {
+      const listing = await manager.findOne(UsedGoldListing, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+
+      if (!listing) throw new NotFoundException('آگهی موردنظر یافت نشد')
+      if (listing.sellerId === buyerId) throw new BadRequestException('خرید آگهی خودتان مجاز نیست')
+      if (listing.saleType !== UsedGoldListingSaleType.DIRECT) {
+        throw new BadRequestException('این آگهی برای فروش مستقیم نیست')
+      }
+      if (![UsedGoldListingStatus.APPROVED, UsedGoldListingStatus.ACTIVE].includes(listing.status)) {
+        throw new BadRequestException('این آگهی در حال حاضر قابل خرید نیست')
+      }
+
+      const amount = Number(listing.fixedPrice)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new BadRequestException('قیمت آگهی نامعتبر است')
+      }
+
+      const existing = await manager.findOne(EscrowPayment, {
+        where: { listingId: id, buyerId },
+      })
+      if (existing) {
+        const existingOrder = existing.orderId
+          ? await manager.findOneBy(Order, { id: existing.orderId })
+          : null
+        if (existingOrder) return { order: existingOrder, escrow: existing, listing }
+        throw new BadRequestException('برای این آگهی قبلاً معامله‌ای ثبت شده است')
+      }
+
+      const order = await manager.save(Order, manager.create(Order, {
+        orderNumber: `GX-${randomUUID().replace(/-/g, '').slice(0, 24)}`,
+        userId: buyerId,
+        items: [{
+          listingId: listing.id,
+          name: listing.title,
+          quantity: 1,
+          unitPrice: amount,
+          totalPrice: amount,
+          weight: Number(listing.weight),
+          karat: listing.karat,
+        }],
+        totalAmount: amount,
+        shippingCost: 0,
+        status: OrderStatus.PENDING,
+        address: data.address,
+        paymentMethod: PaymentMethod.WALLET,
+      }))
+
+      const escrow = await manager.save(EscrowPayment, manager.create(EscrowPayment, {
+        listingId: listing.id,
+        auctionId: null,
+        orderId: order.id,
+        buyerId,
+        sellerId: listing.sellerId,
+        amount,
+        fee: 0,
+        status: EscrowPaymentStatus.INITIATED,
+        authority: null,
+        paymentUrl: null,
+        trackingCode: null,
+      }))
+
+      await this.walletService.ensureWalletForUser(buyerId)
+      await this.walletService.holdEscrow(buyerId, escrow.id, amount, manager)
+
+      order.status = OrderStatus.PAID
+      listing.status = UsedGoldListingStatus.SOLD
+      await manager.save(order)
+      await manager.save(listing)
+      escrow.status = EscrowPaymentStatus.HELD
+      await manager.save(escrow)
+
+      return { order, escrow, listing }
+    })
   }
 }

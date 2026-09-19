@@ -20,6 +20,15 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
   const [activeTab, setActiveTab] = useState(initialTab)
   const [search, setSearch] = useState('')
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null)
+  const [selectedListing, setSelectedListing] = useState<UsedGoldListing | null>(null)
+  const [purchaseAddress, setPurchaseAddress] = useState({
+    title: 'آدرس تحویل',
+    province: '',
+    city: '',
+    street: '',
+    postalCode: '',
+    isDefault: false,
+  })
   const auth = getStoredAuth()
   const queryClient = useQueryClient()
   const [bidForm, setBidForm] = useState({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
@@ -63,6 +72,14 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
       setBidForm({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
       queryClient.invalidateQueries({ queryKey: ['auctions'] })
       queryClient.invalidateQueries({ queryKey: ['auction-bids', updated.id] })
+    },
+  })
+
+  const purchaseMutation = useMutation({
+    mutationFn: (listingId: string) => api.purchaseUsedGoldListing(listingId, { address: purchaseAddress }),
+    onSuccess: () => {
+      setSelectedListing(null)
+      queryClient.invalidateQueries({ queryKey: ['used-gold-listings'] })
     },
   })
 
@@ -146,7 +163,7 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 }}
                 />
               ) : activeTab === 'marketplace' && !listingsLoading && !listingsError ? (
-                <ListingList listings={filteredListings} />
+                  <ListingList listings={filteredListings} selectedListing={selectedListing} onSelect={setSelectedListing} />
               ) : null}
             </div>
 
@@ -165,6 +182,16 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 error={bidMutation.isError ? 'ثبت پیشنهاد انجام نشد؛ مبلغ یا وضعیت مزایده را بررسی کنید.' : undefined}
               />
               <AuctionRulesPanel />
+              {activeTab === 'marketplace' && (
+                <UsedGoldPurchasePanel
+                  listing={selectedListing}
+                  address={purchaseAddress}
+                  onAddressChange={setPurchaseAddress}
+                  onPurchase={() => selectedListing && purchaseMutation.mutate(selectedListing.id)}
+                  isSubmitting={purchaseMutation.isPending}
+                  error={purchaseMutation.isError ? 'خرید انجام نشد؛ موجودی کیف پول، آدرس و وضعیت آگهی را بررسی کنید.' : undefined}
+                />
+              )}
             </aside>
           </div>
         )}
@@ -235,7 +262,7 @@ function AuctionList({
   )
 }
 
-function ListingList({ listings }: { listings: UsedGoldListing[] }) {
+function ListingList({ listings, selectedListing, onSelect }: { listings: UsedGoldListing[]; selectedListing: UsedGoldListing | null; onSelect: (listing: UsedGoldListing) => void }) {
   if (listings.length === 0) {
     return <EmptyState title="آگهی یافت نشد" description="آگهی‌های طلای دست دوم بعد از تأیید ادمین نمایش داده می‌شوند." />
   }
@@ -243,7 +270,7 @@ function ListingList({ listings }: { listings: UsedGoldListing[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {listings.map((listing) => (
-        <div key={listing.id} className="card p-5">
+        <button key={listing.id} type="button" onClick={() => onSelect(listing)} className={`card w-full p-5 text-right transition ${selectedListing?.id === listing.id ? 'ring-2 ring-amber-500' : 'hover:shadow-lg'}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="font-black text-navy-900">{listing.title}</h3>
@@ -265,10 +292,43 @@ function ListingList({ listings }: { listings: UsedGoldListing[] }) {
             />
             <InfoPill label="نوع فروش" value={listing.saleType === 'auction' ? 'مزایده' : 'مستقیم'} />
           </div>
-        </div>
+        </button>
       ))}
     </div>
   )
+}
+
+function UsedGoldPurchasePanel({
+  listing,
+  address,
+  onAddressChange,
+  onPurchase,
+  isSubmitting,
+  error,
+}: {
+  listing: UsedGoldListing | null
+  address: { title: string; province: string; city: string; street: string; postalCode: string; isDefault: boolean }
+  onAddressChange: (value: { title: string; province: string; city: string; street: string; postalCode: string; isDefault: boolean }) => void
+  onPurchase: () => void
+  isSubmitting: boolean
+  error?: string
+}) {
+  if (!listing) return <div className="card p-5 text-sm text-muted-foreground">برای خرید مستقیم، یک آگهی را انتخاب کنید.</div>
+  const update = (key: 'province' | 'city' | 'street' | 'postalCode', value: string) => onAddressChange({ ...address, [key]: value })
+  const ready = Boolean(address.province && address.city && address.street && address.postalCode)
+  return <section className="card p-5" aria-labelledby="used-gold-purchase-title">
+    <h2 id="used-gold-purchase-title" className="font-black text-navy-900">خرید امن با کیف پول</h2>
+    <p className="mt-2 text-sm text-muted-foreground">مبلغ تا تأیید تحویل در escrow نگه داشته می‌شود.</p>
+    <p className="mt-4 font-bold">{listing.title} · {formatPrice(listing.fixedPrice || 0)} تومان</p>
+    <div className="mt-4 space-y-3">
+      <input className="input" aria-label="استان" placeholder="استان" value={address.province} onChange={(event) => update('province', event.target.value)} />
+      <input className="input" aria-label="شهر" placeholder="شهر" value={address.city} onChange={(event) => update('city', event.target.value)} />
+      <textarea className="input min-h-20" aria-label="نشانی" placeholder="نشانی کامل" value={address.street} onChange={(event) => update('street', event.target.value)} />
+      <input className="input" aria-label="کد پستی" placeholder="کد پستی" value={address.postalCode} onChange={(event) => update('postalCode', event.target.value)} />
+    </div>
+    <button type="button" className="btn btn-primary mt-4 w-full" disabled={!ready || isSubmitting} onClick={onPurchase}>{isSubmitting ? 'در حال ثبت معامله…' : 'خرید و نگهداری مبلغ در escrow'}</button>
+    {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
+  </section>
 }
 
 function AuctionDetailPanel({

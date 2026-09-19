@@ -6,6 +6,7 @@ import {
   CreateUsedGoldListingDto,
   ReviewUsedGoldListingDto,
   UpdateUsedGoldListingStatusDto,
+  PurchaseUsedGoldListingDto,
 } from './create-used-gold-listing.dto'
 import { UsedGoldListingStatus } from './used-gold-listing.entity'
 import { UsedGoldListingsService } from './used-gold-listings.service'
@@ -46,5 +47,21 @@ export class UsedGoldListingsController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   async updateStatus(@Param('id') id: string, @Body() body: UpdateUsedGoldListingStatusDto) {
     return this.listingsService.updateStatus(id, body)
+  }
+
+  @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  async cancelOwn(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.listingsService.cancelOwnListing(id, req.user.sub)
+  }
+
+  @Post(':id/purchase')
+  @UseGuards(JwtAuthGuard)
+  async purchase(
+    @Param('id') id: string,
+    @Body() body: PurchaseUsedGoldListingDto,
+    @Req() req: Request & { user: JwtUser },
+  ) {
+    return this.listingsService.purchaseDirect(id, body, req.user.sub)
   }
 }

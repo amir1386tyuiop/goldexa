@@ -7,6 +7,7 @@ import {
   CreateEscrowPaymentDto,
   CreateMarketplaceRatingDto,
   UpdateEscrowStatusDto,
+  ShipEscrowPaymentDto,
 } from './create-escrow.dto'
 
 @Controller('escrow')
@@ -33,6 +34,20 @@ export class EscrowController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   async updatePaymentStatus(@Param('id') id: string, @Body() body: UpdateEscrowStatusDto) {
     return this.escrowService.updatePaymentStatus(id, body)
+  }
+
+  @Patch('payments/:id/ship')
+  async markShipped(
+    @Param('id') id: string,
+    @Body() body: ShipEscrowPaymentDto,
+    @Req() req: Request & { user: JwtUser },
+  ) {
+    return this.escrowService.markShipped(id, req.user.sub, body.trackingCode)
+  }
+
+  @Post('payments/:id/confirm-delivery')
+  async confirmDelivery(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.escrowService.confirmDelivery(id, req.user.sub)
   }
 
   @Get('ratings')

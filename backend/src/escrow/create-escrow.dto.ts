@@ -47,6 +47,12 @@ export class UpdateEscrowStatusDto {
   trackingCode?: string | null
 }
 
+export class ShipEscrowPaymentDto {
+  @IsNotEmpty()
+  @IsString()
+  trackingCode: string
+}
+
 export class CreateMarketplaceRatingDto {
   /** Internal field populated by the controller from JWT; never trust client input. */
   @IsOptional()

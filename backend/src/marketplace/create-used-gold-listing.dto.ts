@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsObject,
   IsString,
   Min,
 } from 'class-validator'
@@ -151,4 +152,14 @@ export class UpdateUsedGoldListingStatusDto {
   @IsNotEmpty()
   @IsEnum(UsedGoldListingStatus)
   status: UsedGoldListingStatus
+}
+
+export class PurchaseUsedGoldListingDto {
+  @IsNotEmpty()
+  @IsObject()
+  address: Record<string, unknown>
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string
 }

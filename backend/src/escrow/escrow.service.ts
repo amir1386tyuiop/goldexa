@@ -177,6 +177,33 @@ export class EscrowService {
     })
   }
 
+  async markShipped(id: string, sellerId: string, trackingCode: string): Promise<EscrowPayment> {
+    if (!trackingCode?.trim()) throw new BadRequestException('کد رهگیری ارسال الزامی است')
+    return this.dataSource.transaction(async (manager) => {
+      const payment = await manager.findOne(EscrowPayment, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!payment) throw new NotFoundException('پرداخت امانی یافت نشد')
+      if (payment.sellerId !== sellerId) throw new ForbiddenException('این escrow متعلق به شما نیست')
+      if (payment.status !== EscrowPaymentStatus.HELD) {
+        throw new BadRequestException('فقط escrow نگه‌داری‌شده قابل ارسال است')
+      }
+      payment.trackingCode = trackingCode.trim()
+      return manager.save(payment)
+    })
+  }
+
+  async confirmDelivery(id: string, buyerId: string): Promise<EscrowPayment> {
+    const payment = await this.escrowRepository.findOneBy({ id })
+    if (!payment) throw new NotFoundException('پرداخت امانی یافت نشد')
+    if (payment.buyerId !== buyerId) throw new ForbiddenException('این escrow متعلق به شما نیست')
+    if (payment.status !== EscrowPaymentStatus.HELD) {
+      throw new BadRequestException('فقط escrow نگه‌داری‌شده قابل تایید است')
+    }
+    return (await this.updatePaymentStatus(id, { status: EscrowPaymentStatus.RELEASED })) as EscrowPayment
+  }
+
   async findRatings(): Promise<MarketplaceRating[]> {
     return this.ratingRepository.find({ order: { createdAt: 'DESC' } })
   }

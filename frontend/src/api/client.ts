@@ -1720,6 +1720,8 @@ export const api = {
   getUsedGoldListing: (id: string) => request<UsedGoldListing>(`/marketplace/listings/${id}`),
   createUsedGoldListing: (body: CreateUsedGoldListingInput) =>
     request<UsedGoldListing>('/marketplace/listings', { method: 'POST', body }),
+  purchaseUsedGoldListing: (listingId: string, body: PurchaseUsedGoldListingInput) =>
+    request<{ order: Order; escrow: EscrowPayment; listing: UsedGoldListing }>(`/marketplace/listings/${listingId}/purchase`, { method: 'POST', body }),
   getVaultAssets: (userId: string) => request<SmartVaultAsset[]>(`/smart-vault/assets/user/${userId}`),
   getVaultSummary: () => request<SmartVaultSummary>('/smart-vault/summary'),
   getVaultSnapshots: (assetId: string) => request<AssetValuationSnapshot[]>(`/smart-vault/assets/${assetId}/snapshots`),
@@ -1985,6 +1987,11 @@ export interface CreateUsedGoldListingInput {
   autoExtendSeconds?: number
   paymentWindowMinutes?: number
   commissionRate?: number
+}
+
+export interface PurchaseUsedGoldListingInput {
+  address: Record<string, unknown>
+  idempotencyKey?: string
 }
 
 export interface CreatePriceAlertInput {

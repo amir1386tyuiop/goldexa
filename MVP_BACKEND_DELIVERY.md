@@ -66,6 +66,15 @@
 - `POST /auth/logout`، `GET/PATCH /users/me` (از JWT)، `GET /pricing/current`، `GET /admin/reports` (گزارش درآمد تفکیکی: پرداخت‌های موفق، ارزش سفارش‌ها، کارمزد escrow، سفارش به تفکیک وضعیت)، `POST /orders/:id/cancel`.
 - endpointهای شخصی users (profile/kyc/addresses/bank) حالا ownership دارند (کاربر فقط داده خودش؛ admin استثنا).
 
+## تکمیل چرخه‌ی بازار دست‌دوم و escrow
+
+- `POST /marketplace/listings/:id/purchase` خرید مستقیم آگهی با کیف پول را در یک transaction انجام می‌دهد؛ listing با قفل سطر بررسی می‌شود، order و escrow ساخته می‌شوند، مبلغ با `holdEscrow` قفل می‌شود و listing به‌صورت اتمیک `sold` می‌شود.
+- خرید تکراری همان listing با بررسی escrow/order رد یا به نتیجه‌ی قبلی همان معامله هدایت می‌شود.
+- `PATCH /marketplace/listings/:id/cancel` برای لغو آگهی توسط فروشنده اضافه شد؛ مالکیت و وضعیت نهایی قبل از تغییر بررسی می‌شود.
+- `PATCH /escrow/payments/:id/ship` فقط توسط فروشنده‌ی همان escrow و با کد رهگیری معتبر قابل اجراست.
+- `POST /escrow/payments/:id/confirm-delivery` فقط توسط خریدار همان escrow اجرا می‌شود و release atomic مبلغ را انجام می‌دهد.
+- مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ اتصال درگاه آنلاین واقعی و dispute کامل همچنان به credential و تصمیم حقوقی نیاز دارد.
+
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.
 - **رفع:** `JwtAuthGuard` (اجبار ورود) + `OwnerGuard` (فقط داده‌ی خودت؛ admin استثنا) روی `wallet`، `orders`، `cart` اعمال شد. userId از param یا body چک می‌شود. `SecurityModule` سراسری.
