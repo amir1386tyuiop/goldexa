@@ -57,23 +57,27 @@ export class UploadsController {
     // PRD 5.5 AC: product images are stored as WebP under 200 KB. Progressively
     // lower quality (and, if needed, dimensions) until the target size is met.
     const MAX_BYTES = 200 * 1024
-    let width = 1200
     let webp: Buffer = Buffer.alloc(0)
-    for (const quality of [82, 72, 62, 52, 45, 38, 30]) {
-      webp = await sharp(file.buffer)
-        .rotate() // respect EXIF orientation
-        .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
-        .webp({ quality })
-        .toBuffer()
+    for (const width of [1200, 1000, 800, 640, 512, 420, 360, 320]) {
+      for (const quality of [82, 72, 62, 52, 45, 38, 30, 25]) {
+        webp = await sharp(file.buffer)
+          .rotate() // respect EXIF orientation
+          .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality })
+          .toBuffer()
+        if (webp.length <= MAX_BYTES) break
+      }
       if (webp.length <= MAX_BYTES) break
-      // Shrink dimensions a little on the lower-quality passes to keep going.
-      if (quality <= 45 && width > 600) width = Math.round(width * 0.8)
+    }
+
+    if (webp.length === 0 || webp.length > MAX_BYTES) {
+      throw new BadRequestException('تصویر پس از فشرده‌سازی همچنان بزرگ‌تر از ۲۰۰ کیلوبایت است')
     }
 
     const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.webp`
     await writeFile(join(dir, filename), webp)
 
     const url = `/uploads/products/${filename}`
-    return { url, filename, size: webp.length, format: 'webp', withinLimit: webp.length <= MAX_BYTES }
+    return { url, filename, size: webp.length, format: 'webp', withinLimit: true }
   }
 }
