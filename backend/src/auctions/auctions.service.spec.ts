@@ -29,6 +29,7 @@ describe('AuctionsService', () => {
       {} as never,
       { findOneBy: jest.fn(async () => ({ id: 'buyer-1', name: 'خریدار' })) } as never,
       dataSource as never,
+      { create: jest.fn(async () => undefined) } as never,
     )
 
     const result = await service.placeBid('auction-1', { amount: 1100 }, 'buyer-1')
@@ -50,6 +51,7 @@ describe('AuctionsService', () => {
       {} as never, {} as never,
       { findOneBy: jest.fn(async () => ({ id: 'buyer-1', name: 'خریدار' })) } as never,
       { transaction: jest.fn(async (callback) => callback(manager)) } as never,
+      { create: jest.fn(async () => undefined) } as never,
     )
     await expect(service.placeBid('auction-1', { amount: 1050 }, 'buyer-1')).rejects.toBeInstanceOf(BadRequestException)
   })
@@ -72,6 +74,7 @@ describe('AuctionsService', () => {
       auctionRepository as never,
       {} as never,
       {} as never,
+      { create: jest.fn(async () => undefined) } as never,
       {} as never,
       {} as never,
     )

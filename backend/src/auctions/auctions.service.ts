@@ -11,6 +11,7 @@ import {
 import { AuctionBid } from './auction-bid.entity'
 import { Product } from '../products/product.entity'
 import { User } from '../users/user.entity'
+import { NotificationsService } from '../notifications/notifications.service'
 import {
   CreateAuctionDto,
   PlaceBidDto,
@@ -29,6 +30,7 @@ export class AuctionsService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private readonly dataSource: DataSource,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findAll(): Promise<Auction[]> {
@@ -180,7 +182,9 @@ export class AuctionsService {
       throw new BadRequestException('فروشنده نمی‌تواند روی مزایده خودش پیشنهاد ثبت کند')
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    let previousWinnerId: string | null = null
+    let previousWinnerName: string | null = null
+    const result = await this.dataSource.transaction(async (manager) => {
       const lockedAuction = await manager.findOne(Auction, {
         where: { id },
         lock: { mode: 'pessimistic_write' },
@@ -196,6 +200,8 @@ export class AuctionsService {
       }
 
       await manager.update(AuctionBid, { auctionId: id, isWinning: true }, { isWinning: false })
+      previousWinnerId = lockedAuction.winningBidderId
+      previousWinnerName = lockedAuction.winningBidderName
       const now = new Date()
       const shouldExtend = this.minutesUntil(lockedAuction.endsAt, now) <= lockedAuction.autoExtendMinutes && lockedAuction.autoExtendSeconds > 0
       if (shouldExtend) {
@@ -224,6 +230,37 @@ export class AuctionsService {
       lockedAuction.reserveMet = !lockedAuction.reservePrice || data.amount >= lockedAuction.reservePrice
       return manager.save(Auction, lockedAuction)
     })
+
+    await this.notifyBidParticipants(result, bidderId, bidder.name, previousWinnerId, previousWinnerName)
+    return result
+  }
+
+  private async notifyBidParticipants(
+    auction: Auction,
+    bidderId: string,
+    bidderName: string,
+    previousWinnerId: string | null,
+    previousWinnerName: string | null,
+  ): Promise<void> {
+    const notifications = [
+      this.notifications.create({
+        userId: auction.sellerId,
+        type: 'auction_bid_received',
+        title: 'پیشنهاد جدید در مزایده',
+        message: `${bidderName} پیشنهاد ${Number(auction.currentPrice).toLocaleString('fa-IR')} تومان ثبت کرد.`,
+        metadata: { auctionId: auction.id, bidderId, amount: auction.currentPrice },
+      }),
+    ]
+    if (previousWinnerId && previousWinnerId !== bidderId) {
+      notifications.push(this.notifications.create({
+        userId: previousWinnerId,
+        type: 'auction_outbid',
+        title: 'پیشنهاد شما بالاترین پیشنهاد نیست',
+        message: `پیشنهاد جدیدی بالاتر از پیشنهاد شما در مزایده ثبت شد.`,
+        metadata: { auctionId: auction.id, previousWinnerName, amount: auction.currentPrice },
+      }))
+    }
+    await Promise.allSettled(notifications)
   }
 
   async settleAuction(id: string): Promise<Auction> {
