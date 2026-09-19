@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, IsNull, Not, Repository } from 'typeorm'
 import {
@@ -12,6 +12,7 @@ import { AuctionBid } from './auction-bid.entity'
 import { Product } from '../products/product.entity'
 import { User } from '../users/user.entity'
 import { NotificationsService } from '../notifications/notifications.service'
+import { AuctionsGateway } from './auctions.gateway'
 import {
   CreateAuctionDto,
   PlaceBidDto,
@@ -31,6 +32,7 @@ export class AuctionsService {
     private userRepository: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly gateway?: AuctionsGateway,
   ) {}
 
   async findAll(): Promise<Auction[]> {
@@ -184,6 +186,7 @@ export class AuctionsService {
 
     let previousWinnerId: string | null = null
     let previousWinnerName: string | null = null
+    let latestBid: AuctionBid | null = null
     const result = await this.dataSource.transaction(async (manager) => {
       const lockedAuction = await manager.findOne(Auction, {
         where: { id },
@@ -210,13 +213,14 @@ export class AuctionsService {
         lockedAuction.status = AuctionStatus.EXTENDED
       }
 
-      await manager.save(AuctionBid, manager.create(AuctionBid, {
+      latestBid = manager.create(AuctionBid, {
         auctionId: id,
         bidderId,
         bidderName: bidder.name,
         amount: data.amount,
         isWinning: true,
-      }))
+      })
+      await manager.save(AuctionBid, latestBid)
       lockedAuction.currentPrice = data.amount
       lockedAuction.bidCount += 1
       if (lockedAuction.winningBidderId && lockedAuction.winningBidderId !== bidderId) {
@@ -231,6 +235,7 @@ export class AuctionsService {
       return manager.save(Auction, lockedAuction)
     })
 
+    if (latestBid) this.gateway?.publishBid(result, latestBid)
     await this.notifyBidParticipants(result, bidderId, bidder.name, previousWinnerId, previousWinnerName)
     return result
   }

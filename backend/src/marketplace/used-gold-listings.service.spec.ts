@@ -57,8 +57,6 @@ describe('UsedGoldListingsService', () => {
       description: 'x', weight: 2, karat: 18, saleType: UsedGoldListingSaleType.DIRECT,
       fixedPrice: 1000, status: UsedGoldListingStatus.ACTIVE,
     }
-    const escrowRepository = { findOne: jest.fn(), create: jest.fn((value) => value) }
-    const orderRepository = {}
     const manager = {
       findOne: jest.fn(async (entity: unknown) => {
         if (entity === Object.getPrototypeOf(listing).constructor) return listing

@@ -3,7 +3,6 @@ import {
   baseUrl,
   createAndLogin,
   databaseFixturesEnabled,
-  e2e,
   jsonBody,
   jsonHeaders,
   seedWalletFixture,

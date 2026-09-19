@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import { formatPrice } from '@/utils/helpers'
 import type { Auction, AuctionBid, Product, UsedGoldListing } from '@/types'
 import { getStoredAuth } from '@/auth'
+import { useAuctionRealtime } from '@/hooks/useAuctionRealtime'
 
 const emptyBidder: AuctionBid = {
   id: '',
@@ -58,6 +59,17 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
     initialData: [],
     enabled: Boolean(selectedAuction),
     refetchInterval: selectedAuction?.status === 'active' || selectedAuction?.status === 'extended' ? 10000 : false,
+  })
+
+  useAuctionRealtime(selectedAuction?.id, ({ auction, bid }) => {
+    setSelectedAuction(auction)
+    queryClient.setQueryData<Auction[]>(['auctions'], (current = []) =>
+      current.map((item) => item.id === auction.id ? auction : item),
+    )
+    queryClient.setQueryData<AuctionBid[]>(['auction-bids', auction.id], (current = []) => [
+      bid,
+      ...current.filter((item) => item.id !== bid.id),
+    ])
   })
 
   const bidMutation = useMutation({

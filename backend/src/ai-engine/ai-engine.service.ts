@@ -354,10 +354,12 @@ export class AiEngineService {
   }
 
   async rerunPrediction(targetId: string | null): Promise<AiPricePrediction> {
+    void targetId
     throw new BadRequestException('اجرای prediction بدون currentPrice و داده‌ی واقعی مجاز نیست؛ از predictions/execute استفاده کنید')
   }
 
   async rerunRecommendation(userId?: string): Promise<AiDesignRecommendation> {
+    void userId
     throw new BadRequestException('اجرای recommendation بدون داده‌ی واقعی مجاز نیست؛ از recommendations/execute استفاده کنید')
   }
 

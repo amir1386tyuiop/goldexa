@@ -6,12 +6,13 @@ import { Product } from '../products/product.entity'
 import { User } from '../users/user.entity'
 import { AuctionsController } from './auctions.controller'
 import { AuctionsService } from './auctions.service'
+import { AuctionsGateway } from './auctions.gateway'
 import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
   imports: [TypeOrmModule.forFeature([Auction, AuctionBid, Product, User]), NotificationsModule],
   controllers: [AuctionsController],
-  providers: [AuctionsService],
+  providers: [AuctionsService, AuctionsGateway],
   exports: [AuctionsService],
 })
 export class AuctionsModule {}
