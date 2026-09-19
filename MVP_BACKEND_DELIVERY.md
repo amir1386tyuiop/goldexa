@@ -77,7 +77,7 @@
 - `POST /escrow/payments/:id/dispute` توسط خریدار یا فروشنده اختلاف را ثبت و مبلغ را در وضعیت `disputed` نگه می‌دارد؛ resolution ادمین برای release/refund نیازمند یادداشت اجباری است.
 - پنل ادمین اکنون `GET /admin/escrow/disputes` و `PATCH /admin/escrow/:id/resolve` دارد؛ فهرست اختلاف‌ها، دلیل، طرفین و دو مسیر release/refund با یادداشت تصمیم در UI مدیریت نمایش داده می‌شود.
 - پایان مزایده دیگر به‌اشتباه `settled/completed` نمی‌شود؛ تا زمان پرداخت برنده در `awaiting_payment` می‌ماند و بعد از پرداخت به escrow متصل می‌شود.
-- مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ اتصال درگاه آنلاین واقعی و dispute کامل همچنان به credential و تصمیم حقوقی نیاز دارد.
+- مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ تست E2E ایزوله‌ی PostgreSQL نیز خرید مستقیم، hold کیف پول، ارسال، release و بازکردن dispute را پوشش می‌دهد.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.
@@ -93,5 +93,5 @@
 
 ## تست
 - suite فعلی Jest شامل ۱۲ تست موفق است؛ پوشش آن عمدتاً unit-level است.
-- smoke/e2e setup در `backend/test/e2e` اضافه شده و با `E2E_BASE_URL` اجرا می‌شود؛ اجرای کامل flow مالی هنوز باید با PostgreSQL/Redis test environment انجام شود.
+- smoke/e2e setup در `backend/test/e2e` اضافه شده و با `E2E_BASE_URL` اجرا می‌شود. compose ایزوله‌ی `backend/test/docker-compose.e2e.yml` PostgreSQL و Redis جدا دارد؛ `E2E_ALLOW_DB_FIXTURES=1` فقط در همین دیتابیس تست برای seed کیف پول مجاز است.
 - security enforcement با `ENFORCE_SECURITY_TESTS=1` آماده است و تا رفع findingهای endpointهای حساس نباید pass کامل تلقی شود.

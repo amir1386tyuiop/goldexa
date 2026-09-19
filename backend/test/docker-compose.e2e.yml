@@ -50,6 +50,7 @@ services:
       JWT_SECRET: e2e-only-secret-at-least-32-characters-long
       JWT_EXPIRES_IN: 1h
       RETURN_OTP_IN_RESPONSE: 'true'
+      E2E_ALLOW_DB_FIXTURES: '1'
       ZARINPAL_MERCHANT_ID: ''
       ZARINPAL_SANDBOX: 'true'
       GOLD_PRICE_SOURCE: mock
