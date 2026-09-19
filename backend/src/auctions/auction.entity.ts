@@ -105,6 +105,15 @@ export class Auction {
   @Column('decimal', { precision: 15, scale: 2, name: 'starting_price' })
   startingPrice: number
 
+  @Column('decimal', { precision: 15, scale: 2, nullable: true, name: 'gold18_price_snapshot' })
+  gold18PriceSnapshot: number | null
+
+  @Column('decimal', { precision: 15, scale: 2, nullable: true, name: 'intrinsic_gold_value' })
+  intrinsicGoldValue: number | null
+
+  @Column({ type: 'timestamp', nullable: true, name: 'price_snapshot_at' })
+  priceSnapshotAt: Date | null
+
   @Column('decimal', { precision: 15, scale: 2, default: 0, name: 'reserve_price' })
   reservePrice: number | null
 

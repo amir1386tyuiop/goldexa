@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, Repository } from 'typeorm'
 import {
@@ -18,6 +18,7 @@ import { Order, OrderStatus, PaymentMethod } from '../orders/order.entity'
 import { EscrowPayment, EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
 import { WalletService } from '../wallet/wallet.service'
 import { randomUUID } from 'crypto'
+import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 
 @Injectable()
 export class UsedGoldListingsService {
@@ -28,6 +29,7 @@ export class UsedGoldListingsService {
     private userRepository: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
+    @Optional() private readonly goldPricing?: GoldPricingService,
   ) {}
 
   async findAll(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
@@ -81,6 +83,12 @@ export class UsedGoldListingsService {
       throw new BadRequestException('حداقل افزایش مزایده الزامی است')
     }
 
+    const valuation = this.goldPricing
+      ? await this.goldPricing.getGoldValuation(data.weight, data.karat).catch((error: unknown) => {
+        throw new BadRequestException((error as Error).message || 'قیمت زنده طلا در دسترس نیست')
+      })
+      : null
+
     const listing = this.listingRepository.create({
       ...data,
       sellerId: seller.id,
@@ -102,6 +110,9 @@ export class UsedGoldListingsService {
       commissionRate: data.commissionRate ?? 0,
       qualityStatus: UsedGoldQualityStatus.NOT_SENT,
       qualityBadge: false,
+      gold18PriceSnapshot: valuation?.gold18Price ?? null,
+      intrinsicGoldValue: valuation?.intrinsicValue ?? null,
+      priceSnapshotAt: valuation?.capturedAt ?? null,
       status: UsedGoldListingStatus.PENDING_REVIEW,
     })
 
@@ -155,6 +166,20 @@ export class UsedGoldListingsService {
     if (!buyerId) throw new BadRequestException('خریدار معتبر نیست')
 
     return this.dataSource.transaction(async (manager) => {
+      if (data.idempotencyKey?.trim()) {
+        const previous = await manager.findOne(EscrowPayment, {
+          where: { idempotencyKey: data.idempotencyKey.trim() },
+        })
+        if (previous) {
+          if (previous.buyerId !== buyerId || previous.listingId !== id || !previous.orderId) {
+            throw new BadRequestException('کلید idempotency قبلاً برای معامله‌ی دیگری استفاده شده است')
+          }
+          const previousOrder = await manager.findOneBy(Order, { id: previous.orderId })
+          const previousListing = await manager.findOneBy(UsedGoldListing, { id })
+          if (previousOrder && previousListing) return { order: previousOrder, escrow: previous, listing: previousListing }
+        }
+      }
+
       const listing = await manager.findOne(UsedGoldListing, {
         where: { id },
         lock: { mode: 'pessimistic_write' },
@@ -208,6 +233,7 @@ export class UsedGoldListingsService {
         listingId: listing.id,
         auctionId: null,
         orderId: order.id,
+        idempotencyKey: data.idempotencyKey?.trim() || null,
         buyerId,
         sellerId: listing.sellerId,
         amount,

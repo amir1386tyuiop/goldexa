@@ -18,6 +18,8 @@ import {
   PlaceBidDto,
   UpdateAuctionReviewDto,
 } from './create-auction.dto'
+import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
+import { Cron, CronExpression } from '@nestjs/schedule'
 
 @Injectable()
 export class AuctionsService {
@@ -33,6 +35,7 @@ export class AuctionsService {
     private readonly dataSource: DataSource,
     private readonly notifications: NotificationsService,
     @Optional() private readonly gateway?: AuctionsGateway,
+    @Optional() private readonly goldPricing?: GoldPricingService,
   ) {}
 
   async findAll(): Promise<Auction[]> {
@@ -90,6 +93,7 @@ export class AuctionsService {
       throw new BadRequestException('فروشنده معتبر نیست')
     }
 
+    let linkedProduct: Product | null = null
     if (data.productId) {
       const product = await this.productRepository.findOneBy({ id: data.productId })
 
@@ -100,6 +104,7 @@ export class AuctionsService {
       if (product.stock < 1) {
         throw new BadRequestException('موجودی محصول برای مزایده کافی نیست')
       }
+      linkedProduct = product
     }
 
     const seller = await this.userRepository.findOneBy({ id: sellerId })
@@ -128,6 +133,12 @@ export class AuctionsService {
         ? (data.startingPrice * (data.bidIncrementPercent ?? 0)) / 100
         : data.minimumBidIncrement
 
+    const valuation = linkedProduct && this.goldPricing
+      ? await this.goldPricing.getGoldValuation(Number(linkedProduct.weight), Number(linkedProduct.karat)).catch((error: unknown) => {
+        throw new BadRequestException((error as Error).message || 'قیمت زنده طلا در دسترس نیست')
+      })
+      : null
+
     const auction = this.auctionRepository.create({
       startsAt,
       endsAt,
@@ -136,6 +147,9 @@ export class AuctionsService {
       sellerName: seller.name,
       durationDays,
       currentPrice: data.startingPrice,
+      gold18PriceSnapshot: valuation?.gold18Price ?? null,
+      intrinsicGoldValue: valuation?.intrinsicValue ?? null,
+      priceSnapshotAt: valuation?.capturedAt ?? null,
       reservePrice: data.reservePrice ?? null,
       bidIncrementType: data.bidIncrementType ?? BidIncrementType.AMOUNT,
       minimumBidIncrement,
@@ -299,6 +313,12 @@ export class AuctionsService {
     auction.status = AuctionStatus.AWAITING_PAYMENT
 
     return this.auctionRepository.save(auction)
+  }
+
+  /** Keep auction state moving even when no public endpoint is being called. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async processLifecycle(): Promise<void> {
+    await this.syncStatuses()
   }
 
   async updateReview(id: string, data: UpdateAuctionReviewDto): Promise<Auction | null> {

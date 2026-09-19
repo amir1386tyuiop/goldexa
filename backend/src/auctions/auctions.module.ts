@@ -8,9 +8,10 @@ import { AuctionsController } from './auctions.controller'
 import { AuctionsService } from './auctions.service'
 import { AuctionsGateway } from './auctions.gateway'
 import { NotificationsModule } from '../notifications/notifications.module'
+import { GoldPricingModule } from '../gold-pricing/gold-pricing.module'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Auction, AuctionBid, Product, User]), NotificationsModule],
+  imports: [TypeOrmModule.forFeature([Auction, AuctionBid, Product, User]), NotificationsModule, GoldPricingModule],
   controllers: [AuctionsController],
   providers: [AuctionsService, AuctionsGateway],
   exports: [AuctionsService],

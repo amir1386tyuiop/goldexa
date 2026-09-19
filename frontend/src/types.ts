@@ -226,6 +226,9 @@ export interface Auction {
   expertName?: string | null
   expertNotes?: string | null
   startingPrice: number
+  gold18PriceSnapshot?: number | null
+  intrinsicGoldValue?: number | null
+  priceSnapshotAt?: string | null
   reservePrice?: number | null
   currentPrice: number
   bidIncrementType: BidIncrementType
@@ -292,6 +295,9 @@ export interface UsedGoldListing {
   description: string
   weight: number
   karat: number
+  gold18PriceSnapshot?: number | null
+  intrinsicGoldValue?: number | null
+  priceSnapshotAt?: string | null
   stones?: unknown[] | null
   dimensions?: unknown
   metalColor?: string | null

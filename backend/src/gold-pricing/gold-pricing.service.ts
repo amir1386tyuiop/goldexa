@@ -109,6 +109,31 @@ export class GoldPricingService implements OnModuleInit {
     return price
   }
 
+  /**
+   * Capture the live 18k reference used to explain and audit marketplace prices.
+   * The seller's asking price remains a business decision, but its gold value
+   * must never be calculated from a client-provided or stale frontend price.
+   */
+  async getGoldValuation(weightGrams: number, karat: number): Promise<{
+    gold18Price: number
+    intrinsicValue: number
+    capturedAt: Date
+  }> {
+    if (!Number.isFinite(weightGrams) || weightGrams <= 0 || !Number.isFinite(karat) || karat < 1 || karat > 24) {
+      throw new Error('وزن یا عیار برای ارزش‌گذاری معتبر نیست')
+    }
+    const price = await this.getPriceByType(GoldPriceType.GOLD_18)
+    if (!price || !Number.isFinite(Number(price.value)) || Number(price.value) <= 0) {
+      throw new Error('قیمت معتبر طلای ۱۸ عیار در دسترس نیست')
+    }
+    const gold18Price = Number(price.value)
+    return {
+      gold18Price,
+      intrinsicValue: (weightGrams * gold18Price * karat) / 18,
+      capturedAt: price.updatedAt ?? price.createdAt,
+    }
+  }
+
   /** Recent price history for charting trends. */
   async getHistory(type: GoldPriceType, limit = 50): Promise<PriceHistory[]> {
     return this.priceHistoryRepository.find({

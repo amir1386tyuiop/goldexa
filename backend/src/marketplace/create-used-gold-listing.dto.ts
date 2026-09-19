@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsObject,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator'
 import {
@@ -161,5 +162,6 @@ export class PurchaseUsedGoldListingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   idempotencyKey?: string
 }

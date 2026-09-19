@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Clock, Gavel, Plus, Search, Star, TrendingUp, UserCheck } from 'lucide-react'
 import { api } from '@/api/client'
@@ -32,6 +32,7 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
   })
   const auth = getStoredAuth()
   const queryClient = useQueryClient()
+  const purchaseIdempotencyKey = useRef<string | null>(null)
   const [bidForm, setBidForm] = useState({ ...emptyBidder, bidderId: auth?.user.id || '', bidderName: auth?.user.name || '' })
 
   const { data: auctions = [], isLoading: auctionsLoading, isError: auctionsError } = useQuery<Auction[]>({
@@ -88,8 +89,15 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
   })
 
   const purchaseMutation = useMutation({
-    mutationFn: (listingId: string) => api.purchaseUsedGoldListing(listingId, { address: purchaseAddress }),
+    mutationFn: (listingId: string) => {
+      purchaseIdempotencyKey.current ??= globalThis.crypto?.randomUUID?.() || `${listingId}-${Date.now()}`
+      return api.purchaseUsedGoldListing(listingId, {
+        address: purchaseAddress,
+        idempotencyKey: purchaseIdempotencyKey.current,
+      })
+    },
     onSuccess: () => {
+      purchaseIdempotencyKey.current = null
       setSelectedListing(null)
       queryClient.invalidateQueries({ queryKey: ['used-gold-listings'] })
     },
@@ -175,7 +183,14 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
                 }}
                 />
               ) : activeTab === 'marketplace' && !listingsLoading && !listingsError ? (
-                  <ListingList listings={filteredListings} selectedListing={selectedListing} onSelect={setSelectedListing} />
+                  <ListingList
+                    listings={filteredListings}
+                    selectedListing={selectedListing}
+                    onSelect={(listing) => {
+                      purchaseIdempotencyKey.current = null
+                      setSelectedListing(listing)
+                    }}
+                  />
               ) : null}
             </div>
 
@@ -260,6 +275,7 @@ function AuctionList({
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <InfoPill label="قیمت فعلی" value={formatPrice(auction.currentPrice)} />
             <InfoPill label="حداقل افزایش" value={formatPrice(auction.minimumBidIncrement)} />
+            {auction.intrinsicGoldValue ? <InfoPill label="ارزش طلای روز" value={formatPrice(auction.intrinsicGoldValue)} /> : null}
             <InfoPill label="پایان" value={new Date(auction.endsAt).toLocaleDateString('fa-IR')} />
             <InfoPill label="وضعیت" value={getAuctionStatusText(auction.status)} />
           </div>
@@ -302,6 +318,7 @@ function ListingList({ listings, selectedListing, onSelect }: { listings: UsedGo
                   : formatPrice(listing.fixedPrice || 0)
               }
             />
+            {listing.intrinsicGoldValue ? <InfoPill label="ارزش طلای روز" value={formatPrice(listing.intrinsicGoldValue)} /> : null}
             <InfoPill label="نوع فروش" value={listing.saleType === 'auction' ? 'مزایده' : 'مستقیم'} />
           </div>
         </button>
@@ -332,6 +349,7 @@ function UsedGoldPurchasePanel({
     <h2 id="used-gold-purchase-title" className="font-black text-navy-900">خرید امن با کیف پول</h2>
     <p className="mt-2 text-sm text-muted-foreground">مبلغ تا تأیید تحویل در escrow نگه داشته می‌شود.</p>
     <p className="mt-4 font-bold">{listing.title} · {formatPrice(listing.fixedPrice || 0)} تومان</p>
+    {listing.intrinsicGoldValue ? <p className="mt-2 text-xs text-muted-foreground">ارزش ذاتی بر اساس قیمت snapshot طلای ۱۸ عیار: {formatPrice(listing.intrinsicGoldValue)} تومان</p> : null}
     <div className="mt-4 space-y-3">
       <input className="input" aria-label="استان" placeholder="استان" value={address.province} onChange={(event) => update('province', event.target.value)} />
       <input className="input" aria-label="شهر" placeholder="شهر" value={address.city} onChange={(event) => update('city', event.target.value)} />

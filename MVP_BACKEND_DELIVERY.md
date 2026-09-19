@@ -70,6 +70,7 @@
 
 - `POST /marketplace/listings/:id/purchase` خرید مستقیم آگهی با کیف پول را در یک transaction انجام می‌دهد؛ listing با قفل سطر بررسی می‌شود، order و escrow ساخته می‌شوند، مبلغ با `holdEscrow` قفل می‌شود و listing به‌صورت اتمیک `sold` می‌شود.
 - خرید تکراری همان listing با بررسی escrow/order رد یا به نتیجه‌ی قبلی همان معامله هدایت می‌شود.
+- `idempotencyKey` خرید مستقیم در escrow ذخیره و unique شده است؛ retry همان خریدار و listing همان order/escrow قبلی را برمی‌گرداند و reuse کلید برای معامله‌ی دیگر رد می‌شود.
 - `PATCH /marketplace/listings/:id/cancel` برای لغو آگهی توسط فروشنده اضافه شد؛ مالکیت و وضعیت نهایی قبل از تغییر بررسی می‌شود.
 - `PATCH /escrow/payments/:id/ship` فقط توسط فروشنده‌ی همان escrow و با کد رهگیری معتبر قابل اجراست.
 - `POST /escrow/payments/:id/confirm-delivery` فقط توسط خریدار همان escrow اجرا می‌شود و release atomic مبلغ را انجام می‌دهد.
@@ -81,6 +82,8 @@
 - مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ تست E2E ایزوله‌ی PostgreSQL نیز خرید مستقیم، hold کیف پول، ارسال، release و بازکردن dispute را پوشش می‌دهد.
 - rate-limit مربوط به OTP و login اکنون از CacheService استفاده می‌کند؛ در صورت دسترسی Redis، شمارش با `INCR/EXPIRE` بین replicaها مشترک است و فقط در fallback توسعه‌ای به حافظه برمی‌گردد.
 - مزایده اکنون gateway زنده‌ی Socket.IO دارد: کلاینت با `auction.join` وارد room می‌شود و هر bid موفق با رویداد `auction.updated` برای همان مزایده broadcast می‌شود؛ Vite و Nginx نیز proxy ارتقای WebSocket را فعال کرده‌اند.
+- قیمت آگهی‌های دست‌دوم و مزایده دیگر فقط یک عدد دستی و بی‌منبع نیست: هنگام ایجاد، سرویس Pricing قیمت معتبر ۱۸ عیار، ارزش ذاتی بر اساس وزن/عیار و زمان snapshot را در listing/auction ذخیره می‌کند؛ مبلغ پیشنهادی فروشنده همچنان قیمت قراردادی است اما مقایسه و audit آن بر اساس قیمت زنده انجام می‌شود.
+- `AuctionsService.processLifecycle` با cron هر دقیقه وضعیت مزایده‌ها، پایان زمان، مهلت پرداخت و انتقال به برنده دوم را حتی بدون ترافیک endpoint پردازش می‌کند؛ برای استقرار چندنمونه‌ای هنوز باید distributed lock/صف job اضافه شود.
 - چرخه‌ی refund سفارش نیز کامل‌تر شد: `GET /admin/refunds` درخواست‌های pending را فهرست می‌کند و `PATCH /admin/refunds/:id` با approve/reject تعیین تکلیف می‌کند؛ approve سفارش wallet در transaction قفل‌شده، credit idempotent به کیف پول انجام می‌دهد و سفارش online تا اتصال provider واقعی عمداً approve نمی‌شود.
 - هنگام قطع منبع قیمت، علاوه بر audit/log به همه‌ی کاربران admin اعلان in-app `gold_price_source_down` ارسال می‌شود؛ خطای notification هرگز feed قیمت را متوقف نمی‌کند.
 - ممیزی dependency در این مرحله، Axios را به `1.20.0`، Sharp را به `0.35.4`، TypeORM را به `0.3.31` و Socket.IO parser را به `4.2.7` ارتقا داد؛ آسیب‌پذیری‌های باقی‌مانده به زنجیره‌ی Nest 10 و ابزارهای transitive مربوط‌اند و رفع کامل آن‌ها نیازمند migration کنترل‌شده به Nest 12 است، بنابراین `npm audit fix --force` اجرا نشده است.

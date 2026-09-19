@@ -201,6 +201,9 @@ CREATE TABLE auctions (
     expert_name VARCHAR(255),
     expert_notes TEXT,
     starting_price DECIMAL(15,2) NOT NULL,
+    gold18_price_snapshot DECIMAL(15,2),
+    intrinsic_gold_value DECIMAL(15,2),
+    price_snapshot_at TIMESTAMP,
     reserve_price DECIMAL(15,2) DEFAULT 0,
     current_price DECIMAL(15,2) DEFAULT 0,
     bid_increment_type VARCHAR(20) DEFAULT 'amount',
@@ -254,6 +257,9 @@ CREATE TABLE used_gold_listings (
     description TEXT NOT NULL,
     weight DECIMAL(10,2) NOT NULL,
     karat INTEGER DEFAULT 18,
+    gold18_price_snapshot DECIMAL(15,2),
+    intrinsic_gold_value DECIMAL(15,2),
+    price_snapshot_at TIMESTAMP,
     stones JSONB,
     dimensions JSONB,
     metal_color VARCHAR(50),
@@ -579,6 +585,7 @@ CREATE TABLE escrow_payments (
     listing_id UUID REFERENCES used_gold_listings(id) ON DELETE SET NULL,
     auction_id UUID REFERENCES auctions(id) ON DELETE SET NULL,
     order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+    idempotency_key VARCHAR(100),
     buyer_id UUID NOT NULL REFERENCES users(id),
     seller_id UUID NOT NULL REFERENCES users(id),
     amount DECIMAL(15,2) NOT NULL,
@@ -1031,6 +1038,7 @@ CREATE INDEX idx_ai_price_predictions_target ON ai_price_predictions(target_type
 CREATE INDEX idx_ai_design_recommendations_user_id ON ai_design_recommendations(user_id);
 CREATE INDEX idx_ai_market_matches_buyer_id ON ai_market_matches(buyer_id);
 CREATE INDEX idx_escrow_payments_order_id ON escrow_payments(order_id);
+CREATE UNIQUE INDEX idx_escrow_payments_idempotency ON escrow_payments(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX idx_marketplace_ratings_reviewee_id ON marketplace_ratings(reviewee_id);
 CREATE INDEX idx_payment_transactions_order_id ON payment_transactions(order_id);
 CREATE INDEX idx_order_tracking_events_order_id ON order_tracking_events(order_id);

@@ -13,7 +13,15 @@ import type { AuctionBid } from './auction-bid.entity'
 
 type AuctionRoomMessage = { auctionId: string }
 
-@WebSocketGateway({ cors: { origin: true, credentials: true } })
+@WebSocketGateway({
+  cors: {
+    origin: String(process.env.FRONTEND_URL || 'http://localhost:5174')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    credentials: true,
+  },
+})
 export class AuctionsGateway implements OnGatewayConnection {
   @WebSocketServer()
   server: Server

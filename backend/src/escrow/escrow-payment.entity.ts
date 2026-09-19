@@ -23,6 +23,9 @@ export class EscrowPayment {
   @Column({ name: 'order_id', nullable: true })
   orderId: string | null
 
+  @Column({ name: 'idempotency_key', nullable: true, unique: true })
+  idempotencyKey: string | null
+
   @Column({ name: 'buyer_id' })
   buyerId: string
 
