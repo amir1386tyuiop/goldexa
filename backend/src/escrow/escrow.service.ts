@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, EntityManager, Repository } from 'typeorm'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
@@ -11,6 +11,8 @@ import {
 import { Auction, AuctionPaymentStatus, AuctionStatus } from '../auctions/auction.entity'
 import { Order, OrderStatus } from '../orders/order.entity'
 import { WalletService } from '../wallet/wallet.service'
+import { SmartVaultAsset } from '../smart-vault/smart-vault-asset.entity'
+import { Product } from '../products/product.entity'
 import {
   CreateEscrowPaymentDto,
   CreateMarketplaceRatingDto,
@@ -30,6 +32,8 @@ export class EscrowService {
     private auctionRepository: Repository<Auction>,
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
+    @InjectRepository(SmartVaultAsset)
+    @Optional() private readonly vaultAssetRepository?: Repository<SmartVaultAsset>,
   ) {}
 
   async findPayments(userId?: string, isAdmin = false): Promise<EscrowPayment[]> {
@@ -220,6 +224,10 @@ export class EscrowService {
       }
     }
 
+    if (nextStatus === EscrowPaymentStatus.RELEASED) {
+      await this.transferOwnership(manager, payment)
+    }
+
     if (!payment.auctionId) return
 
     const auction = await manager.findOne(Auction, {
@@ -242,6 +250,72 @@ export class EscrowService {
       auction.status = AuctionStatus.FAILED
     }
     await manager.save(Auction, auction)
+  }
+
+  /** Create the buyer's immutable ownership record exactly once after escrow release. */
+  private async transferOwnership(manager: EntityManager, payment: EscrowPayment): Promise<void> {
+    if (!this.vaultAssetRepository || (!payment.listingId && !payment.auctionId)) return
+
+    const existing = await manager.findOne(SmartVaultAsset, { where: { sourceEscrowId: payment.id } })
+    if (existing) return
+
+    let name = 'طلای بازار دست‌دوم'
+    let category: string | null = null
+    let productId: string | null = null
+    let weight = 0
+    let karat = 18
+    let images: string[] = []
+    let intrinsicValue = Number(payment.amount)
+
+    if (payment.listingId) {
+      const listing = await manager.findOne(UsedGoldListing, { where: { id: payment.listingId } })
+      if (!listing) throw new NotFoundException('آگهی مرتبط با escrow یافت نشد')
+      name = listing.title
+      productId = listing.productId
+      weight = Number(listing.weight)
+      karat = Number(listing.karat)
+      images = listing.images ?? []
+      intrinsicValue = Number(listing.intrinsicGoldValue ?? payment.amount)
+    } else if (payment.auctionId) {
+      const auction = await manager.findOne(Auction, { where: { id: payment.auctionId } })
+      if (!auction) throw new NotFoundException('مزایده مرتبط با escrow یافت نشد')
+      productId = auction.productId
+      intrinsicValue = Number(auction.intrinsicGoldValue ?? payment.amount)
+      if (productId) {
+        const product = await manager.findOne(Product, { where: { id: productId } })
+        if (product) {
+          name = product.name
+          category = String(product.category)
+          weight = Number(product.weight)
+          karat = Number(product.karat)
+          images = product.images ?? []
+        }
+      }
+    }
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw new BadRequestException('وزن دارایی برای انتقال مالکیت معتبر نیست')
+    }
+
+    const asset = manager.create(SmartVaultAsset, {
+      userId: payment.buyerId,
+      productId,
+      orderId: payment.orderId,
+      sourceEscrowId: payment.id,
+      name,
+      category,
+      weight,
+      karat,
+      purchasePrice: Number(payment.amount),
+      purchaseDate: new Date(),
+      currentRawGoldValue: intrinsicValue,
+      currentValue: intrinsicValue,
+      profitLoss: intrinsicValue - Number(payment.amount),
+      profitLossPercent: Number(payment.amount) > 0 ? ((intrinsicValue - Number(payment.amount)) / Number(payment.amount)) * 100 : 0,
+      images,
+      metadata: { ownershipSource: 'escrow_release', escrowId: payment.id, sellerId: payment.sellerId },
+    })
+    await manager.save(SmartVaultAsset, asset)
   }
 
   async openDispute(id: string, userId: string, reason: string): Promise<EscrowPayment> {

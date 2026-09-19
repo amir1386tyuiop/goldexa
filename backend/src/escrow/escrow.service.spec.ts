@@ -8,6 +8,7 @@ import { MarketplaceRating } from './marketplace-rating.entity'
 import { UsedGoldListing, UsedGoldListingStatus, UsedGoldListingSaleType } from '../marketplace/used-gold-listing.entity'
 import { Auction, AuctionStatus } from '../auctions/auction.entity'
 import { WalletService } from '../wallet/wallet.service'
+import { SmartVaultAsset } from '../smart-vault/smart-vault-asset.entity'
 
 describe('EscrowService security boundaries', () => {
   let service: EscrowService
@@ -17,7 +18,7 @@ describe('EscrowService security boundaries', () => {
   let auctionRepository: { findOneBy: jest.Mock }
   let walletService: { ensureWalletForUser: jest.Mock; holdEscrow: jest.Mock; releaseEscrow: jest.Mock; refundEscrow: jest.Mock }
   let dataSource: { transaction: jest.Mock }
-  let transactionManager: { findOne: jest.Mock; save: jest.Mock; update: jest.Mock }
+  let transactionManager: { findOne: jest.Mock; save: jest.Mock; update: jest.Mock; create: jest.Mock }
 
   beforeEach(async () => {
     escrowRepository = {
@@ -43,6 +44,7 @@ describe('EscrowService security boundaries', () => {
           : escrowRepository.findOneBy(options.where)),
       save: jest.fn(async (...args) => args.length === 2 ? args[1] : args[0]),
       update: jest.fn(),
+      create: jest.fn((_entity, value) => value),
     }
     dataSource = { transaction: jest.fn(async (callback) => callback(transactionManager)) }
 
@@ -53,6 +55,7 @@ describe('EscrowService security boundaries', () => {
         { provide: getRepositoryToken(MarketplaceRating), useValue: ratingRepository },
         { provide: getRepositoryToken(UsedGoldListing), useValue: listingRepository },
         { provide: getRepositoryToken(Auction), useValue: auctionRepository },
+        { provide: getRepositoryToken(SmartVaultAsset), useValue: { findOneBy: jest.fn() } },
         { provide: DataSource, useValue: dataSource },
         { provide: WalletService, useValue: walletService },
       ],
@@ -234,5 +237,29 @@ describe('EscrowService security boundaries', () => {
     expect(auction.paymentDeadlineAt).toBeNull()
     expect(transactionManager.save).toHaveBeenCalledWith(Auction, auction)
     expect(released?.status).toBe(EscrowPaymentStatus.RELEASED)
+  })
+
+  it('transfers a released used-gold listing into the buyer vault exactly once', async () => {
+    const payment = {
+      id: 'escrow-listing-1', listingId: 'listing-1', orderId: 'order-1',
+      status: EscrowPaymentStatus.HELD, buyerId: 'buyer-1', sellerId: 'seller-1', amount: 100, fee: 5,
+    }
+    const listing = {
+      id: 'listing-1', title: 'انگشتر دست‌دوم', sellerId: 'seller-1', productId: 'product-1',
+      weight: 2, karat: 18, images: ['ring.jpg'], intrinsicGoldValue: 90,
+    }
+    escrowRepository.findOneBy.mockResolvedValue(payment)
+    transactionManager.findOne.mockImplementation(async (entity, options) => {
+      if (entity === SmartVaultAsset) return null
+      if (entity === UsedGoldListing) return listing
+      return escrowRepository.findOneBy(options?.where)
+    })
+
+    const released = await service.updatePaymentStatus(payment.id, { status: EscrowPaymentStatus.RELEASED })
+
+    expect(released?.status).toBe(EscrowPaymentStatus.RELEASED)
+    expect(transactionManager.save).toHaveBeenCalledWith(SmartVaultAsset, expect.objectContaining({
+      userId: 'buyer-1', sourceEscrowId: payment.id, orderId: 'order-1', weight: 2,
+    }))
   })
 })

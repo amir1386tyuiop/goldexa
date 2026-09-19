@@ -14,6 +14,9 @@ export class SmartVaultAsset {
   @Column({ name: 'order_id', nullable: true })
   orderId: string | null
 
+  @Column({ name: 'source_escrow_id', nullable: true, unique: true })
+  sourceEscrowId: string | null
+
   @Column()
   name: string
 
