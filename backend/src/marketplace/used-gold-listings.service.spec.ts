@@ -1,12 +1,13 @@
 import { BadRequestException } from '@nestjs/common'
 import { UsedGoldListingsService } from './used-gold-listings.service'
-import { UsedGoldListingSaleType, UsedGoldListingStatus } from './used-gold-listing.entity'
+import { UsedGoldListingSaleType, UsedGoldListingStatus, UsedGoldSource } from './used-gold-listing.entity'
 import { EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
 
 describe('UsedGoldListingsService', () => {
   const listingRepository = {
     create: jest.fn((value) => value),
     save: jest.fn(async (value) => ({ id: 'listing-1', ...value })),
+    findOne: jest.fn(async () => null),
   }
   const userRepository = {
     findOneBy: jest.fn(async () => ({ id: 'seller-1', name: 'فروشنده واقعی' })),
@@ -49,6 +50,38 @@ describe('UsedGoldListingsService', () => {
       sellerId: 'seller-1', sellerName: 'x', title: 'x', description: 'x', weight: 1, karat: 18,
       saleType: UsedGoldListingSaleType.AUCTION, startingPrice: 1000,
     })).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('requires a delivered matching Goldexa order for internal-asset listings', async () => {
+    const orderRepository = {
+      findOneBy: jest.fn().mockResolvedValue({
+        id: 'order-1', userId: 'seller-1', status: 'delivered',
+        items: [{ productId: 'product-1', weight: 2, karat: 18 }],
+      }),
+      findOne: jest.fn().mockResolvedValue(null),
+    }
+    const ownedAssetService = new UsedGoldListingsService(
+      listingRepository as never,
+      userRepository as never,
+      dataSource as never,
+      walletService as never,
+      undefined,
+      orderRepository as never,
+    )
+    await expect(ownedAssetService.createListing({
+      sellerId: 'seller-1', sellerName: 'x', orderId: 'order-1', productId: 'product-1',
+      source: UsedGoldSource.GOLDEKSA_PURCHASE, title: 'انگشتر', description: 'x', weight: 2, karat: 18,
+      saleType: UsedGoldListingSaleType.DIRECT, fixedPrice: 1000,
+    })).resolves.toMatchObject({ status: UsedGoldListingStatus.PENDING_REVIEW })
+
+    orderRepository.findOneBy.mockResolvedValue({
+      id: 'order-1', userId: 'seller-1', status: 'paid', items: [{ productId: 'product-1', weight: 2, karat: 18 }],
+    })
+    await expect(ownedAssetService.createListing({
+      sellerId: 'seller-1', sellerName: 'x', orderId: 'order-1', productId: 'product-1',
+      source: UsedGoldSource.GOLDEKSA_PURCHASE, title: 'انگشتر', description: 'x', weight: 2, karat: 18,
+      saleType: UsedGoldListingSaleType.DIRECT, fixedPrice: 1000,
+    })).rejects.toThrow('تحویل‌شده')
   })
 
   it('atomically moves a direct listing into sold and holds the buyer funds', async () => {

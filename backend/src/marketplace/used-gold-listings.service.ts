@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { DataSource, Repository } from 'typeorm'
+import { DataSource, In, Repository } from 'typeorm'
 import {
   UsedGoldListing,
   UsedGoldListingSaleType,
   UsedGoldListingStatus,
   UsedGoldQualityStatus,
+  UsedGoldSource,
 } from './used-gold-listing.entity'
 import {
   CreateUsedGoldListingDto,
@@ -30,6 +31,7 @@ export class UsedGoldListingsService {
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
     @Optional() private readonly goldPricing?: GoldPricingService,
+    @Optional() @InjectRepository(Order) private readonly orderRepository?: Repository<Order>,
   ) {}
 
   async findAll(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
@@ -66,6 +68,35 @@ export class UsedGoldListingsService {
 
     if (!seller) {
       throw new NotFoundException('فروشنده یافت نشد')
+    }
+
+    const internalAsset = Boolean(data.orderId) || data.source === UsedGoldSource.GOLDEKSA_PURCHASE
+    if (internalAsset) {
+      if (!data.orderId || !this.orderRepository) {
+        throw new BadRequestException('برای فروش دارایی گلدکسا، سفارش منبع الزامی است')
+      }
+      const sourceOrder = await this.orderRepository.findOneBy({ id: data.orderId })
+      if (!sourceOrder || sourceOrder.userId !== seller.id || sourceOrder.status !== OrderStatus.DELIVERED) {
+        throw new BadRequestException('فقط طلای تحویل‌شده‌ی متعلق به همین کاربر قابل ثبت در بازار است')
+      }
+      const items = Array.isArray(sourceOrder.items) ? sourceOrder.items as Array<Record<string, unknown>> : []
+      const matchingItem = items.some((item) =>
+        (!data.productId || String(item.productId ?? '') === data.productId) &&
+        Number(item.weight ?? 0) > 0 && Math.abs(Number(item.weight) - data.weight) <= 0.01 &&
+        Number(item.karat ?? 0) === data.karat,
+      )
+      if (!matchingItem) {
+        throw new BadRequestException('وزن، عیار یا محصول آگهی با سفارش منبع مطابقت ندارد')
+      }
+      const priorListing = await this.listingRepository.findOne({
+        where: { orderId: data.orderId, status: In([
+          UsedGoldListingStatus.PENDING_REVIEW,
+          UsedGoldListingStatus.APPROVED,
+          UsedGoldListingStatus.ACTIVE,
+          UsedGoldListingStatus.SOLD,
+        ]) },
+      })
+      if (priorListing) throw new BadRequestException('این دارایی قبلاً در بازار ثبت شده است')
     }
 
     if (!Number.isFinite(data.weight) || data.weight <= 0 || !Number.isInteger(data.karat) || data.karat < 1 || data.karat > 24) {
