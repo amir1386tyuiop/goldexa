@@ -1899,7 +1899,7 @@ export const api = {
     }>('/admin/stats'),
   getAdminReports: () =>
     request<{
-      revenue: { totalPaidPayments: number; paidPaymentCount: number; totalOrderValue: number; orderCount: number; escrowFees: number; refunds: number; refundCount: number; netOrderValue: number }
+      revenue: { totalPaidPayments: number; paidPaymentCount: number; totalOrderValue: number; orderCount: number; escrowFees: number; refunds: number; refundCount: number; netOrderValue: number; escrowCommissionEarned: number; auctionCommissionEarned: number; totalPlatformCommission: number; settledAuctionGross: number; settledAuctionCount: number; paidPayouts: number; paidPayoutCount: number; operationalNetAfterRefunds: number }
       ordersByStatus: Array<{ status: string; count: number }>
       generatedAt: string
     }>('/admin/reports'),

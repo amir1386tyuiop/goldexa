@@ -22,6 +22,8 @@ describe('AdminService financial reports', () => {
       .mockReturnValueOnce(queryBuilder(null, [{ status: 'paid', count: '2' }])) }
     service.refundRepository = { createQueryBuilder: () => queryBuilder({ total: '250', count: '1' }) }
     service.escrowRepository = { createQueryBuilder: () => queryBuilder({ total: '40' }) }
+    service.auctionRepository = { createQueryBuilder: () => queryBuilder({ total: '15', gross: '500', count: '1' }) }
+    service.payoutRepository = { createQueryBuilder: () => queryBuilder({ total: '100', count: '1' }) }
 
     const report = await service.getReports()
 
@@ -31,6 +33,8 @@ describe('AdminService financial reports', () => {
       refunds: 250,
       refundCount: 1,
       netOrderValue: 1950,
+      totalPlatformCommission: 55,
+      paidPayouts: 100,
     }))
     expect(report.ordersByStatus).toEqual([{ status: 'paid', count: 2 }])
   })
