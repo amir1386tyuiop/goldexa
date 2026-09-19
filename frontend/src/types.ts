@@ -290,6 +290,7 @@ export interface UsedGoldListing {
   sellerName: string
   productId?: string | null
   orderId?: string | null
+  vaultAssetId?: string | null
   source: UsedGoldSource
   title: string
   description: string

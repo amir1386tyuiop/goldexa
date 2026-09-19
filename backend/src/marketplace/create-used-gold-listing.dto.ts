@@ -27,6 +27,10 @@ export class CreateUsedGoldListingDto {
   orderId?: string | null
 
   @IsOptional()
+  @IsString()
+  vaultAssetId?: string | null
+
+  @IsOptional()
   @IsEnum(UsedGoldSource)
   source?: UsedGoldSource
 

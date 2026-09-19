@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Clock, Gavel, Plus, Search, Star, TrendingUp, UserCheck } from 'lucide-react'
 import { api } from '@/api/client'
@@ -18,7 +19,10 @@ const emptyBidder: AuctionBid = {
 }
 
 export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctions' | 'marketplace' | 'create' }) {
-  const [activeTab, setActiveTab] = useState(initialTab)
+  const [searchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab') as 'auctions' | 'marketplace' | 'create' | null
+  const vaultAssetId = searchParams.get('vaultAssetId')
+  const [activeTab, setActiveTab] = useState(requestedTab || initialTab)
   const [search, setSearch] = useState('')
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null)
   const [selectedListing, setSelectedListing] = useState<UsedGoldListing | null>(null)
@@ -153,7 +157,7 @@ export function AuctionsPage({ initialTab = 'auctions' }: { initialTab?: 'auctio
         </div>
 
         {activeTab === 'create' ? (
-          <CreateListingPanel products={products} />
+          <CreateListingPanel products={products} vaultAssetId={vaultAssetId} />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
@@ -443,7 +447,10 @@ function AuctionDetailPanel({
   )
 }
 
-function CreateListingPanel({ products }: { products: Product[] }) {
+function CreateListingPanel({ products, vaultAssetId }: { products: Product[]; vaultAssetId?: string | null }) {
+  const navigate = useNavigate()
+  const vaultQuery = useQuery({ queryKey: ['smart-vault', 'listing-asset', vaultAssetId], queryFn: () => api.getVaultAssets(getStoredAuth()?.user.id || ''), enabled: Boolean(vaultAssetId) })
+  const selectedAsset = vaultQuery.data?.find((asset) => asset.id === vaultAssetId)
   const [form, setForm] = useState({
     sellerId: getStoredAuth()?.user.id || '',
     sellerName: getStoredAuth()?.user.name || '',
@@ -455,10 +462,26 @@ function CreateListingPanel({ products }: { products: Product[] }) {
     saleType: 'auction',
     startingPrice: '',
     fixedPrice: '',
+    minimumBidIncrement: '1000',
   })
+  useEffect(() => {
+    if (selectedAsset) setForm((current) => ({ ...current, productId: selectedAsset.productId || '', title: selectedAsset.name, weight: String(selectedAsset.weight), karat: String(selectedAsset.karat) }))
+  }, [selectedAsset])
+  const createMutation = useMutation({
+    mutationFn: () => api.createUsedGoldListing({
+      sellerId: getStoredAuth()?.user.id || '', sellerName: getStoredAuth()?.user.name || '',
+      productId: form.productId || selectedAsset?.productId || null, vaultAssetId: vaultAssetId || null,
+      title: form.title, description: form.description || 'آگهی ثبت‌شده از خزانه هوشمند',
+      weight: Number(form.weight), karat: Number(form.karat), saleType: form.saleType as 'auction' | 'direct',
+      startingPrice: form.startingPrice ? Number(form.startingPrice) : null, fixedPrice: form.fixedPrice ? Number(form.fixedPrice) : null,
+      minimumBidIncrement: form.minimumBidIncrement ? Number(form.minimumBidIncrement) : null,
+    }),
+    onSuccess: () => navigate('/marketplace'),
+  })
+  function submit(event: FormEvent) { event.preventDefault(); createMutation.mutate() }
 
   return (
-    <div className="card p-6">
+    <form className="card p-6" onSubmit={submit}>
       <div className="flex items-center gap-3 mb-6">
         <Plus className="h-6 w-6 text-gold-600" />
         <div>
@@ -521,6 +544,7 @@ function CreateListingPanel({ products }: { products: Product[] }) {
           className="input"
           placeholder={form.saleType === 'auction' ? 'قیمت پایه مزایده' : 'قیمت ثابت فروش'}
         />
+        {form.saleType === 'auction' ? <input type="number" value={form.minimumBidIncrement} onChange={(event) => setForm({ ...form, minimumBidIncrement: event.target.value })} className="input" placeholder="حداقل افزایش پیشنهاد" /> : null}
         <input
           value={form.karat}
           onChange={(event) => setForm({ ...form, karat: event.target.value })}
@@ -529,10 +553,12 @@ function CreateListingPanel({ products }: { products: Product[] }) {
         />
       </div>
 
-      <button className="btn btn-primary mt-6 w-full md:w-auto">
-        ارسال برای بررسی کارشناسی
+      {vaultAssetId ? <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">این آگهی به دارایی خزانه متصل است و پس از معامله مالکیت آن منتقل می‌شود.</p> : null}
+      {createMutation.isError ? <p className="mt-3 text-sm text-red-700" role="alert">ثبت آگهی ناموفق بود؛ اطلاعات دارایی و قیمت را بررسی کنید.</p> : null}
+      <button type="submit" disabled={createMutation.isPending || !form.title || !form.weight || (form.saleType === 'auction' ? !form.startingPrice : !form.fixedPrice)} className="btn btn-primary mt-6 w-full md:w-auto">
+        {createMutation.isPending ? 'در حال ارسال…' : 'ارسال برای بررسی کارشناسی'}
       </button>
-    </div>
+    </form>
   )
 }
 

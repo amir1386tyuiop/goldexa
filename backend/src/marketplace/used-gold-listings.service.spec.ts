@@ -84,6 +84,25 @@ describe('UsedGoldListingsService', () => {
     })).rejects.toThrow('تحویل‌شده')
   })
 
+  it('allows a seller to create a listing from an owned vault asset once', async () => {
+    const vaultAssets = {
+      findOneBy: jest.fn().mockResolvedValue({ id: 'asset-1', userId: 'seller-1', weight: 2, karat: 18 }),
+    }
+    const vaultService = new UsedGoldListingsService(
+      listingRepository as never,
+      userRepository as never,
+      dataSource as never,
+      walletService as never,
+      undefined,
+      undefined,
+      vaultAssets as never,
+    )
+    await expect(vaultService.createListing({
+      sellerId: 'seller-1', sellerName: 'x', vaultAssetId: 'asset-1', title: 'انگشتر', description: 'x',
+      weight: 2, karat: 18, saleType: UsedGoldListingSaleType.DIRECT, fixedPrice: 1000,
+    })).resolves.toMatchObject({ vaultAssetId: 'asset-1', status: UsedGoldListingStatus.PENDING_REVIEW })
+  })
+
   it('atomically moves a direct listing into sold and holds the buyer funds', async () => {
     const listing = {
       id: 'listing-1', sellerId: 'seller-1', sellerName: 'فروشنده واقعی', title: 'انگشتر',

@@ -93,6 +93,7 @@
 - بازار دست‌دوم endpoint مدیریتی و پنل moderation دارد؛ انتقال وضعیت آگهی با state machine انجام می‌شود و فعال‌سازی بدون تأیید کارشناسی رد می‌شود.
 - پس از release موفق escrow، انتقال مالکیت به‌صورت atomic در `smart_vault_assets` خریدار ثبت می‌شود؛ `source_escrow_id` یکتا از ایجاد دارایی تکراری در retry جلوگیری می‌کند و در صورت خطا کل تسویه rollback می‌شود.
 - ساخت مستقیم دارایی Smart Vault دیگر با قیمت دلخواه مجاز نیست؛ فقط سفارش `delivered` متعلق به همان کاربر و با تطابق محصول، وزن و عیار پذیرفته می‌شود.
+- ثبت آگهی از Smart Vault اکنون با `vaultAssetId` انجام می‌شود؛ مالکیت دارایی در release escrow با lock منتقل می‌شود و `last_transfer_escrow_id` جلوی انتقال تکراری را می‌گیرد.
 - چرخه‌ی refund سفارش نیز کامل‌تر شد: `GET /admin/refunds` درخواست‌های pending را فهرست می‌کند و `PATCH /admin/refunds/:id` با approve/reject تعیین تکلیف می‌کند؛ approve سفارش wallet در transaction قفل‌شده، credit idempotent به کیف پول انجام می‌دهد و سفارش online تا اتصال provider واقعی عمداً approve نمی‌شود.
 - هنگام قطع منبع قیمت، علاوه بر audit/log به همه‌ی کاربران admin اعلان in-app `gold_price_source_down` ارسال می‌شود؛ خطای notification هرگز feed قیمت را متوقف نمی‌کند.
 - ممیزی dependency در این مرحله، Axios را به `1.20.0`، Sharp را به `0.35.4`، TypeORM را به `0.3.31` و Socket.IO parser را به `4.2.7` ارتقا داد؛ آسیب‌پذیری‌های باقی‌مانده به زنجیره‌ی Nest 10 و ابزارهای transitive مربوط‌اند و رفع کامل آن‌ها نیازمند migration کنترل‌شده به Nest 12 است، بنابراین `npm audit fix --force` اجرا نشده است.

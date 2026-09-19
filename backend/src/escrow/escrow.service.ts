@@ -276,6 +276,27 @@ export class EscrowService {
       karat = Number(listing.karat)
       images = listing.images ?? []
       intrinsicValue = Number(listing.intrinsicGoldValue ?? payment.amount)
+      if (listing.vaultAssetId) {
+        const asset = await manager.findOne(SmartVaultAsset, {
+          where: { id: listing.vaultAssetId },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!asset) throw new NotFoundException('دارایی صندوقچه مرتبط با آگهی یافت نشد')
+        if (asset.lastTransferEscrowId === payment.id) return
+        if (asset.userId !== payment.sellerId) throw new BadRequestException('مالک فعلی دارایی با فروشنده یکسان نیست')
+        asset.userId = payment.buyerId
+        asset.orderId = payment.orderId
+        asset.lastTransferEscrowId = payment.id
+        asset.purchasePrice = Number(payment.amount)
+        asset.purchaseDate = new Date()
+        asset.currentRawGoldValue = intrinsicValue
+        asset.currentValue = intrinsicValue
+        asset.profitLoss = intrinsicValue - Number(payment.amount)
+        asset.profitLossPercent = Number(payment.amount) > 0 ? ((intrinsicValue - Number(payment.amount)) / Number(payment.amount)) * 100 : 0
+        asset.metadata = { ...(asset.metadata && typeof asset.metadata === 'object' ? asset.metadata as Record<string, unknown> : {}), lastOwnershipTransfer: { escrowId: payment.id, previousOwnerId: payment.sellerId, transferredAt: new Date().toISOString() } }
+        await manager.save(SmartVaultAsset, asset)
+        return
+      }
     } else if (payment.auctionId) {
       const auction = await manager.findOne(Auction, { where: { id: payment.auctionId } })
       if (!auction) throw new NotFoundException('مزایده مرتبط با escrow یافت نشد')

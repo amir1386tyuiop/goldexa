@@ -20,6 +20,7 @@ import { EscrowPayment, EscrowPaymentStatus } from '../escrow/escrow-payment.ent
 import { WalletService } from '../wallet/wallet.service'
 import { randomUUID } from 'crypto'
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
+import { SmartVaultAsset } from '../smart-vault/smart-vault-asset.entity'
 
 @Injectable()
 export class UsedGoldListingsService {
@@ -32,6 +33,7 @@ export class UsedGoldListingsService {
     private readonly walletService: WalletService,
     @Optional() private readonly goldPricing?: GoldPricingService,
     @Optional() @InjectRepository(Order) private readonly orderRepository?: Repository<Order>,
+    @Optional() @InjectRepository(SmartVaultAsset) private readonly vaultAssetRepository?: Repository<SmartVaultAsset>,
   ) {}
 
   async findAll(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
@@ -73,8 +75,25 @@ export class UsedGoldListingsService {
       throw new NotFoundException('فروشنده یافت نشد')
     }
 
-    const internalAsset = Boolean(data.orderId) || data.source === UsedGoldSource.GOLDEKSA_PURCHASE
+    const internalAsset = Boolean(data.orderId) || Boolean(data.vaultAssetId) || data.source === UsedGoldSource.GOLDEKSA_PURCHASE
     if (internalAsset) {
+      if (data.vaultAssetId) {
+        if (!this.vaultAssetRepository) throw new BadRequestException('صندوقچه در دسترس نیست')
+        const asset = await this.vaultAssetRepository.findOneBy({ id: data.vaultAssetId })
+        if (!asset || asset.userId !== seller.id) throw new BadRequestException('این دارایی صندوقچه متعلق به فروشنده نیست')
+        if (Math.abs(Number(asset.weight) - data.weight) > 0.01 || Number(asset.karat) !== data.karat) {
+          throw new BadRequestException('وزن یا عیار آگهی با دارایی صندوقچه مطابقت ندارد')
+        }
+        const priorListing = await this.listingRepository.findOne({
+          where: { vaultAssetId: data.vaultAssetId, status: In([
+            UsedGoldListingStatus.PENDING_REVIEW,
+            UsedGoldListingStatus.APPROVED,
+            UsedGoldListingStatus.ACTIVE,
+            UsedGoldListingStatus.SOLD,
+          ]) },
+        })
+        if (priorListing) throw new BadRequestException('این دارایی صندوقچه قبلاً در بازار ثبت شده است')
+      } else {
       if (!data.orderId || !this.orderRepository) {
         throw new BadRequestException('برای فروش دارایی گلدکسا، سفارش منبع الزامی است')
       }
@@ -100,6 +119,7 @@ export class UsedGoldListingsService {
         ]) },
       })
       if (priorListing) throw new BadRequestException('این دارایی قبلاً در بازار ثبت شده است')
+      }
     }
 
     if (!Number.isFinite(data.weight) || data.weight <= 0 || !Number.isInteger(data.karat) || data.karat < 1 || data.karat > 24) {
@@ -127,6 +147,7 @@ export class UsedGoldListingsService {
       ...data,
       sellerId: seller.id,
       sellerName: seller.name,
+      vaultAssetId: data.vaultAssetId ?? null,
       images: data.images ?? [],
       stones: data.stones ?? null,
       dimensions: data.dimensions ?? null,

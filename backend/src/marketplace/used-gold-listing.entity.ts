@@ -51,6 +51,9 @@ export class UsedGoldListing {
   @Column({ name: 'order_id', nullable: true })
   orderId: string | null
 
+  @Column({ name: 'vault_asset_id', nullable: true })
+  vaultAssetId: string | null
+
   @Column({
     type: 'enum',
     enum: UsedGoldSource,
