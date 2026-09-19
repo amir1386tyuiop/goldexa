@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SmartVaultAsset } from './smart-vault-asset.entity'
@@ -11,6 +11,7 @@ import {
 } from './create-smart-vault.dto'
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 import { GoldPriceType } from '../gold-pricing/gold-price.entity'
+import { Order, OrderStatus } from '../orders/order.entity'
 
 @Injectable()
 export class SmartVaultService {
@@ -22,6 +23,7 @@ export class SmartVaultService {
     @InjectRepository(PriceAlert)
     private alertRepository: Repository<PriceAlert>,
     @Optional() private readonly goldPricing?: GoldPricingService,
+    @Optional() @InjectRepository(Order) private readonly orderRepository?: Repository<Order>,
   ) {}
 
   async findAssets(userId: string): Promise<SmartVaultAsset[]> {
@@ -62,6 +64,19 @@ export class SmartVaultService {
   }
 
   async createAsset(data: CreateSmartVaultAssetDto): Promise<SmartVaultAsset> {
+    if (!data.userId || !data.orderId || !this.orderRepository) {
+      throw new BadRequestException('دارایی صندوقچه فقط از سفارش تحویل‌شده قابل ثبت است')
+    }
+    const order = await this.orderRepository.findOneBy({ id: data.orderId, userId: data.userId, status: OrderStatus.DELIVERED })
+    if (!order) throw new BadRequestException('فقط سفارش تحویل‌شده‌ی متعلق به همین کاربر قابل افزودن به صندوقچه است')
+    const items = Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : []
+    const matchesOrderItem = items.some((item) =>
+      (!data.productId || String(item.productId ?? '') === data.productId) &&
+      Math.abs(Number(item.weight ?? 0) - Number(data.weight)) <= 0.01 &&
+      Number(item.karat ?? 0) === Number(data.karat ?? 18),
+    )
+    if (!matchesOrderItem) throw new BadRequestException('مشخصات دارایی با اقلام سفارش تحویل‌شده مطابقت ندارد')
+
     const asset = this.assetRepository.create({
       ...data,
       currentRawGoldValue: data.purchasePrice,

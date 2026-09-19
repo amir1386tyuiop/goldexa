@@ -18,4 +18,12 @@ describe('SmartVaultService', () => {
     const service = new SmartVaultService(assets as never, snapshots as never, alerts as never)
     await expect(service.createSnapshot({ assetId: 'a1', userId: 'attacker', rawGoldValue: 1, totalValue: 1, profitLoss: 0, goldPrice: 1 })).rejects.toThrow()
   })
+
+  it('rejects creating an unverified vault asset without a delivered order', async () => {
+    const service = new SmartVaultService(assets as never, snapshots as never, alerts as never)
+    await expect(service.createAsset({
+      userId: 'u1', name: 'جعلی', weight: 2, karat: 18, purchasePrice: 100,
+      purchaseDate: new Date(), orderId: null,
+    })).rejects.toThrow('سفارش تحویل‌شده')
+  })
 })
