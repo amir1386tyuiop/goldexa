@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, SetMetadata } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { CacheService } from './cache.service'
 
 export interface RateLimitOptions {
   limit: number
@@ -19,11 +20,9 @@ export const RateLimit = (options: RateLimitOptions) => SetMetadata(RATE_LIMIT_K
  */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
-  private readonly hits = new Map<string, number[]>()
+  constructor(private readonly reflector: Reflector, private readonly cache: CacheService) {}
 
-  constructor(private readonly reflector: Reflector) {}
-
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const options = this.reflector.getAllAndOverride<RateLimitOptions | undefined>(RATE_LIMIT_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -38,22 +37,9 @@ export class RateLimitGuard implements CanActivate {
       'unknown'
     const routeKey = `${request.method}:${request.route?.path ?? request.url}:${ip}`
 
-    const now = Date.now()
-    const windowStart = now - options.windowMs
-    const timestamps = (this.hits.get(routeKey) ?? []).filter((t) => t > windowStart)
-
-    if (timestamps.length >= options.limit) {
+    const allowed = await this.cache.consumeRateLimit(routeKey, options.limit, options.windowMs)
+    if (!allowed) {
       throw new HttpException('تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.', HttpStatus.TOO_MANY_REQUESTS)
-    }
-
-    timestamps.push(now)
-    this.hits.set(routeKey, timestamps)
-
-    // Opportunistic cleanup to bound memory.
-    if (this.hits.size > 5000) {
-      for (const [key, value] of this.hits) {
-        if (value.every((t) => t <= windowStart)) this.hits.delete(key)
-      }
     }
     return true
   }

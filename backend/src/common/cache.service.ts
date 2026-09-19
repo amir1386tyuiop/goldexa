@@ -14,6 +14,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   private client: Redis | null = null
   private redisReady = false
   private readonly memory = new Map<string, { value: string; expiresAt: number }>()
+  private readonly rateMemory = new Map<string, { count: number; resetAt: number }>()
 
   async onModuleInit(): Promise<void> {
     if ((process.env.CACHE_DRIVER ?? 'redis').toLowerCase() === 'memory') {
@@ -111,6 +112,36 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       }
     }
     this.memory.delete(namespacedKey)
+  }
+
+  /** Atomically consumes one rate-limit slot across API replicas when Redis is available. */
+  async consumeRateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+    const namespacedKey = this.keyFor(`rate-limit:${key}`)
+    const ttlSeconds = Math.max(1, Math.ceil(windowMs / 1000))
+
+    if (this.redisReady && this.client) {
+      try {
+        const count = await this.client.incr(namespacedKey)
+        if (count === 1) await this.client.expire(namespacedKey, ttlSeconds)
+        return count <= limit
+      } catch {
+        // Fall through to the local window during a short Redis outage.
+      }
+    }
+
+    const now = Date.now()
+    const current = this.rateMemory.get(namespacedKey)
+    const entry = !current || current.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : current
+    entry.count += 1
+    this.rateMemory.set(namespacedKey, entry)
+    if (this.rateMemory.size > 5000) {
+      for (const [rateKey, value] of this.rateMemory) {
+        if (value.resetAt <= now) this.rateMemory.delete(rateKey)
+      }
+    }
+    return entry.count <= limit
   }
 
   private keyFor(key: string): string {

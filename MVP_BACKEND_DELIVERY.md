@@ -79,6 +79,7 @@
 - پایان مزایده دیگر به‌اشتباه `settled/completed` نمی‌شود؛ تا زمان پرداخت برنده در `awaiting_payment` می‌ماند و بعد از پرداخت به escrow متصل می‌شود.
 - هنگام `HELD` شدن escrow، مزایده به `escrow_held` و هنگام release به‌صورت transactional به `completed/settled` می‌رود؛ refund نیز مزایده را `failed/refunded` می‌کند تا کیف پول، escrow، سفارش و گزارش مزایده از هم جدا نشوند.
 - مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ تست E2E ایزوله‌ی PostgreSQL نیز خرید مستقیم، hold کیف پول، ارسال، release و بازکردن dispute را پوشش می‌دهد.
+- rate-limit مربوط به OTP و login اکنون از CacheService استفاده می‌کند؛ در صورت دسترسی Redis، شمارش با `INCR/EXPIRE` بین replicaها مشترک است و فقط در fallback توسعه‌ای به حافظه برمی‌گردد.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.

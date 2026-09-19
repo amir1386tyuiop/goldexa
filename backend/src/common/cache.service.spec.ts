@@ -38,4 +38,13 @@ describe('CacheService fallback cache', () => {
     await cache.del('pricing:quote:Q-2')
     await expect(cache.get('pricing:quote:Q-2')).resolves.toBeNull()
   })
+
+  it('enforces a bounded rate-limit window in the fallback cache', async () => {
+    const cache = new CacheService()
+    await cache.onModuleInit()
+
+    await expect(cache.consumeRateLimit('otp:127.0.0.1', 2, 60_000)).resolves.toBe(true)
+    await expect(cache.consumeRateLimit('otp:127.0.0.1', 2, 60_000)).resolves.toBe(true)
+    await expect(cache.consumeRateLimit('otp:127.0.0.1', 2, 60_000)).resolves.toBe(false)
+  })
 })
