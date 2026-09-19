@@ -82,6 +82,7 @@
 - rate-limit مربوط به OTP و login اکنون از CacheService استفاده می‌کند؛ در صورت دسترسی Redis، شمارش با `INCR/EXPIRE` بین replicaها مشترک است و فقط در fallback توسعه‌ای به حافظه برمی‌گردد.
 - مزایده اکنون gateway زنده‌ی Socket.IO دارد: کلاینت با `auction.join` وارد room می‌شود و هر bid موفق با رویداد `auction.updated` برای همان مزایده broadcast می‌شود؛ Vite و Nginx نیز proxy ارتقای WebSocket را فعال کرده‌اند.
 - چرخه‌ی refund سفارش نیز کامل‌تر شد: `GET /admin/refunds` درخواست‌های pending را فهرست می‌کند و `PATCH /admin/refunds/:id` با approve/reject تعیین تکلیف می‌کند؛ approve سفارش wallet در transaction قفل‌شده، credit idempotent به کیف پول انجام می‌دهد و سفارش online تا اتصال provider واقعی عمداً approve نمی‌شود.
+- هنگام قطع منبع قیمت، علاوه بر audit/log به همه‌ی کاربران admin اعلان in-app `gold_price_source_down` ارسال می‌شود؛ خطای notification هرگز feed قیمت را متوقف نمی‌کند.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.

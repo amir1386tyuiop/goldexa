@@ -4,9 +4,11 @@ import { GoldPrice } from './gold-price.entity'
 import { PriceHistory } from './price-history.entity'
 import { GoldPricingService } from './gold-pricing.service'
 import { GoldPricingController } from './gold-pricing.controller'
+import { User } from '../users/user.entity'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([GoldPrice, PriceHistory])],
+  imports: [TypeOrmModule.forFeature([GoldPrice, PriceHistory, User]), NotificationsModule],
   controllers: [GoldPricingController],
   providers: [GoldPricingService],
   exports: [GoldPricingService],

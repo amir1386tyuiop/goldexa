@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -8,6 +8,8 @@ import { GoldPrice, GoldPriceType } from './gold-price.entity'
 import { PriceHistory } from './price-history.entity'
 import { CacheService } from '../common/cache.service'
 import { AuditLogger } from '../common/audit-logger.service'
+import { User, UserRole } from '../users/user.entity'
+import { NotificationsService } from '../notifications/notifications.service'
 
 interface GoldPriceInput {
   type: GoldPriceType
@@ -36,6 +38,9 @@ export class GoldPricingService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly cache: CacheService,
     private readonly audit: AuditLogger,
+    @Optional() @InjectRepository(User)
+    private readonly userRepository?: Repository<User>,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   /** Raise an admin alert (audit + log) the first time the source goes down. */
@@ -48,6 +53,23 @@ export class GoldPricingService implements OnModuleInit {
         entityType: 'gold_price',
         metadata: { reason, at: new Date().toISOString() },
       })
+      await this.notifyAdministrators(reason)
+    }
+  }
+
+  private async notifyAdministrators(reason: string): Promise<void> {
+    if (!this.userRepository || !this.notifications) return
+    try {
+      const administrators = await this.userRepository.find({ where: { role: UserRole.ADMIN } })
+      await Promise.all(administrators.map((admin) => this.notifications!.create({
+        userId: admin.id,
+        type: 'gold_price_source_down',
+        title: 'منبع قیمت طلا قطع شد',
+        message: 'منبع قیمت لحظه‌ای طلا در دسترس نیست؛ آخرین قیمت معتبر نگه داشته شد.',
+        metadata: { reason },
+      })))
+    } catch (error) {
+      this.logger.warn(`Could not notify administrators about price source: ${(error as Error).message}`)
     }
   }
 
