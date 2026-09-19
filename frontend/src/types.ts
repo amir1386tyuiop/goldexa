@@ -691,6 +691,11 @@ export interface EscrowPayment {
   authority?: string | null
   paymentUrl?: string | null
   trackingCode?: string | null
+  disputeReason?: string | null
+  disputedBy?: string | null
+  disputedAt?: string | null
+  resolutionNote?: string | null
+  resolvedAt?: string | null
   createdAt: string
   updatedAt: string
 }

@@ -87,6 +87,11 @@ export class EscrowService {
         authority: data.authority ?? null,
         paymentUrl: data.paymentUrl ?? null,
         trackingCode: data.trackingCode ?? null,
+        disputeReason: null,
+        disputedBy: null,
+        disputedAt: null,
+        resolutionNote: null,
+        resolvedAt: null,
         // Funds are not considered held until the payment provider confirms them.
         status: EscrowPaymentStatus.INITIATED,
       }),
@@ -160,6 +165,11 @@ export class EscrowService {
       if (!transitions[payment.status].includes(nextStatus)) {
         throw new BadRequestException(`انتقال وضعیت escrow از ${payment.status} به ${nextStatus} مجاز نیست`)
       }
+      if (payment.status === EscrowPaymentStatus.DISPUTED &&
+        [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED].includes(nextStatus) &&
+        !data.resolutionNote?.trim()) {
+        throw new BadRequestException('یادداشت حل اختلاف الزامی است')
+      }
 
       if (nextStatus === EscrowPaymentStatus.HELD) {
         await this.walletService.holdEscrow(payment.buyerId, payment.id, Number(payment.amount), manager)
@@ -173,6 +183,33 @@ export class EscrowService {
 
       payment.status = nextStatus
       payment.trackingCode = data.trackingCode ?? payment.trackingCode
+      if (payment.status === EscrowPaymentStatus.RELEASED || payment.status === EscrowPaymentStatus.REFUNDED) {
+        payment.resolutionNote = data.resolutionNote?.trim() ?? payment.resolutionNote
+        payment.resolvedAt = new Date()
+      }
+      return manager.save(payment)
+    })
+  }
+
+  async openDispute(id: string, userId: string, reason: string): Promise<EscrowPayment> {
+    const cleanReason = reason?.trim()
+    if (!cleanReason) throw new BadRequestException('دلیل اختلاف الزامی است')
+    return this.dataSource.transaction(async (manager) => {
+      const payment = await manager.findOne(EscrowPayment, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!payment) throw new NotFoundException('پرداخت امانی یافت نشد')
+      if (payment.buyerId !== userId && payment.sellerId !== userId) {
+        throw new ForbiddenException('این escrow متعلق به شما نیست')
+      }
+      if (payment.status !== EscrowPaymentStatus.HELD) {
+        throw new BadRequestException('فقط escrow نگه‌داری‌شده قابل اختلاف است')
+      }
+      payment.status = EscrowPaymentStatus.DISPUTED
+      payment.disputeReason = cleanReason
+      payment.disputedBy = userId
+      payment.disputedAt = new Date()
       return manager.save(payment)
     })
   }

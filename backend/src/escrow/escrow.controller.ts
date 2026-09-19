@@ -8,6 +8,7 @@ import {
   CreateMarketplaceRatingDto,
   UpdateEscrowStatusDto,
   ShipEscrowPaymentDto,
+  OpenEscrowDisputeDto,
 } from './create-escrow.dto'
 
 @Controller('escrow')
@@ -53,6 +54,15 @@ export class EscrowController {
   @Post('payments/:id/pay')
   async payFromWallet(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
     return this.escrowService.payFromWallet(id, req.user.sub)
+  }
+
+  @Post('payments/:id/dispute')
+  async openDispute(
+    @Param('id') id: string,
+    @Body() body: OpenEscrowDisputeDto,
+    @Req() req: Request & { user: JwtUser },
+  ) {
+    return this.escrowService.openDispute(id, req.user.sub, body.reason)
   }
 
   @Get('ratings')

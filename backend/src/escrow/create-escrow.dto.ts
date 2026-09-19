@@ -45,6 +45,15 @@ export class UpdateEscrowStatusDto {
   @IsOptional()
   @IsString()
   trackingCode?: string | null
+  @IsOptional()
+  @IsString()
+  resolutionNote?: string | null
+}
+
+export class OpenEscrowDisputeDto {
+  @IsNotEmpty()
+  @IsString()
+  reason: string
 }
 
 export class ShipEscrowPaymentDto {

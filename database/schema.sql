@@ -587,6 +587,11 @@ CREATE TABLE escrow_payments (
     authority VARCHAR(255),
     payment_url TEXT,
     tracking_code VARCHAR(100),
+    dispute_reason TEXT,
+    disputed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    disputed_at TIMESTAMP,
+    resolution_note TEXT,
+    resolved_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -146,4 +146,26 @@ describe('EscrowService security boundaries', () => {
     await service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.REFUNDED })
     expect(walletService.refundEscrow).toHaveBeenCalledWith('buyer-1', 'escrow-1', 100, expect.anything())
   })
+
+  it('opens a dispute for a participant and requires an admin resolution note', async () => {
+    const payment = {
+      id: 'escrow-1', status: EscrowPaymentStatus.HELD,
+      buyerId: 'buyer-1', sellerId: 'seller-1', amount: 100, fee: 0,
+    }
+    escrowRepository.findOneBy.mockResolvedValue(payment)
+
+    const disputed = await service.openDispute('escrow-1', 'buyer-1', 'کالا با توضیحات مطابقت ندارد')
+    expect(disputed.status).toBe(EscrowPaymentStatus.DISPUTED)
+    expect(disputed.disputedBy).toBe('buyer-1')
+
+    await expect(service.updatePaymentStatus('escrow-1', { status: EscrowPaymentStatus.RELEASED }))
+      .rejects.toThrow('یادداشت حل اختلاف الزامی است')
+
+    const resolved = await service.updatePaymentStatus('escrow-1', {
+      status: EscrowPaymentStatus.REFUNDED,
+      resolutionNote: 'مدرک خریدار بررسی و refund تایید شد',
+    })
+    expect(resolved?.status).toBe(EscrowPaymentStatus.REFUNDED)
+    expect(resolved?.resolutionNote).toContain('refund')
+  })
 })

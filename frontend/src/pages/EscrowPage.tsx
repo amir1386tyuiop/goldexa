@@ -116,9 +116,11 @@ function EscrowList({ payments, userId, onChanged }: { payments: EscrowPayment[]
 
 function EscrowCard({ payment, userId, onChanged }: { payment: EscrowPayment; userId?: string; onChanged: () => void }) {
   const [trackingCode, setTrackingCode] = useState('')
+  const [disputeReason, setDisputeReason] = useState('')
   const payMutation = useMutation({ mutationFn: () => api.payEscrowFromWallet(payment.id), onSuccess: onChanged })
   const shipMutation = useMutation({ mutationFn: () => api.shipEscrowPayment(payment.id, trackingCode), onSuccess: onChanged })
   const deliveryMutation = useMutation({ mutationFn: () => api.confirmEscrowDelivery(payment.id), onSuccess: onChanged })
+  const disputeMutation = useMutation({ mutationFn: () => api.openEscrowDispute(payment.id, disputeReason), onSuccess: () => { setDisputeReason(''); onChanged() } })
   const isBuyer = Boolean(userId && payment.buyerId === userId)
   const isSeller = Boolean(userId && payment.sellerId === userId)
 
@@ -139,7 +141,9 @@ function EscrowCard({ payment, userId, onChanged }: { payment: EscrowPayment; us
           {isBuyer && payment.status === 'initiated' && <button type="button" className="btn btn-primary mt-4 w-full" disabled={payMutation.isPending} onClick={() => payMutation.mutate()}>{payMutation.isPending ? 'در حال پرداخت…' : 'پرداخت و قفل مبلغ از کیف پول'}</button>}
           {isSeller && payment.status === 'held' && <div className="mt-4 flex gap-2"><input className="input" aria-label="کد رهگیری ارسال" placeholder="کد رهگیری ارسال" value={trackingCode} onChange={(event) => setTrackingCode(event.target.value)} /><button type="button" className="btn btn-outline shrink-0" disabled={!trackingCode.trim() || shipMutation.isPending} onClick={() => shipMutation.mutate()}>ثبت ارسال</button></div>}
           {isBuyer && payment.status === 'held' && <button type="button" className="btn btn-primary mt-4 w-full" disabled={deliveryMutation.isPending} onClick={() => deliveryMutation.mutate()}>{deliveryMutation.isPending ? 'در حال تایید…' : 'تایید دریافت و آزادسازی مبلغ'}</button>}
-          {(payMutation.isError || shipMutation.isError || deliveryMutation.isError) && <p className="mt-3 text-sm text-red-700" role="alert">عملیات escrow انجام نشد؛ وضعیت و موجودی را بررسی کنید.</p>}
+          {(isBuyer || isSeller) && payment.status === 'held' && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3"><label className="text-xs font-bold text-red-900" htmlFor={`dispute-${payment.id}`}>ثبت اختلاف</label><textarea id={`dispute-${payment.id}`} className="input mt-2 min-h-20 bg-white" placeholder="دلیل اختلاف را توضیح دهید" value={disputeReason} onChange={(event) => setDisputeReason(event.target.value)} /><button type="button" className="btn mt-2 w-full border border-red-300 bg-white text-red-800" disabled={!disputeReason.trim() || disputeMutation.isPending} onClick={() => disputeMutation.mutate()}>{disputeMutation.isPending ? 'در حال ثبت…' : 'ثبت اختلاف و توقف تسویه'}</button></div>}
+          {payment.status === 'disputed' && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-900">این معامله در حال بررسی اختلاف است: {payment.disputeReason || 'دلیل ثبت نشده'}</p>}
+          {(payMutation.isError || shipMutation.isError || deliveryMutation.isError || disputeMutation.isError) && <p className="mt-3 text-sm text-red-700" role="alert">عملیات escrow انجام نشد؛ وضعیت و موجودی را بررسی کنید.</p>}
         </div>
 }
 

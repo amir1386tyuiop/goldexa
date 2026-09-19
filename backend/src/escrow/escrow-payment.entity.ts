@@ -51,6 +51,21 @@ export class EscrowPayment {
   @Column({ name: 'tracking_code', nullable: true })
   trackingCode: string | null
 
+  @Column('text', { nullable: true, name: 'dispute_reason' })
+  disputeReason: string | null
+
+  @Column({ name: 'disputed_by', nullable: true })
+  disputedBy: string | null
+
+  @Column({ name: 'disputed_at', nullable: true })
+  disputedAt: Date | null
+
+  @Column('text', { nullable: true, name: 'resolution_note' })
+  resolutionNote: string | null
+
+  @Column({ name: 'resolved_at', nullable: true })
+  resolvedAt: Date | null
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 

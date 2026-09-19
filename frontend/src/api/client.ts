@@ -779,6 +779,11 @@ function normalizeEscrowPayment(value: Record<string, unknown>) {
     authority: value.authority ?? null,
     paymentUrl: value.paymentUrl ?? value.payment_url ?? null,
     trackingCode: value.trackingCode ?? value.tracking_code ?? null,
+    disputeReason: value.disputeReason ?? value.dispute_reason ?? null,
+    disputedBy: value.disputedBy ?? value.disputed_by ?? null,
+    disputedAt: value.disputedAt ?? value.disputed_at ?? null,
+    resolutionNote: value.resolutionNote ?? value.resolution_note ?? null,
+    resolvedAt: value.resolvedAt ?? value.resolved_at ?? null,
     status: value.status || 'held',
     createdAt: String(value.createdAt || value.created_at || ''),
     updatedAt: String(value.updatedAt || value.updated_at || ''),
@@ -1777,6 +1782,8 @@ export const api = {
     request<EscrowPayment>(`/escrow/payments/${id}/ship`, { method: 'PATCH', body: { trackingCode } }),
   confirmEscrowDelivery: (id: string) =>
     request<EscrowPayment>(`/escrow/payments/${id}/confirm-delivery`, { method: 'POST' }),
+  openEscrowDispute: (id: string, reason: string) =>
+    request<EscrowPayment>(`/escrow/payments/${id}/dispute`, { method: 'POST', body: { reason } }),
   getMarketplaceRatings: (userId: string) => request<MarketplaceRating[]>(`/escrow/ratings/user/${userId}`),
   createMarketplaceRating: (body: CreateMarketplaceRatingInput) =>
     request<MarketplaceRating>('/escrow/ratings', { method: 'POST', body }),

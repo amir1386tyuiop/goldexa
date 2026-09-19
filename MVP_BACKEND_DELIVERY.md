@@ -74,6 +74,7 @@
 - `PATCH /escrow/payments/:id/ship` فقط توسط فروشنده‌ی همان escrow و با کد رهگیری معتبر قابل اجراست.
 - `POST /escrow/payments/:id/confirm-delivery` فقط توسط خریدار همان escrow اجرا می‌شود و release atomic مبلغ را انجام می‌دهد.
 - `POST /escrow/payments/:id/pay` پرداخت escrow را از کیف پول خریدار انجام می‌دهد و وضعیت را به `held` می‌برد.
+- `POST /escrow/payments/:id/dispute` توسط خریدار یا فروشنده اختلاف را ثبت و مبلغ را در وضعیت `disputed` نگه می‌دارد؛ resolution ادمین برای release/refund نیازمند یادداشت اجباری است.
 - پایان مزایده دیگر به‌اشتباه `settled/completed` نمی‌شود؛ تا زمان پرداخت برنده در `awaiting_payment` می‌ماند و بعد از پرداخت به escrow متصل می‌شود.
 - مسیرهای جدید با تست‌های واحد marketplace، escrow و wallet پوشش داده شده‌اند؛ اتصال درگاه آنلاین واقعی و dispute کامل همچنان به credential و تصمیم حقوقی نیاز دارد.
 
