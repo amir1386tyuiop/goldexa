@@ -56,8 +56,8 @@ export class PayoutService {
   }
 
   async resolve(id: string, adminId: string, status: PayoutRequestStatus, data: ResolvePayoutDto): Promise<PayoutRequest> {
-    if (![PayoutRequestStatus.APPROVED, PayoutRequestStatus.PAID, PayoutRequestStatus.REJECTED, PayoutRequestStatus.FAILED].includes(status)) {
-      throw new BadRequestException('وضعیت نهایی برداشت نامعتبر است')
+    if (![PayoutRequestStatus.APPROVED, PayoutRequestStatus.PROCESSING, PayoutRequestStatus.PAID, PayoutRequestStatus.REJECTED, PayoutRequestStatus.FAILED].includes(status)) {
+      throw new BadRequestException('وضعیت برداشت نامعتبر است')
     }
     return this.dataSource.transaction(async (manager) => {
       const request = await manager.findOne(PayoutRequest, { where: { id }, lock: { mode: 'pessimistic_write' } })
@@ -68,6 +68,9 @@ export class PayoutService {
       }
       if (status === PayoutRequestStatus.APPROVED && request.status !== PayoutRequestStatus.PENDING) {
         throw new BadRequestException('فقط درخواست در انتظار بررسی قابل تأیید است')
+      }
+      if (status === PayoutRequestStatus.PROCESSING && request.status !== PayoutRequestStatus.APPROVED) {
+        throw new BadRequestException('فقط برداشت تأییدشده قابل ارسال به مرحله تسویه است')
       }
       if (status === PayoutRequestStatus.PAID && ![PayoutRequestStatus.APPROVED, PayoutRequestStatus.PROCESSING].includes(request.status)) {
         throw new BadRequestException('فقط برداشت تأییدشده قابل علامت‌گذاری به‌عنوان پرداخت‌شده است')

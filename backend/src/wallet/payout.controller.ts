@@ -41,4 +41,10 @@ export class PayoutController {
   async paid(@Param('id') id: string, @Body() body: ResolvePayoutDto, @Req() req: Request & { user: JwtUser }) {
     return this.payoutService.resolve(id, req.user.sub, PayoutRequestStatus.PAID, body)
   }
+
+  @Patch(':id/processing')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async processing(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.payoutService.resolve(id, req.user.sub, PayoutRequestStatus.PROCESSING, {})
+  }
 }

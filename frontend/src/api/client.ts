@@ -1918,6 +1918,7 @@ export const api = {
   getAdminPayouts: (limit = 100, status?: string) =>
     request<import('@/types').PayoutRequest[]>(`/admin/payouts?limit=${limit}${status ? `&status=${status}` : ''}`),
   approvePayout: (id: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/approve`, { method: 'PATCH' }),
+  processPayout: (id: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/processing`, { method: 'PATCH' }),
   rejectPayout: (id: string, reason: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/reject`, { method: 'PATCH', body: { reason } }),
   markPayoutPaid: (id: string, providerReference: string) => request<import('@/types').PayoutRequest>(`/wallet/payouts/${id}/paid`, { method: 'PATCH', body: { providerReference } }),
   resolveAdminRefund: (id: string, status: 'approved' | 'rejected') =>
