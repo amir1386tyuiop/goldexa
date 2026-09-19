@@ -1710,6 +1710,7 @@ export const api = {
   },
   getProduct: (id: string) => request<Product>(`/products/${id}`),
   getAuctions: () => request<Auction[]>('/auctions'),
+  getAdminAuctions: () => request<Auction[]>('/auctions/admin/all'),
   getActiveAuctions: () => request<Auction[]>('/auctions/active'),
   getAuction: (id: string) => request<Auction>(`/auctions/${id}`),
   getAuctionBids: (auctionId: string) => request<AuctionBid[]>(`/auctions/${auctionId}/bids`),
@@ -1722,9 +1723,15 @@ export const api = {
   cancelAuction: (auctionId: string) => request<Auction>(`/auctions/${auctionId}/cancel`, { method: 'PATCH' }),
   getUsedGoldListings: (status?: string) =>
     request<UsedGoldListing[]>(`/marketplace/listings${status ? `?status=${status}` : ''}`),
+  getAdminUsedGoldListings: (status?: string) =>
+    request<UsedGoldListing[]>(`/marketplace/listings/admin/all${status ? `?status=${status}` : ''}`),
   getUsedGoldListing: (id: string) => request<UsedGoldListing>(`/marketplace/listings/${id}`),
   createUsedGoldListing: (body: CreateUsedGoldListingInput) =>
     request<UsedGoldListing>('/marketplace/listings', { method: 'POST', body }),
+  reviewUsedGoldListing: (id: string, body: { qualityStatus: string; expertName?: string; expertNotes?: string }) =>
+    request<UsedGoldListing>(`/marketplace/listings/${id}/review`, { method: 'PATCH', body }),
+  updateUsedGoldListingStatus: (id: string, status: string) =>
+    request<UsedGoldListing>(`/marketplace/listings/${id}/status`, { method: 'PATCH', body: { status } }),
   purchaseUsedGoldListing: (listingId: string, body: PurchaseUsedGoldListingInput) =>
     request<{ order: Order; escrow: EscrowPayment; listing: UsedGoldListing }>(`/marketplace/listings/${listingId}/purchase`, { method: 'POST', body }),
   getVaultAssets: (userId: string) => request<SmartVaultAsset[]>(`/smart-vault/assets/user/${userId}`),

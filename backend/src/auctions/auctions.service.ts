@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { DataSource, IsNull, Not, Repository } from 'typeorm'
+import { DataSource, In, IsNull, Not, Repository } from 'typeorm'
 import {
   Auction,
   AuctionPaymentStatus,
@@ -44,11 +44,23 @@ export class AuctionsService {
     await this.syncStatuses()
 
     return this.auctionRepository.find({
+      where: {
+        status: In([
+          AuctionStatus.SCHEDULED,
+          AuctionStatus.ACTIVE,
+          AuctionStatus.EXTENDED,
+        ]),
+      },
       order: {
         endsAt: 'ASC',
         createdAt: 'DESC',
       },
     })
+  }
+
+  async findAllForAdmin(): Promise<Auction[]> {
+    await this.syncStatuses()
+    return this.auctionRepository.find({ order: { endsAt: 'ASC', createdAt: 'DESC' } })
   }
 
   async findActive(): Promise<Auction[]> {

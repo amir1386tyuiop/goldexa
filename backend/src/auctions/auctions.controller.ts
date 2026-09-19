@@ -27,6 +27,12 @@ export class AuctionsController {
     return this.auctionsService.findActive()
   }
 
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async findAllForAdmin() {
+    return this.auctionsService.findAllForAdmin()
+  }
+
   @Get('user/:userId')
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @OwnerParam('userId')

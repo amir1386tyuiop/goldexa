@@ -20,6 +20,12 @@ export class UsedGoldListingsController {
     return this.listingsService.findAll(status)
   }
 
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async findAllForAdmin(@Query('status') status?: UsedGoldListingStatus) {
+    return this.listingsService.findAllForAdmin(status)
+  }
+
   @Get('user/:userId')
   @UseGuards(JwtAuthGuard)
   async findByUser(@Param('userId') userId: string, @Req() req: Request & { user: JwtUser }) {

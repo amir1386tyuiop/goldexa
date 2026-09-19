@@ -36,14 +36,17 @@ export class UsedGoldListingsService {
 
   async findAll(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
     const publicStatuses = [UsedGoldListingStatus.APPROVED, UsedGoldListingStatus.ACTIVE]
-    const where = status && publicStatuses.includes(status)
-      ? { status }
-      : status
-        ? { status: UsedGoldListingStatus.ACTIVE }
-        : { status: UsedGoldListingStatus.ACTIVE }
+    const where = status && publicStatuses.includes(status) ? { status } : { status: UsedGoldListingStatus.ACTIVE }
 
     return this.listingRepository.find({
       where,
+      order: { createdAt: 'DESC' },
+    })
+  }
+
+  async findAllForAdmin(status?: UsedGoldListingStatus): Promise<UsedGoldListing[]> {
+    return this.listingRepository.find({
+      where: status ? { status } : {},
       order: { createdAt: 'DESC' },
     })
   }
@@ -151,15 +154,22 @@ export class UsedGoldListingsService {
   }
 
   async reviewListing(id: string, data: ReviewUsedGoldListingDto): Promise<UsedGoldListing | null> {
+    const listing = await this.listingRepository.findOneBy({ id })
+    if (!listing) throw new NotFoundException('آگهی موردنظر یافت نشد')
+    if (![UsedGoldListingStatus.PENDING_REVIEW, UsedGoldListingStatus.REJECTED].includes(listing.status)) {
+      throw new BadRequestException('این آگهی در وضعیت قابل بازبینی نیست')
+    }
+    const nextStatus = data.qualityStatus === UsedGoldQualityStatus.APPROVED
+      ? UsedGoldListingStatus.APPROVED
+      : data.qualityStatus === UsedGoldQualityStatus.REJECTED
+        ? UsedGoldListingStatus.REJECTED
+        : UsedGoldListingStatus.PENDING_REVIEW
     await this.listingRepository.update(id, {
       qualityStatus: data.qualityStatus,
       expertName: data.expertName ?? null,
       expertNotes: data.expertNotes ?? null,
       qualityBadge: data.qualityStatus === UsedGoldQualityStatus.APPROVED,
-      status:
-        data.qualityStatus === UsedGoldQualityStatus.APPROVED
-          ? UsedGoldListingStatus.APPROVED
-          : UsedGoldListingStatus.REJECTED,
+      status: nextStatus,
     })
 
     return this.listingRepository.findOneBy({ id })
@@ -169,6 +179,24 @@ export class UsedGoldListingsService {
     id: string,
     data: UpdateUsedGoldListingStatusDto,
   ): Promise<UsedGoldListing | null> {
+    const listing = await this.listingRepository.findOneBy({ id })
+    if (!listing) throw new NotFoundException('آگهی موردنظر یافت نشد')
+    const transitions: Record<UsedGoldListingStatus, UsedGoldListingStatus[]> = {
+      [UsedGoldListingStatus.DRAFT]: [UsedGoldListingStatus.PENDING_REVIEW, UsedGoldListingStatus.CANCELLED],
+      [UsedGoldListingStatus.PENDING_REVIEW]: [UsedGoldListingStatus.APPROVED, UsedGoldListingStatus.REJECTED, UsedGoldListingStatus.CANCELLED],
+      [UsedGoldListingStatus.APPROVED]: [UsedGoldListingStatus.ACTIVE, UsedGoldListingStatus.CANCELLED],
+      [UsedGoldListingStatus.REJECTED]: [UsedGoldListingStatus.PENDING_REVIEW, UsedGoldListingStatus.CANCELLED],
+      [UsedGoldListingStatus.ACTIVE]: [UsedGoldListingStatus.CANCELLED],
+      [UsedGoldListingStatus.SOLD]: [],
+      [UsedGoldListingStatus.CANCELLED]: [],
+    }
+    if (listing.status === data.status) return listing
+    if (!transitions[listing.status].includes(data.status)) {
+      throw new BadRequestException(`تغییر وضعیت آگهی از ${listing.status} به ${data.status} مجاز نیست`)
+    }
+    if (data.status === UsedGoldListingStatus.ACTIVE && listing.qualityStatus !== UsedGoldQualityStatus.APPROVED) {
+      throw new BadRequestException('آگهی قبل از فعال‌شدن باید تأیید کارشناسی شود')
+    }
     await this.listingRepository.update(id, { status: data.status })
     return this.listingRepository.findOneBy({ id })
   }

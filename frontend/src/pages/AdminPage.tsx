@@ -26,7 +26,7 @@ import {
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { AiEnginePanel } from './AiEnginePage'
-import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission } from '@/types'
+import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission, UsedGoldListing } from '@/types'
 
 interface AdminStats {
   totalUsers: number
@@ -71,6 +71,7 @@ const menuItems = [
   { id: 'payouts', icon: <Wallet className="h-5 w-5" />, label: 'برداشت‌های بانکی' },
   { id: 'disputes', icon: <ShieldCheck className="h-5 w-5" />, label: 'اختلاف‌های escrow' },
   { id: 'auctions', icon: <Gavel className="h-5 w-5" />, label: 'مزایده‌ها' },
+  { id: 'marketplace', icon: <ShieldCheck className="h-5 w-5" />, label: 'بازار دست‌دوم' },
   { id: 'users', icon: <Users className="h-5 w-5" />, label: 'کاربران' },
   { id: 'roles', icon: <ShieldCheck className="h-5 w-5" />, label: 'نقش‌ها' },
   { id: 'ai', icon: <Brain className="h-5 w-5" />, label: 'هوش مصنوعی' },
@@ -177,7 +178,13 @@ export function AdminPage() {
 
   const { data: auctions = [] } = useQuery<Auction[]>({
     queryKey: ['admin-auctions'],
-    queryFn: api.getAuctions,
+    queryFn: api.getAdminAuctions,
+    initialData: [],
+  })
+
+  const { data: marketplaceListings = [] } = useQuery<UsedGoldListing[]>({
+    queryKey: ['admin-marketplace-listings'],
+    queryFn: () => api.getAdminUsedGoldListings(),
     initialData: [],
   })
 
@@ -268,6 +275,8 @@ export function AdminPage() {
             {activeTab === 'orders' && <OrdersTable orders={adminOrders} />}
 
             {activeTab === 'auctions' && <AuctionsTable auctions={auctions} />}
+
+            {activeTab === 'marketplace' && <MarketplaceModerationPanel listings={marketplaceListings} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-marketplace-listings'] })} />}
 
             {activeTab === 'users' && <UsersTable users={adminUsers} />}
 
@@ -612,6 +621,43 @@ function RefundsPanel({ refunds, onResolved }: { refunds: Refund[]; onResolved: 
       {resolveMutation.isError && <p className="mt-3 text-sm text-red-700" role="alert">تعیین تکلیف بازپرداخت انجام نشد؛ روش پرداخت سفارش را بررسی کنید.</p>}
     </article>)}
   </div>
+}
+
+function MarketplaceModerationPanel({ listings, onResolved }: { listings: UsedGoldListing[]; onResolved: () => void }) {
+  const review = useMutation({
+    mutationFn: ({ id, qualityStatus }: { id: string; qualityStatus: 'approved' | 'rejected' }) =>
+      api.reviewUsedGoldListing(id, { qualityStatus, expertName: 'پنل مدیریت' }),
+    onSuccess: onResolved,
+  })
+  const activate = useMutation({
+    mutationFn: (id: string) => api.updateUsedGoldListingStatus(id, 'active'),
+    onSuccess: onResolved,
+  })
+
+  if (listings.length === 0) return <EmptyState title="آگهی‌ای برای moderation وجود ندارد" description="آگهی‌های بازار دست‌دوم پس از ثبت اینجا نمایش داده می‌شوند." />
+
+  return (
+    <div className="card p-6">
+      <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+        <div><h2 className="text-xl font-bold">بازبینی بازار دست‌دوم</h2><p className="text-sm text-muted-foreground">تأیید کارشناسی پیش از انتشار عمومی الزامی است.</p></div>
+        <span className="badge badge-info">{listings.length} آگهی</span>
+      </div>
+      <div className="space-y-3">
+        {listings.map((listing) => (
+          <article key={listing.id} className="rounded-2xl border border-border p-4">
+            <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+              <div><h3 className="font-black">{listing.title}</h3><p className="mt-1 text-sm text-muted-foreground">فروشنده: {listing.sellerName} · {listing.weight} گرم · عیار {listing.karat}</p><p className="mt-2 text-xs text-muted-foreground">وضعیت: {listing.status} · کارشناسی: {listing.qualityStatus}</p></div>
+              <div className="flex flex-wrap gap-2">
+                {['pending_review', 'rejected'].includes(listing.status) ? <><button type="button" className="btn btn-primary min-h-10" disabled={review.isPending} onClick={() => review.mutate({ id: listing.id, qualityStatus: 'approved' })}>تأیید کارشناسی</button><button type="button" className="btn btn-outline min-h-10 border-red-300 text-red-800" disabled={review.isPending} onClick={() => review.mutate({ id: listing.id, qualityStatus: 'rejected' })}>رد آگهی</button></> : null}
+                {listing.status === 'approved' && listing.qualityStatus === 'approved' ? <button type="button" className="btn btn-outline min-h-10" disabled={activate.isPending} onClick={() => activate.mutate(listing.id)}>فعال‌سازی انتشار</button> : null}
+              </div>
+            </div>
+            {(review.isError || activate.isError) ? <p className="mt-3 text-sm text-red-700" role="alert">تغییر وضعیت آگهی ناموفق بود.</p> : null}
+          </article>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function PayoutsPanel({ payouts, onResolved }: { payouts: PayoutRequest[]; onResolved: () => void }) {
