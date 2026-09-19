@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { ShieldCheck, Star, TrendingUp } from 'lucide-react'
 import { api } from '@/api/client'
@@ -11,6 +11,7 @@ export function EscrowPage() {
   const [activeTab, setActiveTab] = useState<'escrow' | 'ratings' | 'payments' | 'tracking'>('escrow')
   const [orderId, setOrderId] = useState('')
   const auth = getStoredAuth()
+  const queryClient = useQueryClient()
 
   const { data: escrows = [], isLoading: escrowsLoading, isError: escrowsError } = useQuery<EscrowPayment[]>({
     queryKey: ['escrow-payments'],
@@ -61,7 +62,7 @@ export function EscrowPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {activeTab === 'escrow' && <AsyncState loading={escrowsLoading} error={escrowsError} label="پرداخت‌های امانی" content={<EscrowList payments={escrows} />} />}
+            {activeTab === 'escrow' && <AsyncState loading={escrowsLoading} error={escrowsError} label="پرداخت‌های امانی" content={<EscrowList payments={escrows} userId={auth?.user.id} onChanged={() => queryClient.invalidateQueries({ queryKey: ['escrow-payments'] })} />} />}
             {activeTab === 'ratings' && <AsyncState loading={ratingsLoading} error={ratingsError} label="امتیازها" content={<RatingList ratings={ratings} />} />}
             {activeTab === 'payments' && <AsyncState loading={paymentsLoading} error={paymentsError} label="تراکنش‌ها" content={<PaymentList payments={payments} />} />}
             {activeTab === 'tracking' && (
@@ -98,7 +99,7 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
   )
 }
 
-function EscrowList({ payments }: { payments: EscrowPayment[] }) {
+function EscrowList({ payments, userId, onChanged }: { payments: EscrowPayment[]; userId?: string; onChanged: () => void }) {
   if (payments.length === 0) {
     return <EmptyState title="پرداخت امانی ثبت نشده" description="پرداخت‌های امن بازار دست دوم اینجا نمایش داده می‌شوند." />
   }
@@ -107,7 +108,21 @@ function EscrowList({ payments }: { payments: EscrowPayment[] }) {
     <div className="space-y-4">
       <p className="rounded-xl bg-gold-50 p-4 text-sm text-muted-foreground">پرداخت امانی پس از انتخاب آگهی معتبر در Marketplace یا پایان مزایده ایجاد می‌شود.</p>
       {payments.map((payment) => (
-        <div key={payment.id} className="card p-5">
+        <EscrowCard key={payment.id} payment={payment} userId={userId} onChanged={onChanged} />
+      ))}
+    </div>
+  )
+}
+
+function EscrowCard({ payment, userId, onChanged }: { payment: EscrowPayment; userId?: string; onChanged: () => void }) {
+  const [trackingCode, setTrackingCode] = useState('')
+  const payMutation = useMutation({ mutationFn: () => api.payEscrowFromWallet(payment.id), onSuccess: onChanged })
+  const shipMutation = useMutation({ mutationFn: () => api.shipEscrowPayment(payment.id, trackingCode), onSuccess: onChanged })
+  const deliveryMutation = useMutation({ mutationFn: () => api.confirmEscrowDelivery(payment.id), onSuccess: onChanged })
+  const isBuyer = Boolean(userId && payment.buyerId === userId)
+  const isSeller = Boolean(userId && payment.sellerId === userId)
+
+  return <div className="card p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="font-black text-navy-900">پرداخت امن {payment.trackingCode}</h3>
@@ -121,10 +136,11 @@ function EscrowList({ payments }: { payments: EscrowPayment[] }) {
             <InfoPill label="وضعیت" value={payment.status} />
             <InfoPill label="کد رهگیری" value={payment.trackingCode || 'ثبت نشده'} />
           </div>
+          {isBuyer && payment.status === 'initiated' && <button type="button" className="btn btn-primary mt-4 w-full" disabled={payMutation.isPending} onClick={() => payMutation.mutate()}>{payMutation.isPending ? 'در حال پرداخت…' : 'پرداخت و قفل مبلغ از کیف پول'}</button>}
+          {isSeller && payment.status === 'held' && <div className="mt-4 flex gap-2"><input className="input" aria-label="کد رهگیری ارسال" placeholder="کد رهگیری ارسال" value={trackingCode} onChange={(event) => setTrackingCode(event.target.value)} /><button type="button" className="btn btn-outline shrink-0" disabled={!trackingCode.trim() || shipMutation.isPending} onClick={() => shipMutation.mutate()}>ثبت ارسال</button></div>}
+          {isBuyer && payment.status === 'held' && <button type="button" className="btn btn-primary mt-4 w-full" disabled={deliveryMutation.isPending} onClick={() => deliveryMutation.mutate()}>{deliveryMutation.isPending ? 'در حال تایید…' : 'تایید دریافت و آزادسازی مبلغ'}</button>}
+          {(payMutation.isError || shipMutation.isError || deliveryMutation.isError) && <p className="mt-3 text-sm text-red-700" role="alert">عملیات escrow انجام نشد؛ وضعیت و موجودی را بررسی کنید.</p>}
         </div>
-      ))}
-    </div>
-  )
 }
 
 function RatingList({ ratings }: { ratings: MarketplaceRating[] }) {

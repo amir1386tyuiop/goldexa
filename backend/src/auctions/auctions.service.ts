@@ -249,10 +249,12 @@ export class AuctionsService {
       return this.auctionRepository.save(auction)
     }
 
-    auction.paymentStatus =
-      AuctionPaymentStatus.SETTLED
+    // Ending an auction is not the same as receiving the winner's money.
+    // Keep the winner and move to the payment window; escrow payment will
+    // later change the payment status to ESCROW_HELD.
+    auction.paymentStatus = AuctionPaymentStatus.UNPAID
     auction.commissionAmount = (amount * Number(auction.commissionRate ?? 0)) / 100
-    auction.status = AuctionStatus.COMPLETED
+    auction.status = AuctionStatus.AWAITING_PAYMENT
 
     return this.auctionRepository.save(auction)
   }

@@ -1771,6 +1771,12 @@ export const api = {
   getEscrowPayments: () => request<EscrowPayment[]>('/escrow/payments'),
   createEscrowPayment: (body: CreateEscrowPaymentInput) =>
     request<EscrowPayment>('/escrow/payments', { method: 'POST', body }),
+  payEscrowFromWallet: (id: string) =>
+    request<EscrowPayment>(`/escrow/payments/${id}/pay`, { method: 'POST' }),
+  shipEscrowPayment: (id: string, trackingCode: string) =>
+    request<EscrowPayment>(`/escrow/payments/${id}/ship`, { method: 'PATCH', body: { trackingCode } }),
+  confirmEscrowDelivery: (id: string) =>
+    request<EscrowPayment>(`/escrow/payments/${id}/confirm-delivery`, { method: 'POST' }),
   getMarketplaceRatings: (userId: string) => request<MarketplaceRating[]>(`/escrow/ratings/user/${userId}`),
   createMarketplaceRating: (body: CreateMarketplaceRatingInput) =>
     request<MarketplaceRating>('/escrow/ratings', { method: 'POST', body }),

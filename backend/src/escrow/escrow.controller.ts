@@ -50,6 +50,11 @@ export class EscrowController {
     return this.escrowService.confirmDelivery(id, req.user.sub)
   }
 
+  @Post('payments/:id/pay')
+  async payFromWallet(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.escrowService.payFromWallet(id, req.user.sub)
+  }
+
   @Get('ratings')
   @UseGuards(JwtAuthGuard, AdminGuard)
   async findRatings() {

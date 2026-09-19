@@ -204,6 +204,16 @@ export class EscrowService {
     return (await this.updatePaymentStatus(id, { status: EscrowPaymentStatus.RELEASED })) as EscrowPayment
   }
 
+  async payFromWallet(id: string, buyerId: string): Promise<EscrowPayment> {
+    const payment = await this.escrowRepository.findOneBy({ id })
+    if (!payment) throw new NotFoundException('پرداخت امانی یافت نشد')
+    if (payment.buyerId !== buyerId) throw new ForbiddenException('این escrow متعلق به شما نیست')
+    if (payment.status !== EscrowPaymentStatus.INITIATED) {
+      throw new BadRequestException('این escrow قبلاً پرداخت یا بسته شده است')
+    }
+    return (await this.updatePaymentStatus(id, { status: EscrowPaymentStatus.HELD })) as EscrowPayment
+  }
+
   async findRatings(): Promise<MarketplaceRating[]> {
     return this.ratingRepository.find({ order: { createdAt: 'DESC' } })
   }
