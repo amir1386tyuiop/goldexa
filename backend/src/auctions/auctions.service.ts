@@ -20,6 +20,7 @@ import {
 } from './create-auction.dto'
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { CacheService } from '../common/cache.service'
 
 @Injectable()
 export class AuctionsService {
@@ -36,6 +37,7 @@ export class AuctionsService {
     private readonly notifications: NotificationsService,
     @Optional() private readonly gateway?: AuctionsGateway,
     @Optional() private readonly goldPricing?: GoldPricingService,
+    @Optional() private readonly cache?: CacheService,
   ) {}
 
   async findAll(): Promise<Auction[]> {
@@ -380,7 +382,22 @@ export class AuctionsService {
     return from === to || transitions[from].includes(to)
   }
 
-  private async syncStatuses() {
+  private async syncStatuses(): Promise<void> {
+    const lockToken = this.cache
+      ? await this.cache.acquireLock('auctions:lifecycle', 55)
+      : null
+    if (this.cache && !lockToken) return
+
+    try {
+      await this.syncStatusesLocked()
+    } finally {
+      if (this.cache && lockToken) {
+        await this.cache.releaseLock('auctions:lifecycle', lockToken)
+      }
+    }
+  }
+
+  private async syncStatusesLocked() {
     const now = new Date()
 
     await this.auctionRepository

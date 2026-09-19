@@ -15,6 +15,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   private redisReady = false
   private readonly memory = new Map<string, { value: string; expiresAt: number }>()
   private readonly rateMemory = new Map<string, { count: number; resetAt: number }>()
+  private readonly lockMemory = new Map<string, { token: string; expiresAt: number }>()
 
   async onModuleInit(): Promise<void> {
     if ((process.env.CACHE_DRIVER ?? 'redis').toLowerCase() === 'memory') {
@@ -112,6 +113,48 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       }
     }
     this.memory.delete(namespacedKey)
+  }
+
+  /** Acquire a short-lived distributed lock. Redis is mandatory for production locks. */
+  async acquireLock(key: string, ttlSeconds: number): Promise<string | null> {
+    const namespacedKey = this.keyFor(`lock:${key}`)
+    const token = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const ttl = Math.max(1, Math.ceil(ttlSeconds))
+
+    if (this.redisReady && this.client) {
+      try {
+        const acquired = await this.client.set(namespacedKey, token, 'EX', ttl, 'NX')
+        return acquired === 'OK' ? token : null
+      } catch {
+        return null
+      }
+    }
+
+    if (process.env.NODE_ENV === 'production') return null
+    const current = this.lockMemory.get(namespacedKey)
+    if (current && current.expiresAt > Date.now()) return null
+    this.lockMemory.set(namespacedKey, { token, expiresAt: Date.now() + ttl * 1000 })
+    return token
+  }
+
+  /** Release only the lock owned by this caller. */
+  async releaseLock(key: string, token: string): Promise<void> {
+    const namespacedKey = this.keyFor(`lock:${key}`)
+    if (this.redisReady && this.client) {
+      try {
+        await this.client.eval(
+          "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+          1,
+          namespacedKey,
+          token,
+        )
+        return
+      } catch {
+        return
+      }
+    }
+    const current = this.lockMemory.get(namespacedKey)
+    if (current?.token === token) this.lockMemory.delete(namespacedKey)
   }
 
   /** Atomically consumes one rate-limit slot across API replicas when Redis is available. */

@@ -47,4 +47,15 @@ describe('CacheService fallback cache', () => {
     await expect(cache.consumeRateLimit('otp:127.0.0.1', 2, 60_000)).resolves.toBe(true)
     await expect(cache.consumeRateLimit('otp:127.0.0.1', 2, 60_000)).resolves.toBe(false)
   })
+
+  it('allows only one owner for a short-lived fallback lock', async () => {
+    const cache = new CacheService()
+    await cache.onModuleInit()
+
+    const token = await cache.acquireLock('auction:lifecycle', 30)
+    expect(token).toEqual(expect.any(String))
+    await expect(cache.acquireLock('auction:lifecycle', 30)).resolves.toBeNull()
+    await cache.releaseLock('auction:lifecycle', token as string)
+    await expect(cache.acquireLock('auction:lifecycle', 30)).resolves.toEqual(expect.any(String))
+  })
 })
