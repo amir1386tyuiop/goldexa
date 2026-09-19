@@ -8,6 +8,7 @@ import {
   UpdateProductDto,
   UpdateSettingDto,
 } from './admin.dto'
+import { EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
 
 @Controller('admin')
 export class AdminController {
@@ -74,6 +75,23 @@ export class AdminController {
   @Get('payments')
   async getPayments(@Query('limit') limit?: string, @Query('status') status?: string) {
     return this.adminService.listPayments(this.parseLimit(limit), status)
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('VIEW_PAYMENTS')
+  @Get('escrow/disputes')
+  async getEscrowDisputes(@Query('limit') limit?: string) {
+    return this.adminService.listDisputedEscrows(this.parseLimit(limit))
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('REFUND_PAYMENT')
+  @Patch('escrow/:id/resolve')
+  async resolveEscrow(
+    @Param('id') id: string,
+    @Body() body: { status: EscrowPaymentStatus; resolutionNote: string },
+  ) {
+    return this.adminService.resolveEscrowDispute(id, body.status, body.resolutionNote)
   }
 
   @UseGuards(PermissionsGuard)

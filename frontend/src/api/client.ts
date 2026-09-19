@@ -1903,6 +1903,9 @@ export const api = {
     request<Product>(`/admin/products/${id}`, { method: 'PATCH', body }),
   getAdminPayments: (limit = 100, status?: string) =>
     request<PaymentTransaction[]>(`/admin/payments?limit=${limit}${status ? `&status=${status}` : ''}`),
+  getAdminEscrowDisputes: (limit = 100) => request<EscrowPayment[]>(`/admin/escrow/disputes?limit=${limit}`),
+  resolveAdminEscrowDispute: (id: string, status: 'released' | 'refunded', resolutionNote: string) =>
+    request<EscrowPayment>(`/admin/escrow/${id}/resolve`, { method: 'PATCH', body: { status, resolutionNote } }),
   verifyAdminPayment: (id: string) => request<PaymentTransaction>(`/admin/payments/${id}/verify`, { method: 'PATCH' }),
   refundAdminPayment: (id: string, status: PaymentTransaction['status']) =>
     request<PaymentTransaction>(`/admin/payments/${id}/refund`, { method: 'PATCH', body: { status } }),

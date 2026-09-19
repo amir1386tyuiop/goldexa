@@ -34,6 +34,7 @@ import { Permission } from '../auth/permission.entity'
 import { UserRoleMapping } from '../auth/user-role-mapping.entity'
 import { RolePermissionMapping } from '../auth/role-permission-mapping.entity'
 import { RoleService } from '../auth/role.service'
+import { EscrowModule } from '../escrow/escrow.module'
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { RoleService } from '../auth/role.service'
       UserRoleMapping,
       RolePermissionMapping,
     ]),
+    EscrowModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, RoleService],

@@ -14,7 +14,8 @@ import { PriceAlert } from '../smart-vault/price-alert.entity'
 import { SubscriptionPlan } from '../subscriptions/subscription-plan.entity'
 import { JewelryDesign } from '../custom-builder/jewelry-design.entity'
 import { AiPricePrediction } from '../ai-engine/ai-price-prediction.entity'
-import { EscrowPayment } from '../escrow/escrow-payment.entity'
+import { EscrowPayment, EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
+import { EscrowService } from '../escrow/escrow.service'
 import { PaymentTransaction, PaymentTransactionStatus } from '../payments/payment-transaction.entity'
 import { ProductCategoryMaster } from '../catalog/product-category-master.entity'
 import { Cart } from '../cart/cart.entity'
@@ -84,6 +85,7 @@ export class AdminService {
     @InjectRepository(SystemSetting)
     private systemSettingRepository: Repository<SystemSetting>,
     private roleService: RoleService,
+    private readonly escrowService: EscrowService,
   ) {}
 
   async getDashboardStats() {
@@ -284,6 +286,21 @@ export class AdminService {
       ],
       generatedAt: new Date().toISOString(),
     }
+  }
+
+  async listDisputedEscrows(limit = 100) {
+    return this.escrowRepository.find({
+      where: { status: EscrowPaymentStatus.DISPUTED },
+      order: { disputedAt: 'ASC' },
+      take: Math.min(limit, 500),
+    })
+  }
+
+  async resolveEscrowDispute(id: string, status: EscrowPaymentStatus, resolutionNote: string) {
+    if (![EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED].includes(status)) {
+      throw new BadRequestException('حل اختلاف فقط با release یا refund مجاز است')
+    }
+    return this.escrowService.updatePaymentStatus(id, { status, resolutionNote })
   }
 
   /** Block or unblock a user. Blocked users are refused login. */

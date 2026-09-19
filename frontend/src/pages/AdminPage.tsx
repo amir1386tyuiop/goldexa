@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import {
   Activity,
@@ -26,7 +26,7 @@ import {
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { AiEnginePanel } from './AiEnginePage'
-import type { Auction, Order, PaymentTransaction, Product, Role, SystemSetting, User, Permission } from '@/types'
+import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, Role, SystemSetting, User, Permission } from '@/types'
 
 interface AdminStats {
   totalUsers: number
@@ -67,6 +67,7 @@ const menuItems = [
   { id: 'products', icon: <Package className="h-5 w-5" />, label: 'محصولات' },
   { id: 'orders', icon: <ShoppingCart className="h-5 w-5" />, label: 'سفارشات' },
   { id: 'payments', icon: <CreditCard className="h-5 w-5" />, label: 'پرداخت‌ها' },
+  { id: 'disputes', icon: <ShieldCheck className="h-5 w-5" />, label: 'اختلاف‌های escrow' },
   { id: 'auctions', icon: <Gavel className="h-5 w-5" />, label: 'مزایده‌ها' },
   { id: 'users', icon: <Users className="h-5 w-5" />, label: 'کاربران' },
   { id: 'roles', icon: <ShieldCheck className="h-5 w-5" />, label: 'نقش‌ها' },
@@ -100,6 +101,7 @@ const emptyStats: AdminStats = {
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [search, setSearch] = useState('')
+  const queryClient = useQueryClient()
 
   const { data: stats = emptyStats, isLoading: statsLoading, isError: statsError } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
@@ -127,6 +129,12 @@ export function AdminPage() {
   const { data: payments = [] } = useQuery<PaymentTransaction[]>({
     queryKey: ['admin-payments'],
     queryFn: () => api.getAdminPayments(100),
+    initialData: [],
+  })
+
+  const { data: escrowDisputes = [] } = useQuery<EscrowPayment[]>({
+    queryKey: ['admin-escrow-disputes'],
+    queryFn: () => api.getAdminEscrowDisputes(100),
     initialData: [],
   })
 
@@ -250,6 +258,8 @@ export function AdminPage() {
             {activeTab === 'users' && <UsersTable users={adminUsers} />}
 
             {activeTab === 'payments' && <PaymentsTable payments={payments} />}
+
+            {activeTab === 'disputes' && <DisputesPanel disputes={escrowDisputes} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-escrow-disputes'] })} />}
 
             {activeTab === 'roles' && <RolesPanel roles={roles} permissions={permissions} />}
 
@@ -543,6 +553,32 @@ function UsersTable({ users }: { users: User[] }) {
       </div>
     </div>
   )
+}
+
+function DisputesPanel({ disputes, onResolved }: { disputes: EscrowPayment[]; onResolved: () => void }) {
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'released' | 'refunded' }) =>
+      api.resolveAdminEscrowDispute(id, status, notes[id] || ''),
+    onSuccess: onResolved,
+  })
+
+  if (!disputes.length) return <div className="card p-10 text-center"><ShieldCheck className="mx-auto h-10 w-10 text-emerald-600" /><h2 className="mt-4 text-xl font-black">اختلاف فعالی وجود ندارد</h2><p className="mt-2 text-sm text-muted-foreground">همه‌ی escrowها در وضعیت سالم هستند.</p></div>
+
+  return <div className="space-y-4">
+    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">هر resolution باید با یادداشت مستند ثبت شود. با release مبلغ به فروشنده می‌رسد و با refund به خریدار برمی‌گردد.</div>
+    {disputes.map((dispute) => <article key={dispute.id} className="card p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><p className="text-xs font-bold text-red-700">ESCROW DISPUTE · {dispute.id.slice(0, 8)}</p><h3 className="mt-2 font-black">دلیل اختلاف</h3><p className="mt-1 text-sm leading-7 text-stone-700">{dispute.disputeReason || 'دلیل ثبت نشده'}</p></div><span className="badge badge-danger">در انتظار رسیدگی</span></div>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><AdminInfoPill label="مبلغ" value={`${formatPrice(dispute.amount)} تومان`} /><AdminInfoPill label="خریدار" value={dispute.buyerId.slice(0, 8)} /><AdminInfoPill label="فروشنده" value={dispute.sellerId.slice(0, 8)} /></div>
+      <textarea className="input mt-4 min-h-24" aria-label={`یادداشت حل اختلاف ${dispute.id}`} placeholder="یادداشت تصمیم ادمین" value={notes[dispute.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [dispute.id]: event.target.value }))} />
+      <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={!notes[dispute.id]?.trim() || resolveMutation.isPending} onClick={() => resolveMutation.mutate({ id: dispute.id, status: 'released' })}>حل به نفع فروشنده · Release</button><button type="button" className="btn btn-outline border-red-300 text-red-800" disabled={!notes[dispute.id]?.trim() || resolveMutation.isPending} onClick={() => resolveMutation.mutate({ id: dispute.id, status: 'refunded' })}>حل به نفع خریدار · Refund</button></div>
+      {resolveMutation.isError && <p className="mt-3 text-sm text-red-700" role="alert">حل اختلاف انجام نشد؛ وضعیت escrow و دسترسی ادمین را بررسی کنید.</p>}
+    </article>)}
+  </div>
+}
+
+function AdminInfoPill({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-slate-100 p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 font-bold text-navy-900">{value}</p></div>
 }
 
 function ReportsPanel({
