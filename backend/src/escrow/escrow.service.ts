@@ -13,6 +13,7 @@ import { Order, OrderStatus } from '../orders/order.entity'
 import { WalletService } from '../wallet/wallet.service'
 import { SmartVaultAsset } from '../smart-vault/smart-vault-asset.entity'
 import { Product } from '../products/product.entity'
+import { PlatformRevenue } from '../finance/platform-revenue.entity'
 import {
   CreateEscrowPaymentDto,
   CreateMarketplaceRatingDto,
@@ -32,6 +33,8 @@ export class EscrowService {
     private auctionRepository: Repository<Auction>,
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
+    @InjectRepository(PlatformRevenue)
+    private readonly revenueRepository: Repository<PlatformRevenue>,
     @InjectRepository(SmartVaultAsset)
     @Optional() private readonly vaultAssetRepository?: Repository<SmartVaultAsset>,
   ) {}
@@ -182,6 +185,14 @@ export class EscrowService {
         const sellerAmount = Math.max(0, Number(payment.amount) - Number(payment.fee ?? 0))
         if (sellerAmount <= 0) throw new BadRequestException('مبلغ قابل پرداخت به فروشنده نامعتبر است')
         await this.walletService.releaseEscrow(payment.sellerId, payment.id, sellerAmount, manager)
+        const fee = Number(payment.fee ?? 0)
+        if (fee > 0) {
+          await manager.save(PlatformRevenue, manager.create(PlatformRevenue, {
+            sourceType: payment.auctionId ? 'auction_commission' : 'marketplace_commission',
+            sourceId: payment.id,
+            amount: fee,
+          }))
+        }
       } else if (nextStatus === EscrowPaymentStatus.REFUNDED) {
         await this.walletService.refundEscrow(payment.buyerId, payment.id, Number(payment.amount), manager)
       }

@@ -641,6 +641,15 @@ CREATE TABLE payment_transactions (
 );
 CREATE UNIQUE INDEX idx_payment_idempotency ON payment_transactions(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
+CREATE TABLE platform_revenue (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    source_type VARCHAR(50) NOT NULL,
+    source_id UUID NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (source_type, source_id)
+);
+
 CREATE TABLE order_tracking_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

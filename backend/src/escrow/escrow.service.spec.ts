@@ -10,6 +10,7 @@ import { Auction, AuctionStatus } from '../auctions/auction.entity'
 import { WalletService } from '../wallet/wallet.service'
 import { SmartVaultAsset } from '../smart-vault/smart-vault-asset.entity'
 import { Product } from '../products/product.entity'
+import { PlatformRevenue } from '../finance/platform-revenue.entity'
 
 describe('EscrowService security boundaries', () => {
   let service: EscrowService
@@ -57,6 +58,7 @@ describe('EscrowService security boundaries', () => {
         { provide: getRepositoryToken(UsedGoldListing), useValue: listingRepository },
         { provide: getRepositoryToken(Auction), useValue: auctionRepository },
         { provide: getRepositoryToken(SmartVaultAsset), useValue: { findOneBy: jest.fn() } },
+        { provide: getRepositoryToken(PlatformRevenue), useValue: { findOneBy: jest.fn() } },
         { provide: DataSource, useValue: dataSource },
         { provide: WalletService, useValue: walletService },
       ],
@@ -237,6 +239,9 @@ describe('EscrowService security boundaries', () => {
     expect(auction.paymentStatus).toBe('settled')
     expect(auction.paymentDeadlineAt).toBeNull()
     expect(transactionManager.save).toHaveBeenCalledWith(Auction, auction)
+    expect(transactionManager.save).toHaveBeenCalledWith(PlatformRevenue, expect.objectContaining({
+      sourceType: 'auction_commission', sourceId: payment.id, amount: 5,
+    }))
     expect(released?.status).toBe(EscrowPaymentStatus.RELEASED)
   })
 

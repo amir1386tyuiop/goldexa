@@ -116,6 +116,7 @@ import { Shipment } from './orders/shipment.entity'
 import { Invoice } from './orders/invoice.entity'
 import { Refund } from './orders/refund.entity'
 import { OrderCancellation } from './orders/order-cancellation.entity'
+import { PlatformRevenue } from './finance/platform-revenue.entity'
 
 @Module({
   imports: [
@@ -212,6 +213,7 @@ import { OrderCancellation } from './orders/order-cancellation.entity'
         Invoice,
         Refund,
         OrderCancellation,
+        PlatformRevenue,
       ],
       synchronize: false,
       logging: process.env.NODE_ENV === 'development',
