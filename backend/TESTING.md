@@ -24,7 +24,8 @@ npm run test:security
 
 The full E2E suite uses isolated PostgreSQL and Redis services. It does not use
 `database/seed.sql`, the development compose database, or a production URL.
-The compose file mounts `database/schema.sql` only; the schema contains no
+The compose file mounts `database/schema.sql` and runs the versioned migrations
+through a dedicated one-shot migration service before the backend starts; the schema contains no
 user credentials or OTP fixtures. The wallet suite uses direct SQL fixtures
 only when `E2E_ALLOW_DB_FIXTURES=1` and `DB_DATABASE` contains `test` or `e2e`.
 
@@ -58,6 +59,8 @@ The suite covers:
 - mock ZarinPal request, idempotency and verification;
 - refund ownership, amount bounds and refund listing;
 - wallet minting protection and wallet checkout debit contract.
+- group creation, live-priced product selection, atomic share payment, inventory
+  locking and final paid-order checkout.
 
 `wallet checkout contract` is skipped unless the isolated database fixture
 environment is explicitly enabled. A skipped suite is not a production signoff.

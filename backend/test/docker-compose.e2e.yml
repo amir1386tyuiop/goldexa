@@ -30,6 +30,22 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: test
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: goldeksa_e2e
+      DB_PASSWORD: goldeksa_e2e_only
+      DB_DATABASE: goldeksa_e2e
+    command: ['node', 'node_modules/typeorm/cli.js', '-d', 'dist/data-source.js', 'migration:run']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build:
       context: ..
@@ -62,6 +78,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   goldexa-e2e-postgres:
