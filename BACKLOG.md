@@ -88,7 +88,7 @@
 - ⬜ **پنل مدیریت v2** (صف سفارش سفارشی + مرحله‌ی ساخت + آپلود عکس مراحل، گزارش تفکیکی، آپلود مدل GLB/glTF)
 
 ## فاز ۳ — اکوسیستم و جامعه (خارج از MVP؛ کد اولیه موجود)
-- 🟡 **بازار دست‌دوم + مزایده C2C** (ثبت آگهی یک‌کلیک از صندوقچه، فروش مستقیم/مزایده، بالاترین پیشنهاد، **Escrow**، تأیید کارشناس، انتقال مالکیت و امتیازدهی) — ثبت آگهی از Smart Vault، خرید مستقیم با کمیسیون قابل‌تنظیم، escrow، WebSocket، cron lifecycle، distributed lock، moderation ادمین، انتقال مالکیت به Smart Vault و امتیازدهی مبتنی بر معامله پیاده شده؛ payout بانکی واقعی و الزامات حقوقی/عملیاتی باقی است
+- 🟡 **بازار دست‌دوم + مزایده C2C** (ثبت آگهی یک‌کلیک از صندوقچه، فروش مستقیم/مزایده، بالاترین پیشنهاد، **Escrow**، تأیید کارشناس، انتقال مالکیت و امتیازدهی) — ثبت آگهی از Smart Vault، خرید مستقیم با کمیسیون قابل‌تنظیم، escrow، WebSocket، cron lifecycle، distributed lock، moderation ادمین، انتقال مالکیت به Smart Vault و امتیازدهی مبتنی بر معامله پیاده شده؛ payout بانکی provider-backed و الزامات حقوقی/عملیاتی باقی است
 - 🟡 **خرید گروهی** (سرگروه، دعوت با لینک/کد، سهم هر نفر، تخفیف گروهی، پرداخت یکجا/جداگانه، پنل سرگروه) — route و UI، انتخاب محصول از کاتالوگ، احراز مالکیت JWT، ایجاد گروه، join، پرداخت سهم، نهایی‌سازی اتمیک سفارش/قفل موجودی، لغو گروه و refund سهم‌ها پیاده شد؛ workflow حمل‌ونقل گروهی باقی است
 - 🟡 **موتور AI** (پیش‌بینی قیمت، توصیه‌گر طراحی، Matching خریدار/فروشنده) — artifactهای قابل‌آموزش برای رگرسیون قیمت، popularity/collaborative baseline و matcher اضافه شد؛ اتصال داده‌های واقعی، آموزش دوره‌ای production و providerهای پیشرفته هنوز باقی است
 - 🟡 **جامعه + چالش‌های طراحی** (صفحه‌ی عمومی، لایک/کامنت/ذخیره، چالش ماهانه، رأی‌گیری، جوایز/نشان خودکار) — backend موجود
@@ -109,10 +109,11 @@
 2. ✅ سخت‌گیری آپلود تصویر به **< ۲۰۰KB** (فشرده‌سازی هدفمند WebP و رد خروجی بزرگ‌تر)
 3. ✅ **گزارش تفکیکی درآمد** در پنل ادمین برای کمیسیون‌های قطعی؛ ثبت جداگانه‌ی اسپرد/اشتراک/AI/AR برای حسابداری کامل باقی است.
 4. 🟡 **refund آنلاین واقعی** — قرارداد endpoint/provider و credential زرین‌پال باید در محیط sandbox/production تأیید شود؛ در کد، وضعیت `refund_pending`، قفل تراکنش و rollback امن اضافه شده و refund جعلی ممنوع است.
-5. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ regression coverage برای routeهای حساس اضافه شده و ممیزی route-by-route سایر ماژول‌ها باقی است)
-6. ⬜ ممیزی **OWASP** (helmet، CSRF، بازبینی ورودی‌ها) + بنچمارک < ۲۰۰ms + ممیزی ایندکس/N+1
-7. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
-8. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
-9. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است
+5. 🟡 **payout بانکی واقعی** — چرخه‌ی reserve/approve/processing/paid/reject و ثبت `providerReference` پیاده شده؛ اتصال API بانکی و reconciliation بیرونی باقی است.
+6. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ regression coverage برای routeهای حساس اضافه شده و ممیزی route-by-route سایر ماژول‌ها باقی است)
+7. ⬜ ممیزی **OWASP** (helmet، CSRF، بازبینی ورودی‌ها) + بنچمارک < ۲۰۰ms + ممیزی ایندکس/N+1
+8. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
+9. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
+10. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است
 9. 🔒 اتصال‌های واقعی: زرین‌پال (Merchant ID)، tgju (`GOLD_PRICE_SOURCE=tgju`)، Redis (بالا آوردن سرور)
 10. ⏸️ (عمدی) OpenAPI/حذف normalizer (frontend)، بازآرایی کامل Hexagonal

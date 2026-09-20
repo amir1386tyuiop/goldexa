@@ -75,6 +75,9 @@ export class PayoutService {
       if (status === PayoutRequestStatus.PAID && ![PayoutRequestStatus.APPROVED, PayoutRequestStatus.PROCESSING].includes(request.status)) {
         throw new BadRequestException('فقط برداشت تأییدشده قابل علامت‌گذاری به‌عنوان پرداخت‌شده است')
       }
+      if (status === PayoutRequestStatus.PAID && !data.providerReference?.trim()) {
+        throw new BadRequestException('شماره مرجع بانکی برای ثبت پرداخت الزامی است')
+      }
       if ([PayoutRequestStatus.REJECTED, PayoutRequestStatus.FAILED].includes(status)) {
         await this.walletService.refundPayout(request.userId, request.id, Number(request.amount), manager)
       }

@@ -29,7 +29,8 @@ export class UsedGoldListingsController {
   @Get('user/:userId')
   @UseGuards(JwtAuthGuard)
   async findByUser(@Param('userId') userId: string, @Req() req: Request & { user: JwtUser }) {
-    return this.listingsService.findByUser(req.user.role === 'admin' ? userId : req.user.sub)
+    const isAdmin = req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true
+    return this.listingsService.findByUser(isAdmin ? userId : req.user.sub)
   }
 
   @Get(':id')

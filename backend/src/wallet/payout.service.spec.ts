@@ -11,7 +11,6 @@ describe('PayoutService', () => {
       find: jest.fn(),
     }
     const bankRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 'bank-1', userId: 'user-1' }) }
-    const request = { id: 'payout-1', userId: 'user-1', amount: 10000, status: PayoutRequestStatus.PENDING }
     const manager = {
       create: jest.fn((_entity, value) => ({ ...value, id: 'payout-1' })),
       save: jest.fn(async (value) => value),
@@ -48,5 +47,21 @@ describe('PayoutService', () => {
     expect((service as never as { walletService: { refundPayout: jest.Mock } }).walletService.refundPayout).toHaveBeenCalledWith('user-1', 'payout-1', 10000, manager)
     request.status = PayoutRequestStatus.REJECTED
     await expect(service.resolve('payout-1', 'admin-1', PayoutRequestStatus.PAID, {})).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('requires a bank provider reference before marking a payout paid', async () => {
+    const request = { id: 'payout-1', userId: 'user-1', amount: 10000, status: PayoutRequestStatus.PROCESSING }
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(request),
+      save: jest.fn(async (value) => value),
+    }
+    const service = new PayoutService(
+      {} as never,
+      {} as never,
+      { transaction: jest.fn(async (callback) => callback(manager)) } as never,
+      {} as never,
+    )
+    await expect(service.resolve('payout-1', 'admin-1', PayoutRequestStatus.PAID, {})).rejects.toThrow('شماره مرجع بانکی')
+    await expect(service.resolve('payout-1', 'admin-1', PayoutRequestStatus.PAID, { providerReference: 'BANK-1' })).resolves.toMatchObject({ status: PayoutRequestStatus.PAID })
   })
 })
