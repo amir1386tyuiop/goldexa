@@ -9,6 +9,7 @@ import { UsedGoldListing, UsedGoldListingStatus, UsedGoldListingSaleType } from 
 import { Auction, AuctionStatus } from '../auctions/auction.entity'
 import { WalletService } from '../wallet/wallet.service'
 import { SmartVaultAsset } from '../smart-vault/smart-vault-asset.entity'
+import { Product } from '../products/product.entity'
 
 describe('EscrowService security boundaries', () => {
   let service: EscrowService
@@ -237,6 +238,34 @@ describe('EscrowService security boundaries', () => {
     expect(auction.paymentDeadlineAt).toBeNull()
     expect(transactionManager.save).toHaveBeenCalledWith(Auction, auction)
     expect(released?.status).toBe(EscrowPaymentStatus.RELEASED)
+  })
+
+  it('reserves auction inventory on escrow hold and releases it on refund', async () => {
+    const payment = {
+      id: 'escrow-auction-stock', auctionId: 'auction-stock', status: EscrowPaymentStatus.INITIATED,
+      buyerId: 'winner-1', sellerId: 'seller-1', amount: 250, fee: 5,
+    }
+    const auction = {
+      id: 'auction-stock', productId: 'product-1', status: AuctionStatus.AWAITING_PAYMENT,
+      paymentStatus: 'unpaid', winningBidderId: 'winner-1', winningAmount: 250,
+      paymentDeadlineAt: new Date(), inventoryReserved: false,
+    }
+    const product = { id: 'product-1', stock: 1 }
+    escrowRepository.findOneBy.mockResolvedValue(payment)
+    transactionManager.findOne.mockImplementation(async (entity) => {
+      if (entity === Auction) return auction
+      if (entity === Product) return product
+      return payment
+    })
+
+    await service.updatePaymentStatus(payment.id, { status: EscrowPaymentStatus.HELD })
+    expect(product.stock).toBe(0)
+    expect(auction.inventoryReserved).toBe(true)
+
+    payment.status = EscrowPaymentStatus.HELD
+    await service.updatePaymentStatus(payment.id, { status: EscrowPaymentStatus.REFUNDED })
+    expect(product.stock).toBe(1)
+    expect(auction.inventoryReserved).toBe(false)
   })
 
   it('transfers a released used-gold listing into the buyer vault exactly once', async () => {

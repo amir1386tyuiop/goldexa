@@ -240,12 +240,34 @@ export class EscrowService {
     }
 
     if (nextStatus === EscrowPaymentStatus.HELD) {
+      if (auction.productId && !auction.inventoryReserved) {
+        const product = await manager.findOne(Product, {
+          where: { id: auction.productId },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!product) throw new NotFoundException('محصول مزایده یافت نشد')
+        if (product.stock < 1) throw new BadRequestException('موجودی محصول مزایده کافی نیست')
+        product.stock -= 1
+        await manager.save(product)
+        auction.inventoryReserved = true
+      }
       auction.paymentStatus = AuctionPaymentStatus.ESCROW_HELD
     } else if (nextStatus === EscrowPaymentStatus.RELEASED) {
       auction.paymentStatus = AuctionPaymentStatus.SETTLED
       auction.status = AuctionStatus.COMPLETED
       auction.paymentDeadlineAt = null
+      auction.inventoryReserved = false
     } else if (nextStatus === EscrowPaymentStatus.REFUNDED) {
+      if (auction.productId && auction.inventoryReserved) {
+        const product = await manager.findOne(Product, {
+          where: { id: auction.productId },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!product) throw new NotFoundException('محصول مزایده یافت نشد')
+        product.stock += 1
+        await manager.save(product)
+        auction.inventoryReserved = false
+      }
       auction.paymentStatus = AuctionPaymentStatus.REFUNDED
       auction.status = AuctionStatus.FAILED
     }

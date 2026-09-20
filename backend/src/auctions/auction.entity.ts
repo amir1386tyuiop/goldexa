@@ -61,6 +61,9 @@ export class Auction {
   @Column({ name: 'product_id', nullable: true })
   productId: string | null
 
+  @Column({ default: false, name: 'inventory_reserved' })
+  inventoryReserved: boolean
+
   @Column({ name: 'seller_id' })
   sellerId: string
 

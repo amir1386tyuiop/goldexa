@@ -192,6 +192,7 @@ CREATE TABLE orders (
 CREATE TABLE auctions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+    inventory_reserved BOOLEAN NOT NULL DEFAULT false,
     seller_id UUID NOT NULL REFERENCES users(id),
     seller_name VARCHAR(255) NOT NULL,
     status VARCHAR(30) DEFAULT 'pending_review',
