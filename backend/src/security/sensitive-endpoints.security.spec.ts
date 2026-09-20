@@ -21,6 +21,12 @@ describe('sensitive endpoint guard policy', () => {
     ['pricing spread creation', '../pricing/pricing.controller.ts', 'createSpread', true],
     ['pricing tax rule creation', '../pricing/pricing.controller.ts', 'createTaxRule', true],
     ['pricing labor rule creation', '../pricing/pricing.controller.ts', 'createLaborRule', true],
+    ['content page creation', '../content/content.controller.ts', 'createPage', true],
+    ['promotion creation', '../content/content.controller.ts', 'createPromotion', true],
+    ['ad campaign creation', '../content/content.controller.ts', 'createAd', true],
+    ['liquidity status update', '../liquidity/liquidity.controller.ts', 'updateRequestStatus', true],
+    ['community challenge creation', '../community/community.controller.ts', 'createChallenge', true],
+    ['community challenge winner', '../community/community.controller.ts', 'setWinner', true],
   ])('%s requires the declared security policy', (_label, relativeFile, method, adminRequired) => {
     const source = readFileSync(join(__dirname, relativeFile), 'utf8')
     const methodIndex = source.indexOf(`async ${method}(`)
@@ -32,5 +38,11 @@ describe('sensitive endpoint guard policy', () => {
     if (adminRequired) {
       expect(decorators).toContain('AdminGuard')
     }
+  })
+
+  securityIt('keeps user-scoped liquidity reads behind an owner-or-admin check', () => {
+    const source = readFileSync(join(__dirname, '../liquidity/liquidity.controller.ts'), 'utf8')
+    expect(source).toContain('assertOwnerOrAdmin(userId, req.user)')
+    expect(source).toContain("user.role !== 'admin'")
   })
 })
