@@ -39,4 +39,19 @@ describe('SmartVaultService', () => {
     expect(notifications.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'price_alert', userId: 'u1' }))
     expect(alerts.save).toHaveBeenCalledWith(expect.objectContaining({ notifiedAt: expect.any(Date) }))
   })
+
+  it('resets only an owned alert and clears its notification marker', async () => {
+    const alert = { id: 'alert-1', userId: 'u1', isActive: false, notifiedAt: new Date() }
+    alerts.findOneBy.mockResolvedValue(alert)
+    const service = new SmartVaultService(assets as never, snapshots as never, alerts as never)
+
+    await expect(service.resetAlert('alert-1', 'u1')).resolves.toEqual(expect.objectContaining({ isActive: true, notifiedAt: null }))
+    expect(alerts.save).toHaveBeenCalledWith(expect.objectContaining({ isActive: true, notifiedAt: null }))
+  })
+
+  it('does not allow resetting another user alert', async () => {
+    alerts.findOneBy.mockResolvedValue({ id: 'alert-1', userId: 'owner', isActive: false })
+    const service = new SmartVaultService(assets as never, snapshots as never, alerts as never)
+    await expect(service.resetAlert('alert-1', 'attacker')).rejects.toThrow('دسترسی')
+  })
 })

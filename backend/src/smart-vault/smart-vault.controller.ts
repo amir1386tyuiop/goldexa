@@ -59,6 +59,11 @@ export class SmartVaultController {
   async disableAlert(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.smartVaultService.disableAlert(id, req.user.sub, isAdmin(req.user))
   }
+
+  @Patch('alerts/:id/reset')
+  async resetAlert(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.smartVaultService.resetAlert(id, req.user.sub, isAdmin(req.user))
+  }
 }
 
 function isAdmin(user: JwtUser): boolean {

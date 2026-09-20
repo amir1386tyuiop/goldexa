@@ -218,4 +218,16 @@ export class SmartVaultService {
     alert.isActive = false
     return this.alertRepository.save(alert)
   }
+
+  async resetAlert(id: string, userId: string, isAdmin = false): Promise<PriceAlert | null> {
+    const alert = await this.alertRepository.findOneBy({ id })
+    if (!alert) throw new NotFoundException('هشدار قیمت یافت نشد')
+    if (!isAdmin && alert.userId !== userId) {
+      throw new ForbiddenException('به این هشدار دسترسی ندارید')
+    }
+
+    alert.isActive = true
+    alert.notifiedAt = null
+    return this.alertRepository.save(alert)
+  }
 }

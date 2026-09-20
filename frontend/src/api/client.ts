@@ -1745,6 +1745,8 @@ export const api = {
     request<PriceAlert>('/smart-vault/alerts', { method: 'POST', body }),
   disablePriceAlert: (id: string) =>
     request<PriceAlert>(`/smart-vault/alerts/${id}/disable`, { method: 'PATCH' }),
+  resetPriceAlert: (id: string) =>
+    request<PriceAlert>(`/smart-vault/alerts/${id}/reset`, { method: 'PATCH' }),
   getGroupBuyingGroups: () => request<GroupBuyingGroup[]>('/group-buying'),
   getGroupBuyingGroup: (id: string) => request<{ group: GroupBuyingGroup; items: GroupBuyingItem[]; members: GroupBuyingMember[] }>(`/group-buying/${id}`),
   createGroupBuyingGroup: (body: CreateGroupBuyingGroupInput) =>
