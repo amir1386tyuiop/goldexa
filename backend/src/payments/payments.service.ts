@@ -352,6 +352,61 @@ export class PaymentsService {
     return this.transactionRepository.save(transaction)
   }
 
+  /** Execute an idempotent provider-backed refund. Never credits the wallet. */
+  async refundTransaction(id: string): Promise<PaymentTransaction> {
+    const transaction = await this.dataSource.transaction(async (manager) => {
+      const locked = await manager.findOne(PaymentTransaction, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!locked) throw new NotFoundException('تراکنش پرداخت یافت نشد')
+      if (locked.status === PaymentTransactionStatus.REFUNDED) return locked
+      if (locked.status !== PaymentTransactionStatus.PAID) {
+        throw new BadRequestException('فقط پرداخت موفق قابل بازپرداخت است')
+      }
+      locked.status = PaymentTransactionStatus.REFUND_PENDING
+      return manager.save(locked)
+    })
+
+    if (transaction.status === PaymentTransactionStatus.REFUNDED) return transaction
+
+    try {
+      const provider = await this.zarinpal.refundPayment({
+        authority: transaction.authority ?? '',
+        amount: Number(transaction.amount),
+        referenceId: transaction.referenceId,
+      })
+      if (!provider.success) throw new BadRequestException(provider.message)
+
+      return this.dataSource.transaction(async (manager) => {
+        const locked = await manager.findOne(PaymentTransaction, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!locked) throw new NotFoundException('تراکنش پرداخت یافت نشد')
+        if (locked.status === PaymentTransactionStatus.REFUNDED) return locked
+        if (locked.status !== PaymentTransactionStatus.REFUND_PENDING) {
+          throw new BadRequestException('وضعیت بازپرداخت تراکنش تغییر کرده است')
+        }
+        locked.status = PaymentTransactionStatus.REFUNDED
+        locked.trackingCode = provider.refundId ?? locked.trackingCode
+        return manager.save(locked)
+      })
+    } catch (error) {
+      await this.dataSource.transaction(async (manager) => {
+        const locked = await manager.findOne(PaymentTransaction, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (locked?.status === PaymentTransactionStatus.REFUND_PENDING) {
+          locked.status = PaymentTransactionStatus.PAID
+          await manager.save(locked)
+        }
+      })
+      throw error
+    }
+  }
+
   async findOrderTracking(orderId: string, userId?: string, isAdmin = false): Promise<OrderTrackingEvent[]> {
     if (!isAdmin && userId) {
       const order = await this.orderRepository.findOneBy({ id: orderId, userId })

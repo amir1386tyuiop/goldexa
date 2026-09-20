@@ -12,6 +12,6 @@ import { PricingModule } from '../pricing/pricing.module'
   imports: [TypeOrmModule.forFeature([PaymentTransaction, OrderTrackingEvent, Order]), PricingModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, ZarinpalService],
-  exports: [PaymentsService],
+  exports: [PaymentsService, ZarinpalService],
 })
 export class PaymentsModule {}

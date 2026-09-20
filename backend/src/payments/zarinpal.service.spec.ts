@@ -30,4 +30,8 @@ describe('ZarinpalService (mock mode)', () => {
   it('treats a configured merchant id as real (non-mock) mode', () => {
     expect(build('REAL-MERCHANT-ID').isMock).toBe(false)
   })
+
+  it('refuses refunds in mock mode instead of creating a fake refund', async () => {
+    await expect(build().refundPayment({ authority: 'MOCK-1', amount: 1000 })).rejects.toThrow('حالت mock')
+  })
 })

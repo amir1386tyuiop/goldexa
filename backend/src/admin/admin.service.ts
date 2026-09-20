@@ -30,6 +30,7 @@ import { UserFollow } from '../community-extensions/user-follow.entity'
 import { RoleService } from '../auth/role.service'
 import { SystemSetting } from '../audit/system-setting.entity'
 import { PayoutRequest, PayoutRequestStatus } from '../wallet/payout-request.entity'
+import { PaymentsService } from '../payments/payments.service'
 @Injectable()
 export class AdminService {
   constructor(
@@ -63,6 +64,7 @@ export class AdminService {
     private escrowRepository: Repository<EscrowPayment>,
     @InjectRepository(PaymentTransaction)
     private paymentTransactionRepository: Repository<PaymentTransaction>,
+    private readonly paymentsService: PaymentsService,
     @InjectRepository(ProductCategoryMaster)
     private categoryRepository: Repository<ProductCategoryMaster>,
     @InjectRepository(Cart)
@@ -411,19 +413,10 @@ export class AdminService {
   }
 
   async refundPayment(id: string, status: PaymentTransactionStatus = PaymentTransactionStatus.REFUNDED) {
-    const payment = await this.paymentTransactionRepository.findOneBy({ id })
-
-    if (!payment) {
-      throw new NotFoundException('پرداخت یافت نشد')
-    }
-
     if (status !== PaymentTransactionStatus.REFUNDED) {
       throw new BadRequestException('وضعیت بازپرداخت نامعتبر است')
     }
-    if (payment.status !== PaymentTransactionStatus.PAID) {
-      throw new BadRequestException('فقط پرداخت موفق قابل بازپرداخت است')
-    }
-    return this.paymentTransactionRepository.save({ ...payment, status })
+    return this.paymentsService.refundTransaction(id)
   }
 
   async listSettings() {

@@ -58,6 +58,12 @@ export class PaymentsController {
     return this.paymentsService.updateTransactionStatus(id, body)
   }
 
+  @Post('transactions/:id/refund')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async refundTransaction(@Param('id') id: string) {
+    return this.paymentsService.refundTransaction(id)
+  }
+
   @Get('orders/:orderId/tracking')
   @UseGuards(JwtAuthGuard)
   async findOrderTracking(@Param('orderId') orderId: string, @Req() request: Request & { user: JwtUser }) {

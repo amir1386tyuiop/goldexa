@@ -17,6 +17,14 @@ export interface ZarinpalVerifyResult {
   mock: boolean
 }
 
+export interface ZarinpalRefundResult {
+  success: boolean
+  refundId: string | null
+  code: number
+  message: string
+  mock: boolean
+}
+
 /**
  * ZarinPal payment gateway adapter.
  *
@@ -113,6 +121,38 @@ export class ZarinpalService {
       refId: refId ? String(refId) : null,
       code: Number(code ?? -1),
       message: success ? 'پرداخت تأیید شد' : 'تأیید پرداخت ناموفق بود',
+      mock: false,
+    }
+  }
+
+  /** Provider-backed refund. The merchant must explicitly configure its refund endpoint. */
+  async refundPayment(params: { authority: string; amount: number; referenceId?: string | null }): Promise<ZarinpalRefundResult> {
+    const endpoint = this.config.get<string>('ZARINPAL_REFUND_ENDPOINT')
+    if (this.isMock || params.authority.startsWith('MOCK-')) {
+      throw new Error('بازپرداخت آنلاین در حالت mock مجاز نیست')
+    }
+    if (!endpoint || !this.merchantId) {
+      throw new Error('provider بازپرداخت زرین‌پال پیکربندی نشده است')
+    }
+
+    const { data } = await axios.post(
+      endpoint,
+      {
+        merchant_id: this.merchantId,
+        authority: params.authority,
+        amount: this.toRial(params.amount),
+        reference_id: params.referenceId ?? undefined,
+      },
+      { timeout: 10000 },
+    )
+    const code = Number(data?.data?.code ?? data?.code ?? -1)
+    const refundId = data?.data?.refund_id ?? data?.data?.ref_id ?? data?.refund_id ?? null
+    const success = code === 100 || code === 101
+    return {
+      success,
+      refundId: refundId ? String(refundId) : null,
+      code,
+      message: success ? 'بازپرداخت توسط provider تأیید شد' : 'بازپرداخت توسط provider ناموفق بود',
       mock: false,
     }
   }

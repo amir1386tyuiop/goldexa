@@ -47,7 +47,7 @@
 - ✅ AC: شماره سفارش یکتا (`GX-...`)
 - ✅ AC: پرداخت ناموفق → بازگشت با خطای واضح (status failed)
 - ✅ مدیریت لجستیک MVP: ثبت کد رهگیری توسط فروشنده + نمایش به کاربر (tracking/shipments)
-- 🔒 اتصال واقعی زرین‌پال نیازمند `ZARINPAL_MERCHANT_ID`
+- 🟡 اتصال واقعی زرین‌پال نیازمند `ZARINPAL_MERCHANT_ID` و تست sandbox است؛ refund آنلاین اکنون فقط با `ZARINPAL_REFUND_ENDPOINT` و تأیید provider انجام می‌شود و در mock عمداً رد می‌شود
 
 ### ۵.۴ پنل کاربری پایه
 - ✅ ورود موبایل + OTP (هش‌شده، انقضای ۵دقیقه، پشت flag برای prod، rate-limit)
@@ -108,10 +108,11 @@
 1. ✅ تنظیم آستانه‌ی نوسان قیمت به **۲٪** (طبق AC دقیق PRD)
 2. ✅ سخت‌گیری آپلود تصویر به **< ۲۰۰KB** (فشرده‌سازی هدفمند WebP و رد خروجی بزرگ‌تر)
 3. ✅ **گزارش تفکیکی درآمد** در پنل ادمین برای کمیسیون‌های قطعی؛ ثبت جداگانه‌ی اسپرد/اشتراک/AI/AR برای حسابداری کامل باقی است.
-4. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ regression coverage برای routeهای حساس اضافه شده و ممیزی route-by-route سایر ماژول‌ها باقی است)
-5. ⬜ ممیزی **OWASP** (helmet، CSRF، بازبینی ورودی‌ها) + بنچمارک < ۲۰۰ms + ممیزی ایندکس/N+1
-6. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
-7. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
-8. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است
+4. 🟡 **refund آنلاین واقعی** — قرارداد endpoint/provider و credential زرین‌پال باید در محیط sandbox/production تأیید شود؛ در کد، وضعیت `refund_pending`، قفل تراکنش و rollback امن اضافه شده و refund جعلی ممنوع است.
+5. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ regression coverage برای routeهای حساس اضافه شده و ممیزی route-by-route سایر ماژول‌ها باقی است)
+6. ⬜ ممیزی **OWASP** (helmet، CSRF، بازبینی ورودی‌ها) + بنچمارک < ۲۰۰ms + ممیزی ایندکس/N+1
+7. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
+8. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
+9. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است
 9. 🔒 اتصال‌های واقعی: زرین‌پال (Merchant ID)، tgju (`GOLD_PRICE_SOURCE=tgju`)، Redis (بالا آوردن سرور)
 10. ⏸️ (عمدی) OpenAPI/حذف normalizer (frontend)، بازآرایی کامل Hexagonal

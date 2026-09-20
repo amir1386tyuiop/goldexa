@@ -6,6 +6,7 @@ export enum PaymentTransactionStatus {
   PAID = 'paid',
   FAILED = 'failed',
   REFUNDED = 'refunded',
+  REFUND_PENDING = 'refund_pending',
 }
 
 @Entity('payment_transactions')

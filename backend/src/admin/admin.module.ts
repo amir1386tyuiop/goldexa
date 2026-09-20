@@ -37,6 +37,7 @@ import { RoleService } from '../auth/role.service'
 import { EscrowModule } from '../escrow/escrow.module'
 import { OrdersModule } from '../orders/orders.module'
 import { PayoutRequest } from '../wallet/payout-request.entity'
+import { PaymentsModule } from '../payments/payments.module'
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { PayoutRequest } from '../wallet/payout-request.entity'
     ]),
     EscrowModule,
     OrdersModule,
+    PaymentsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, RoleService],

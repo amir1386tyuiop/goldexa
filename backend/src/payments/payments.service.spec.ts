@@ -38,7 +38,7 @@ describe('PaymentsService financial flow', () => {
     save: jest.Mock
   }
   let orderRepository: { findOneBy: jest.Mock }
-  let zarinpal: { requestPayment: jest.Mock; verifyPayment: jest.Mock }
+  let zarinpal: { requestPayment: jest.Mock; verifyPayment: jest.Mock; refundPayment: jest.Mock }
   let dataSource: { transaction: jest.Mock }
   let audit: { record: jest.Mock }
   let pricingService: { requireValidQuote: jest.Mock }
@@ -67,6 +67,7 @@ describe('PaymentsService financial flow', () => {
         message: 'ok',
         mock: true,
       })),
+      refundPayment: jest.fn(),
     }
     audit = { record: jest.fn(async () => undefined) }
     pricingService = {
@@ -188,5 +189,25 @@ describe('PaymentsService financial flow', () => {
       ),
     ).rejects.toThrow('کلید idempotency قبلاً برای درخواست دیگری استفاده شده است')
     expect(zarinpal.requestPayment).not.toHaveBeenCalled()
+  })
+
+  it('requires provider acknowledgement before marking an online payment refunded', async () => {
+    transaction.status = PaymentTransactionStatus.PAID
+    zarinpal.refundPayment.mockRejectedValueOnce(new Error('provider unavailable'))
+
+    await expect(service.refundTransaction('tx-1')).rejects.toThrow('provider unavailable')
+    expect(zarinpal.refundPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 12_340 }))
+    expect(transaction.status).toBe(PaymentTransactionStatus.PAID)
+  })
+
+  it('marks a paid transaction refunded only after provider success', async () => {
+    transaction.status = PaymentTransactionStatus.PAID
+    zarinpal.refundPayment.mockResolvedValueOnce({ success: true, refundId: 'REFUND-1', code: 100, message: 'ok', mock: false })
+
+    const result = await service.refundTransaction('tx-1')
+
+    expect(result.status).toBe(PaymentTransactionStatus.REFUNDED)
+    expect(result.trackingCode).toBe('REFUND-1')
+    expect(zarinpal.refundPayment).toHaveBeenCalledTimes(1)
   })
 })
