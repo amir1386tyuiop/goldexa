@@ -5,6 +5,7 @@ import { GroupBuyingService } from './group-buying.service'
 import {
   AddGroupBuyingItemDto,
   CreateGroupBuyingGroupDto,
+  FinalizeGroupBuyingDto,
   JoinGroupBuyingDto,
   PayGroupBuyingShareDto,
 } from './create-group-buying.dto'
@@ -49,5 +50,10 @@ export class GroupBuyingController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.groupBuyingService.payShare(id, memberId, body, req.user.sub)
+  }
+
+  @Post(':id/finalize')
+  async finalize(@Param('id') id: string, @Body() body: FinalizeGroupBuyingDto, @Req() req: AuthenticatedRequest) {
+    return this.groupBuyingService.finalizeGroup(id, body.address, req.user.sub)
   }
 }

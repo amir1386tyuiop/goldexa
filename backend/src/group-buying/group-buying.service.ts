@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, Repository } from 'typeorm'
 import {
@@ -17,6 +17,11 @@ import {
 } from './create-group-buying.dto'
 import { User } from '../users/user.entity'
 import { WalletService } from '../wallet/wallet.service'
+import { Order, OrderStatus, PaymentMethod } from '../orders/order.entity'
+import { Product } from '../products/product.entity'
+import { CreateOrderAddressDto } from '../orders/create-order.dto'
+import { PricingService } from '../pricing/pricing.service'
+import { randomUUID } from 'crypto'
 
 @Injectable()
 export class GroupBuyingService {
@@ -31,6 +36,7 @@ export class GroupBuyingService {
     private userRepository: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
+    @Optional() private readonly pricingService?: PricingService,
   ) {}
 
   async findAll(): Promise<GroupBuyingGroup[]> {
@@ -67,6 +73,7 @@ export class GroupBuyingService {
       targetAmount: data.targetAmount || 0,
       discountRate: data.discountRate || 0,
       inviteCode: this.createInviteCode(),
+      orderId: null,
       status: GroupBuyingStatus.OPEN,
     })
 
@@ -80,17 +87,23 @@ export class GroupBuyingService {
       throw new NotFoundException('گروه خرید یافت نشد')
     }
     if (group.leaderId !== actorId) throw new ForbiddenException('فقط رهبر گروه می‌تواند محصول اضافه کند')
+    if (group.status !== GroupBuyingStatus.OPEN) throw new BadRequestException('این گروه دیگر قابل ویرایش نیست')
     if (!Number.isFinite(Number(data.unitPrice)) || Number(data.unitPrice) <= 0 || !Number.isInteger(Number(data.quantity || 1)) || Number(data.quantity || 1) < 1) {
       throw new BadRequestException('مقدار و قیمت محصول نامعتبر است')
     }
 
+    const product = await this.itemRepository.manager.findOne(Product, { where: { id: data.productId } })
+    if (!product) throw new NotFoundException('محصول یافت نشد')
+    if (!this.pricingService) throw new BadRequestException('سرویس قیمت‌گذاری در دسترس نیست')
+    const livePrice = await this.pricingService.calculateProductPrice(product)
+
     const item = this.itemRepository.create({
       groupId,
-      productId: data.productId,
-      name: data.name,
+      productId: product.id,
+      name: product.name,
       quantity: data.quantity || 1,
-      unitPrice: data.unitPrice,
-      totalPrice: Number(data.unitPrice) * Number(data.quantity || 1),
+      unitPrice: livePrice,
+      totalPrice: Number(livePrice) * Number(data.quantity || 1),
     })
 
     return this.itemRepository.save(item)
@@ -140,6 +153,66 @@ export class GroupBuyingService {
       member.paidAmount = requested
       member.status = requested >= Number(member.shareAmount) ? GroupBuyingMemberStatus.PAID : GroupBuyingMemberStatus.JOINED
       return manager.save(member)
+    })
+  }
+
+  async finalizeGroup(groupId: string, address: CreateOrderAddressDto, actorId: string): Promise<Order> {
+    return this.dataSource.transaction(async (manager) => {
+      const group = await manager.findOne(GroupBuyingGroup, {
+        where: { id: groupId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!group) throw new NotFoundException('گروه خرید یافت نشد')
+      if (group.leaderId !== actorId) throw new ForbiddenException('فقط رهبر گروه می‌تواند خرید را نهایی کند')
+      if (group.orderId) {
+        const existing = await manager.findOne(Order, { where: { id: group.orderId } })
+        if (existing) return existing
+      }
+      if (group.status !== GroupBuyingStatus.OPEN) throw new BadRequestException('این گروه قابل نهایی‌سازی نیست')
+
+      const [items, members] = await Promise.all([
+        manager.find(GroupBuyingItem, { where: { groupId } }),
+        manager.find(GroupBuyingMember, { where: { groupId }, lock: { mode: 'pessimistic_write' } }),
+      ])
+      if (!items.length || !members.length) throw new BadRequestException('گروه هنوز محصول یا عضو ندارد')
+
+      const goodsTotal = items.reduce((sum, item) => sum + Number(item.totalPrice), 0)
+      const discount = Math.min(Math.max(Number(group.discountRate || 0), 0), 99.99)
+      const totalAmount = Math.round(goodsTotal * (1 - discount / 100) * 100) / 100
+      const paidTotal = members.reduce((sum, member) => sum + Number(member.paidAmount || 0), 0)
+      if (paidTotal < totalAmount || members.some((member) => Number(member.paidAmount || 0) < Number(member.shareAmount))) {
+        throw new BadRequestException('همه سهم‌ها هنوز به طور کامل پرداخت نشده‌اند')
+      }
+
+      const productIds = [...new Set(items.map((item) => item.productId))].sort()
+      const products = new Map<string, Product>()
+      for (const productId of productIds) {
+        const product = await manager.findOne(Product, { where: { id: productId }, lock: { mode: 'pessimistic_write' } })
+        if (!product) throw new NotFoundException(`محصول ${productId} یافت نشد`)
+        products.set(productId, product)
+      }
+      for (const item of items) {
+        const product = products.get(item.productId)!
+        if (product.stock < item.quantity) throw new BadRequestException(`موجودی محصول ${product.name} کافی نیست`)
+        product.stock -= item.quantity
+        await manager.save(product)
+      }
+
+      const order = manager.create(Order, {
+        orderNumber: `GX-${randomUUID().replace(/-/g, '').slice(0, 24)}`,
+        userId: group.leaderId,
+        items: items.map((item) => ({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice })),
+        totalAmount,
+        shippingCost: 0,
+        status: OrderStatus.PAID,
+        address,
+        paymentMethod: PaymentMethod.WALLET,
+      })
+      const saved = await manager.save(order)
+      group.orderId = saved.id
+      group.status = GroupBuyingStatus.PAID
+      await manager.save(group)
+      return saved
     })
   }
 

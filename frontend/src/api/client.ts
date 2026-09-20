@@ -1562,6 +1562,7 @@ function normalizeGroupBuyingGroup(value: Record<string, unknown>) {
     targetAmount: toNumber(value.targetAmount || value.target_amount),
     discountRate: toNumber(value.discountRate || value.discount_rate),
     inviteCode: String(value.inviteCode || value.invite_code || ''),
+    orderId: value.orderId ?? value.order_id ?? null,
     status: value.status || 'draft',
     createdAt: String(value.createdAt || value.created_at || ''),
     updatedAt: String(value.updatedAt || value.updated_at || ''),
@@ -1754,6 +1755,8 @@ export const api = {
     request<GroupBuyingMember>(`/group-buying/${id}/join`, { method: 'POST', body }),
   payGroupBuyingShare: (id: string, memberId: string, body: { paidAmount: number }) =>
     request<GroupBuyingMember>(`/group-buying/${id}/members/${memberId}/pay`, { method: 'PATCH', body }),
+  finalizeGroupBuying: (id: string, address: { title: string; province: string; city: string; street: string; postalCode: string; isDefault: boolean }) =>
+    request<Order>(`/group-buying/${id}/finalize`, { method: 'POST', body: { address } }),
   getSubscriptionPlans: () => request<SubscriptionPlan[]>('/subscriptions/plans'),
   getDiscountCodes: () => request<DiscountCode[]>('/subscriptions/discounts'),
   getNotifications: (userId: string) => request<Notification[]>(`/notifications/user/${userId}`),

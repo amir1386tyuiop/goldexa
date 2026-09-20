@@ -7,9 +7,11 @@ import { User } from '../users/user.entity'
 import { GroupBuyingController } from './group-buying.controller'
 import { GroupBuyingService } from './group-buying.service'
 import { WalletModule } from '../wallet/wallet.module'
+import { PricingModule } from '../pricing/pricing.module'
+import { Product } from '../products/product.entity'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([GroupBuyingGroup, GroupBuyingItem, GroupBuyingMember, User]), WalletModule],
+  imports: [TypeOrmModule.forFeature([GroupBuyingGroup, GroupBuyingItem, GroupBuyingMember, User, Product]), WalletModule, PricingModule],
   controllers: [GroupBuyingController],
   providers: [GroupBuyingService],
   exports: [GroupBuyingService],

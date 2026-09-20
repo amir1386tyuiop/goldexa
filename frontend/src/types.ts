@@ -398,6 +398,7 @@ export interface GroupBuyingGroup {
   targetAmount: number
   discountRate: number
   inviteCode: string
+  orderId?: string | null
   createdAt: string
   updatedAt: string
 }

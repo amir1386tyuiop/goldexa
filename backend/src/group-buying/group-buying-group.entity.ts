@@ -58,6 +58,9 @@ export class GroupBuyingGroup {
   @Column({ name: 'invite_code', unique: true })
   inviteCode: string
 
+  @Column({ name: 'order_id', nullable: true, unique: true })
+  orderId: string | null
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
 
