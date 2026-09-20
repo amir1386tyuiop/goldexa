@@ -74,7 +74,8 @@ class AiServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_health_describes_local_mode(self):
         result = await health()
         self.assertEqual(result["status"], "healthy")
-        self.assertEqual(result["checks"]["model_store"], "not_required")
+        self.assertEqual(result["checks"]["model_store"], "fallback")
+        self.assertEqual(result["models"], {"price": False, "recommendation": False, "matching": False})
 
 
 if __name__ == "__main__":
