@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { DataSource, In, Repository } from 'typeorm'
 import {
@@ -223,14 +223,19 @@ export class UsedGoldListingsService {
   }
 
   async cancelOwnListing(id: string, sellerId: string): Promise<UsedGoldListing> {
-    const listing = await this.listingRepository.findOneBy({ id })
-    if (!listing) throw new NotFoundException('آگهی موردنظر یافت نشد')
-    if (listing.sellerId !== sellerId) throw new BadRequestException('این آگهی متعلق به شما نیست')
-    if ([UsedGoldListingStatus.SOLD, UsedGoldListingStatus.CANCELLED].includes(listing.status)) {
-      throw new BadRequestException('آگهی در وضعیت قابل لغو نیست')
-    }
-    listing.status = UsedGoldListingStatus.CANCELLED
-    return this.listingRepository.save(listing)
+    return this.dataSource.transaction(async (manager) => {
+      const listing = await manager.findOne(UsedGoldListing, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!listing) throw new NotFoundException('آگهی موردنظر یافت نشد')
+      if (listing.sellerId !== sellerId) throw new ForbiddenException('این آگهی متعلق به شما نیست')
+      if ([UsedGoldListingStatus.SOLD, UsedGoldListingStatus.CANCELLED].includes(listing.status)) {
+        throw new BadRequestException('آگهی در وضعیت قابل لغو نیست')
+      }
+      listing.status = UsedGoldListingStatus.CANCELLED
+      return manager.save(listing)
+    })
   }
 
   /**

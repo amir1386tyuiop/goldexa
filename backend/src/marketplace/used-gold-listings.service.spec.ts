@@ -140,4 +140,27 @@ describe('UsedGoldListingsService', () => {
     expect(result.escrow.status).toBe(EscrowPaymentStatus.HELD)
     expect(result.escrow.fee).toBe(50)
   })
+
+  it('locks an active listing before a seller cancellation', async () => {
+    const listing = { id: 'listing-1', sellerId: 'seller-1', status: UsedGoldListingStatus.ACTIVE }
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(listing),
+      save: jest.fn(async (value: Record<string, unknown>) => value),
+    }
+    const transactional = { transaction: jest.fn(async (callback: (value: typeof manager) => unknown) => callback(manager)) }
+    const cancellationService = new UsedGoldListingsService(
+      listingRepository as never,
+      userRepository as never,
+      transactional as never,
+      walletService as never,
+    )
+
+    const result = await cancellationService.cancelOwnListing('listing-1', 'seller-1')
+
+    expect(manager.findOne).toHaveBeenCalledWith(expect.anything(), {
+      where: { id: 'listing-1' },
+      lock: { mode: 'pessimistic_write' },
+    })
+    expect(result.status).toBe(UsedGoldListingStatus.CANCELLED)
+  })
 })
