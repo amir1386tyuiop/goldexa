@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, Header } from '@nestjs/common'
 
 @Controller()
 export class AppController {
@@ -36,5 +36,30 @@ export class AppController {
       },
       timestamp: new Date().toISOString(),
     }
+  }
+
+  /** Prometheus exposition format for a scrape target. */
+  @Get('metrics/prometheus')
+  @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+  prometheusMetrics() {
+    const mem = process.memoryUsage()
+    const lines = [
+      '# HELP goldexa_process_uptime_seconds Process uptime in seconds.',
+      '# TYPE goldexa_process_uptime_seconds gauge',
+      `goldexa_process_uptime_seconds ${process.uptime()}`,
+      '# HELP goldexa_process_resident_memory_bytes Resident process memory in bytes.',
+      '# TYPE goldexa_process_resident_memory_bytes gauge',
+      `goldexa_process_resident_memory_bytes ${mem.rss}`,
+      '# HELP goldexa_process_heap_used_bytes Node.js heap currently used in bytes.',
+      '# TYPE goldexa_process_heap_used_bytes gauge',
+      `goldexa_process_heap_used_bytes ${mem.heapUsed}`,
+      '# HELP goldexa_process_heap_total_bytes Node.js heap allocated in bytes.',
+      '# TYPE goldexa_process_heap_total_bytes gauge',
+      `goldexa_process_heap_total_bytes ${mem.heapTotal}`,
+      '# HELP goldexa_up Whether the Goldexa API process is running.',
+      '# TYPE goldexa_up gauge',
+      'goldexa_up 1',
+    ]
+    return `${lines.join('\n')}\n`
   }
 }
