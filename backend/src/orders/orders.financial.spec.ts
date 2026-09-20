@@ -38,16 +38,17 @@ describe('OrdersService invoice and refund guards', () => {
     expect(manager.save).not.toHaveBeenCalled()
   })
 
-  it('approves a wallet refund exactly once and rejects online approval without a provider', async () => {
+  it('approves a wallet refund exactly once and settles a full online refund through the provider', async () => {
     const service = Object.create(OrdersService.prototype) as any
     const refund = { id: 'refund-1', orderId: 'order-1', amount: 250, status: 'pending' }
-    const order = { id: 'order-1', userId: 'user-1', paymentMethod: PaymentMethod.WALLET }
+    const order = { id: 'order-1', userId: 'user-1', paymentMethod: PaymentMethod.WALLET, totalAmount: 250 }
     const manager = {
       findOne: jest.fn(async (entity: unknown) => entity === Refund ? refund : order),
       save: jest.fn(async (_entity: unknown, value: unknown) => value),
     }
     service.dataSource = { transaction: jest.fn((callback: (value: unknown) => unknown) => callback(manager)) }
     service.walletService = { refundOrderToWallet: jest.fn() }
+    service.paymentsService = { refundOrderPayment: jest.fn().mockResolvedValue({ status: 'refunded' }) }
 
     await expect(service.resolveRefund('refund-1', 'approved')).resolves.toMatchObject({ status: 'approved' })
     expect(service.walletService.refundOrderToWallet).toHaveBeenCalledWith('user-1', 'order-1', 250, manager)
@@ -57,8 +58,8 @@ describe('OrdersService invoice and refund guards', () => {
 
     refund.status = 'pending'
     order.paymentMethod = PaymentMethod.ONLINE
-    await expect(service.resolveRefund('refund-1', 'approved')).rejects.toThrow('provider واقعی')
-    expect(refund.status).toBe('pending')
+    await expect(service.resolveRefund('refund-1', 'approved')).resolves.toMatchObject({ status: 'approved' })
+    expect(service.paymentsService.refundOrderPayment).toHaveBeenCalledWith('order-1', 250)
   })
 
   it('cancels a paid wallet order atomically, refunds it, and restores stock', async () => {

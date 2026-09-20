@@ -43,6 +43,7 @@ describe('OrdersService wallet checkout', () => {
       {} as any,
       walletService,
       pricingService,
+      {} as any,
       dataSource,
     )
   })

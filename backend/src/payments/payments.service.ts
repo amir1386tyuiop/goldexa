@@ -407,6 +407,19 @@ export class PaymentsService {
     }
   }
 
+  /** Refund the single settled online transaction belonging to an order. */
+  async refundOrderPayment(orderId: string, amount: number): Promise<PaymentTransaction> {
+    const transaction = await this.transactionRepository.findOneBy({
+      orderId,
+      status: PaymentTransactionStatus.PAID,
+    })
+    if (!transaction) throw new NotFoundException('پرداخت آنلاین موفق برای سفارش پیدا نشد')
+    if (Math.round(Number(transaction.amount) * 100) !== Math.round(Number(amount) * 100)) {
+      throw new BadRequestException('بازپرداخت جزئی آنلاین تا پشتیبانی provider قابل انجام نیست')
+    }
+    return this.refundTransaction(transaction.id)
+  }
+
   async findOrderTracking(orderId: string, userId?: string, isAdmin = false): Promise<OrderTrackingEvent[]> {
     if (!isAdmin && userId) {
       const order = await this.orderRepository.findOneBy({ id: orderId, userId })

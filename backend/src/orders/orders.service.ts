@@ -13,6 +13,7 @@ import { CreateOrderDto } from './create-order.dto'
 import { WalletService } from '../wallet/wallet.service'
 import { randomUUID } from 'crypto'
 import { PricingService } from '../pricing/pricing.service'
+import { PaymentsService } from '../payments/payments.service'
 
 @Injectable()
 export class OrdersService {
@@ -35,6 +36,7 @@ export class OrdersService {
     private cancellationRepository: Repository<OrderCancellation>,
     private readonly walletService: WalletService,
     private readonly pricingService: PricingService,
+    private readonly paymentsService: PaymentsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -230,13 +232,26 @@ export class OrdersService {
     })
   }
 
-  /** Approves or rejects a refund request with an atomic wallet credit. */
+  /** Approves or rejects a refund request with an atomic wallet/provider settlement. */
   async resolveRefund(refundId: string, status: 'approved' | 'rejected'): Promise<Refund> {
     if (!['approved', 'rejected'].includes(status)) {
       throw new BadRequestException('وضعیت بازپرداخت نامعتبر است')
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    if (status === 'rejected') {
+      return this.dataSource.transaction(async (manager) => {
+        const refund = await manager.findOne(Refund, {
+          where: { id: refundId },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!refund) throw new NotFoundException('درخواست بازپرداخت یافت نشد')
+        if (refund.status !== 'pending') throw new BadRequestException('این درخواست قبلاً تعیین تکلیف شده است')
+        refund.status = 'rejected'
+        return manager.save(Refund, refund)
+      })
+    }
+
+    const pending = await this.dataSource.transaction(async (manager) => {
       const refund = await manager.findOne(Refund, {
         where: { id: refundId },
         lock: { mode: 'pessimistic_write' },
@@ -252,14 +267,40 @@ export class OrdersService {
       })
       if (!order) throw new NotFoundException('سفارش بازپرداخت یافت نشد')
 
-      if (status === 'approved') {
-        if (order.paymentMethod !== PaymentMethod.WALLET) {
-          throw new BadRequestException('بازپرداخت آنلاین تا اتصال provider واقعی باید از پنل درگاه انجام شود')
-        }
+      if (order.paymentMethod === PaymentMethod.WALLET) {
         await this.walletService.refundOrderToWallet(order.userId, order.id, Number(refund.amount), manager)
+        refund.status = 'approved'
+        return manager.save(Refund, refund)
       }
 
-      refund.status = status
+      if (Number(refund.amount) !== Number(order.totalAmount)) {
+        throw new BadRequestException('بازپرداخت جزئی آنلاین تا پشتیبانی provider قابل انجام نیست')
+      }
+      refund.status = 'processing'
+      return manager.save(Refund, refund)
+    })
+
+    if (pending.status === 'approved') return pending
+
+    try {
+      await this.paymentsService.refundOrderPayment(pending.orderId, Number(pending.amount))
+    } catch (error) {
+      await this.dataSource.transaction(async (manager) => {
+        const refund = await manager.findOne(Refund, { where: { id: refundId }, lock: { mode: 'pessimistic_write' } })
+        if (refund?.status === 'processing') {
+          refund.status = 'pending'
+          await manager.save(Refund, refund)
+        }
+      })
+      throw error
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const refund = await manager.findOne(Refund, { where: { id: refundId }, lock: { mode: 'pessimistic_write' } })
+      if (!refund) throw new NotFoundException('درخواست بازپرداخت یافت نشد')
+      if (refund.status === 'approved') return refund
+      if (refund.status !== 'processing') throw new BadRequestException('وضعیت بازپرداخت تغییر کرده است')
+      refund.status = 'approved'
       return manager.save(Refund, refund)
     })
   }
