@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
 import type { Request } from 'express'
 import { AdminGuard } from '../common/guards/admin.guard'
 import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
@@ -26,7 +26,12 @@ export class CommunityExtensionsController {
   }
 
   @Get('saves/:userId')
-  async findSaves(@Param('userId') userId: string) {
+  @UseGuards(JwtAuthGuard)
+  async findSaves(@Param('userId') userId: string, @Req() req: Request & { user: JwtUser }) {
+    const isAdmin = req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true
+    if (!isAdmin && req.user.sub !== userId) {
+      throw new ForbiddenException('دسترسی به ذخیره‌های کاربر دیگر مجاز نیست')
+    }
     return this.communityExtensionsService.findSaves(userId)
   }
 

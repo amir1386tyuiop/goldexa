@@ -45,4 +45,14 @@ describe('sensitive endpoint guard policy', () => {
     expect(source).toContain('assertOwnerOrAdmin(userId, req.user)')
     expect(source).toContain("user.role !== 'admin'")
   })
+
+  securityIt('keeps saved designs behind authentication and ownership checks', () => {
+    const source = readFileSync(join(__dirname, '../community-extensions/community-extensions.controller.ts'), 'utf8')
+    const methodIndex = source.indexOf('async findSaves(')
+    const routeDecoratorIndex = source.lastIndexOf("@Get('saves/:userId')", methodIndex)
+    const decorators = source.slice(routeDecoratorIndex, methodIndex)
+    expect(methodIndex).toBeGreaterThanOrEqual(0)
+    expect(decorators).toContain('JwtAuthGuard')
+    expect(source).toContain('req.user.sub !== userId')
+  })
 })
