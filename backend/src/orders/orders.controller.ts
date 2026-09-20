@@ -23,7 +23,7 @@ export class OrdersController {
   @Post(':id/cancel')
   async cancel(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     const scope = this.scope(req)
-    return this.ordersService.updateStatus(id, OrderStatus.CANCELLED, scope.userId, scope.isAdmin)
+    return this.ordersService.cancelOrder(id, scope.userId, scope.isAdmin)
   }
 
   @Get()

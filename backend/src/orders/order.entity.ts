@@ -47,6 +47,9 @@ export class Order {
   @Column({ nullable: true, name: 'tracking_code' })
   trackingCode: string | null
 
+  @Column({ name: 'group_buying_id', nullable: true })
+  groupBuyingId: string | null
+
   @Column({
     type: 'enum',
     enum: PaymentMethod,

@@ -207,6 +207,7 @@ export class GroupBuyingService {
         status: OrderStatus.PAID,
         address,
         paymentMethod: PaymentMethod.WALLET,
+        groupBuyingId: group.id,
       })
       const saved = await manager.save(order)
       group.orderId = saved.id

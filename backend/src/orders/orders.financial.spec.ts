@@ -60,4 +60,32 @@ describe('OrdersService invoice and refund guards', () => {
     await expect(service.resolveRefund('refund-1', 'approved')).rejects.toThrow('provider واقعی')
     expect(refund.status).toBe('pending')
   })
+
+  it('cancels a paid wallet order atomically, refunds it, and restores stock', async () => {
+    const service = Object.create(OrdersService.prototype) as any
+    const order = {
+      id: 'order-1', userId: 'user-1', status: OrderStatus.PAID, paymentMethod: PaymentMethod.WALLET,
+      totalAmount: 250, groupBuyingId: null, items: [{ productId: 'product-1', quantity: 2 }],
+    }
+    const product = { id: 'product-1', stock: 1 }
+    const manager = {
+      findOne: jest.fn(async (entity: unknown, options: any) => options.where.id === 'order-1' ? order : product),
+      save: jest.fn(async (value: unknown) => value),
+      create: jest.fn((_entity: unknown, value: unknown) => value),
+    }
+    service.dataSource = { transaction: jest.fn((callback: (value: unknown) => unknown) => callback(manager)) }
+    service.walletService = { refundOrderToWallet: jest.fn() }
+
+    await expect(service.cancelOrder('order-1', 'user-1')).resolves.toMatchObject({ status: OrderStatus.CANCELLED })
+    expect(product.stock).toBe(3)
+    expect(service.walletService.refundOrderToWallet).toHaveBeenCalledWith('user-1', 'order-1', 250, manager)
+    expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ status: OrderStatus.CANCELLED }))
+  })
+
+  it('refuses generic cancellation for a group order to avoid double refunds', async () => {
+    const service = Object.create(OrdersService.prototype) as any
+    const manager = { findOne: jest.fn().mockResolvedValue({ id: 'order-1', userId: 'leader-1', status: OrderStatus.PAID, groupBuyingId: 'group-1' }) }
+    service.dataSource = { transaction: jest.fn((callback: (value: unknown) => unknown) => callback(manager)) }
+    await expect(service.cancelOrder('order-1', 'leader-1')).rejects.toThrow('لغو سفارش گروهی')
+  })
 })

@@ -271,6 +271,51 @@ export class OrdersService {
     )
   }
 
+  /** Cancels an unpaid/paid direct order atomically and restores its inventory. */
+  async cancelOrder(orderId: string, userId: string, isAdmin = false): Promise<Order> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: isAdmin ? { id: orderId } : { id: orderId, userId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!order) throw new NotFoundException('سفارش یافت نشد')
+      if (![OrderStatus.PENDING, OrderStatus.PAID].includes(order.status)) {
+        throw new BadRequestException('این سفارش دیگر قابل لغو نیست')
+      }
+      if (order.groupBuyingId) {
+        throw new BadRequestException('لغو سفارش گروهی باید از مسیر خرید گروهی انجام شود')
+      }
+
+      const items = Array.isArray(order.items) ? order.items as Array<{ productId?: string; quantity?: number }> : []
+      const productIds = [...new Set(items.map((item) => item.productId).filter((id): id is string => Boolean(id)))].sort()
+      for (const productId of productIds) {
+        const product = await manager.findOne(Product, {
+          where: { id: productId },
+          lock: { mode: 'pessimistic_write' },
+        })
+        if (!product) throw new NotFoundException(`محصول ${productId} یافت نشد`)
+        const quantity = items.filter((item) => item.productId === productId).reduce((sum, item) => sum + Math.max(0, Number(item.quantity || 0)), 0)
+        product.stock += quantity
+        await manager.save(product)
+      }
+
+      if (order.status === OrderStatus.PAID && order.paymentMethod === PaymentMethod.WALLET) {
+        await this.walletService.refundOrderToWallet(order.userId, order.id, Number(order.totalAmount), manager)
+      } else if (order.status === OrderStatus.PAID && order.paymentMethod === PaymentMethod.ONLINE) {
+        throw new BadRequestException('بازپرداخت آنلاین تا اتصال provider واقعی قابل لغو نیست')
+      }
+
+      order.status = OrderStatus.CANCELLED
+      await manager.save(order)
+      await manager.save(manager.create(OrderStatusHistory, {
+        orderId: order.id,
+        status: OrderStatus.CANCELLED,
+        note: 'لغو atomic سفارش و بازگشت موجودی',
+      }))
+      return order
+    })
+  }
+
   async findStatusHistory(orderId: string, userId: string, isAdmin = false): Promise<OrderStatusHistory[]> {
     await this.findOwnedOrder(orderId, userId, isAdmin)
     return this.orderStatusHistoryRepository.findBy({ orderId })

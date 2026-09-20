@@ -182,6 +182,7 @@ CREATE TABLE orders (
     status VARCHAR(30) DEFAULT 'pending',
     address JSONB NOT NULL,
     tracking_code VARCHAR(100),
+    group_buying_id UUID,
     payment_method VARCHAR(20) DEFAULT 'online',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -345,6 +346,7 @@ CREATE TABLE group_buying_groups (
     target_amount DECIMAL(15,2) DEFAULT 0,
     discount_rate DECIMAL(5,2) DEFAULT 0,
     invite_code VARCHAR(30) UNIQUE NOT NULL,
+    order_id UUID,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -760,6 +762,7 @@ CREATE TABLE wallet_transactions (
     order_id UUID,
     escrow_id UUID,
     payout_request_id UUID,
+    group_buying_member_id UUID,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -1037,6 +1040,7 @@ CREATE INDEX idx_products_name ON products(name);
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX idx_orders_group_buying_id ON orders(group_buying_id);
 CREATE INDEX idx_auctions_status ON auctions(status);
 CREATE INDEX idx_auctions_ends_at ON auctions(ends_at);
 CREATE INDEX idx_auctions_product_id ON auctions(product_id);
@@ -1048,6 +1052,7 @@ CREATE INDEX idx_used_gold_listings_sale_type ON used_gold_listings(sale_type);
 CREATE INDEX idx_smart_vault_assets_user_id ON smart_vault_assets(user_id);
 CREATE INDEX idx_price_alerts_user_id ON price_alerts(user_id);
 CREATE INDEX idx_group_buying_groups_invite_code ON group_buying_groups(invite_code);
+CREATE UNIQUE INDEX idx_group_buying_groups_order_id ON group_buying_groups(order_id) WHERE order_id IS NOT NULL;
 CREATE INDEX idx_design_posts_challenge_id ON design_posts(challenge_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_jewelry_designs_user_id ON jewelry_designs(user_id);
@@ -1072,6 +1077,7 @@ CREATE INDEX idx_carts_user_id ON carts(user_id);
 CREATE INDEX idx_cart_items_cart_id ON cart_items(cart_id);
 CREATE INDEX idx_wallets_user_id ON wallets(user_id);
 CREATE INDEX idx_wallet_transactions_user_id ON wallet_transactions(user_id);
+CREATE INDEX idx_wallet_transactions_group_buying_member ON wallet_transactions(group_buying_member_id);
 CREATE INDEX idx_pricing_spreads_category ON pricing_spreads(product_category);
 CREATE INDEX idx_tax_rules_category ON tax_rules(product_category);
 CREATE INDEX idx_labor_cost_rules_category ON labor_cost_rules(product_category);

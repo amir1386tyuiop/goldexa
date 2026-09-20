@@ -1876,6 +1876,7 @@ export const api = {
   getUser: (id: string) => request<User>(`/users/${id}`),
   getOrders: () => request<Order[]>('/orders'),
   getOrdersByUser: (userId: string) => request<Order[]>(`/orders/user/${userId}`),
+  cancelOrder: (orderId: string) => request<Order>(`/orders/${orderId}/cancel`, { method: 'POST', body: {} }),
   createOrder: (body: CreateOrderInput) => request<Order>('/orders', { method: 'POST', body }),
   requestOnlinePayment: (body: RequestPaymentInput) =>
     request<{ paymentUrl: string | null; authority: string | null; mock?: boolean }>('/payments/zarinpal/request', { method: 'POST', body }),
