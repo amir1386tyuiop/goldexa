@@ -365,6 +365,15 @@ function ProductsTable({ products }: { products: Product[] }) {
 }
 
 function OrdersTable({ orders }: { orders: Order[] }) {
+  const queryClient = useQueryClient()
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Order['status'] }) => api.updateAdminOrderStatus(id, status),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-panel-orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin-reports'] })
+    },
+  })
   if (orders.length === 0) {
     return <EmptyState title="سفارشی ثبت نشده" description="بعد از ثبت سفارش، وضعیت پرداخت و ارسال اینجا نمایش داده می‌شود." />
   }
@@ -384,6 +393,7 @@ function OrdersTable({ orders }: { orders: Order[] }) {
               <th className="text-right py-3 font-medium text-muted-foreground">مبلغ</th>
               <th className="text-right py-3 font-medium text-muted-foreground">وضعیت</th>
               <th className="text-right py-3 font-medium text-muted-foreground">پرداخت</th>
+              <th className="text-right py-3 font-medium text-muted-foreground">عملیات</th>
             </tr>
           </thead>
           <tbody>
@@ -401,6 +411,23 @@ function OrdersTable({ orders }: { orders: Order[] }) {
                   <span className={`badge ${getOrderBadge(order.status)}`}>{getStatusText(order.status)}</span>
                 </td>
                 <td className="py-3">{order.paymentMethod === 'online' ? 'آنلاین' : 'کیف پول'}</td>
+                <td className="py-3">
+                  <label className="sr-only" htmlFor={`admin-order-status-${order.id}`}>تغییر وضعیت سفارش {order.orderNumber || order.id}</label>
+                  <select
+                    id={`admin-order-status-${order.id}`}
+                    className="input min-h-10 min-w-36 py-1 text-xs"
+                    value={order.status}
+                    disabled={updateStatus.isPending}
+                    onChange={(event) => updateStatus.mutate({ id: order.id, status: event.target.value as Order['status'] })}
+                  >
+                    <option value="pending">در انتظار پرداخت</option>
+                    <option value="paid">پرداخت‌شده</option>
+                    <option value="processing">در حال پردازش</option>
+                    <option value="shipped">ارسال‌شده</option>
+                    <option value="delivered">تحویل‌شده</option>
+                    <option value="cancelled">لغوشده</option>
+                  </select>
+                </td>
               </tr>
             ))}
           </tbody>
