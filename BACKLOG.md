@@ -108,7 +108,7 @@
 1. ✅ تنظیم آستانه‌ی نوسان قیمت به **۲٪** (طبق AC دقیق PRD)
 2. ✅ سخت‌گیری آپلود تصویر به **< ۲۰۰KB** (فشرده‌سازی هدفمند WebP و رد خروجی بزرگ‌تر)
 3. ✅ **گزارش تفکیکی درآمد** در پنل ادمین برای کمیسیون‌های قطعی؛ ثبت جداگانه‌ی اسپرد/اشتراک/AI/AR برای حسابداری کامل باقی است.
-4. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ ممیزی route-by-route باقی است)
+4. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ regression coverage برای routeهای حساس اضافه شده و ممیزی route-by-route سایر ماژول‌ها باقی است)
 5. ⬜ ممیزی **OWASP** (helmet، CSRF، بازبینی ورودی‌ها) + بنچمارک < ۲۰۰ms + ممیزی ایندکس/N+1
 6. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
 7. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
