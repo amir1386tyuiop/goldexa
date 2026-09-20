@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { DataSource, Repository } from 'typeorm'
 import {
   GroupBuyingGroup,
   GroupBuyingMemberStatus,
@@ -16,6 +16,7 @@ import {
   PayGroupBuyingShareDto,
 } from './create-group-buying.dto'
 import { User } from '../users/user.entity'
+import { WalletService } from '../wallet/wallet.service'
 
 @Injectable()
 export class GroupBuyingService {
@@ -28,6 +29,8 @@ export class GroupBuyingService {
     private memberRepository: Repository<GroupBuyingMember>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly dataSource: DataSource,
+    private readonly walletService: WalletService,
   ) {}
 
   async findAll(): Promise<GroupBuyingGroup[]> {
@@ -123,23 +126,21 @@ export class GroupBuyingService {
     data: PayGroupBuyingShareDto,
     actorId: string,
   ): Promise<GroupBuyingMember> {
-    const member = await this.memberRepository.findOneBy({ id: memberId, groupId })
-
-    if (!member) {
-      throw new NotFoundException('عضو گروه خرید یافت نشد')
-    }
-    if (member.userId !== actorId) throw new ForbiddenException('فقط صاحب سهم می‌تواند پرداخت خود را ثبت کند')
-    if (!Number.isFinite(Number(data.paidAmount)) || Number(data.paidAmount) < 0 || Number(data.paidAmount) > Number(member.shareAmount)) {
-      throw new BadRequestException('مبلغ پرداختی نامعتبر است')
-    }
-
-    member.paidAmount = data.paidAmount
-    member.status =
-      Number(member.paidAmount) >= Number(member.shareAmount)
-        ? GroupBuyingMemberStatus.PAID
-        : GroupBuyingMemberStatus.JOINED
-
-    return this.memberRepository.save(member)
+    return this.dataSource.transaction(async (manager) => {
+      const member = await manager.findOne(GroupBuyingMember, { where: { id: memberId, groupId }, lock: { mode: 'pessimistic_write' } })
+      if (!member) throw new NotFoundException('عضو گروه خرید یافت نشد')
+      if (member.userId !== actorId) throw new ForbiddenException('فقط صاحب سهم می‌تواند پرداخت خود را ثبت کند')
+      const requested = Number(data.paidAmount)
+      const previous = Number(member.paidAmount || 0)
+      if (!Number.isFinite(requested) || requested < previous || requested > Number(member.shareAmount)) {
+        throw new BadRequestException('مبلغ پرداختی نامعتبر است')
+      }
+      const delta = requested - previous
+      if (delta > 0) await this.walletService.payGroupBuyingShare(actorId, member.id, delta, manager)
+      member.paidAmount = requested
+      member.status = requested >= Number(member.shareAmount) ? GroupBuyingMemberStatus.PAID : GroupBuyingMemberStatus.JOINED
+      return manager.save(member)
+    })
   }
 
   private createInviteCode(): string {

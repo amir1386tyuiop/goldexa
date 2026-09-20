@@ -24,6 +24,7 @@ type LedgerParams = {
   orderId?: string | null
   escrowId?: string | null
   payoutRequestId?: string | null
+  groupBuyingMemberId?: string | null
   description?: string | null
 }
 
@@ -192,6 +193,7 @@ export class WalletService {
       orderId: params.orderId ?? null,
       escrowId: params.escrowId ?? null,
       payoutRequestId: params.payoutRequestId ?? null,
+      groupBuyingMemberId: params.groupBuyingMemberId ?? null,
       description: params.description ?? null,
     })
     return manager.save(tx)
@@ -353,6 +355,28 @@ export class WalletService {
       payoutRequestId,
       description: 'رزرو مبلغ درخواست برداشت',
     })
+  }
+
+  /** Debits a group-buying share exactly once for the cumulative paid amount. */
+  async payGroupBuyingShare(userId: string, memberId: string, amount: number, manager: EntityManager): Promise<WalletTransaction> {
+    if (!memberId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات پرداخت سهم نامعتبر است')
+    }
+    const transaction = await this.applyLedgerInManager(manager, {
+      userId,
+      type: WalletTransactionType.GROUP_BUYING_PAYMENT,
+      rialDelta: -Math.abs(amount),
+      groupBuyingMemberId: memberId,
+      description: 'پرداخت سهم خرید گروهی از کیف پول',
+    })
+    await this.audit.record({
+      userId,
+      action: 'WALLET_GROUP_BUYING_PAYMENT',
+      entityType: 'wallet_transaction',
+      entityId: transaction.id,
+      metadata: { groupBuyingMemberId: memberId, amount },
+    })
+    return transaction
   }
 
   async refundPayout(userId: string, payoutRequestId: string, amount: number, manager: EntityManager): Promise<WalletTransaction> {
