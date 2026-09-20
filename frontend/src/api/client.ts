@@ -1773,8 +1773,10 @@ export const api = {
   getCustomBuilderQuotes: (userId: string) => request<CustomBuilderQuote[]>(`/custom-builder/quotes/user/${userId}`),
   createCustomBuilderQuote: (body: CreateCustomBuilderQuoteInput) =>
     request<CustomBuilderQuote>('/custom-builder/quotes', { method: 'POST', body }),
-  getAiPredictions: (userId: string) => request<AiPricePrediction[]>(`/ai-engine/predictions/user/${userId}`),
-  getAiRecommendations: (userId: string) => request<AiDesignRecommendation[]>(`/ai-engine/recommendations/user/${userId}`),
+  // User-owned AI data must use the /me routes. The parameterized routes are
+  // intentionally restricted to reporting/admin permissions.
+  getAiPredictions: () => request<AiPricePrediction[]>('/ai-engine/predictions/me'),
+  getAiRecommendations: () => request<AiDesignRecommendation[]>('/ai-engine/recommendations/me'),
   getAiMatches: () => request<AiMarketMatch[]>('/ai-engine/matches'),
   getAiMetrics: () => request<AiServiceMetric[]>('/ai-engine/metrics'),
   getAiProviders: () => request<AiProviderPublicConfig[]>('/ai-engine/providers'),
