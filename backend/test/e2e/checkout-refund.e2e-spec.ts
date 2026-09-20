@@ -123,6 +123,32 @@ e2e('checkout and refund against an isolated PostgreSQL database', () => {
     expect(refunds.status).toBe(200)
     expect(refunds.body.some((item) => item.id === requested.body.id)).toBe(true)
   })
+
+  it('cancels a pending order and restores the reserved product stock', async () => {
+    const available = await api<Product[]>('/products?inStock=true&limit=10')
+    const cancelProduct = available.body.find((candidate) => candidate.stock >= 1)
+    expect(cancelProduct).toBeDefined()
+    const before = Number(cancelProduct!.stock)
+    const created = await api<Order>('/orders', jsonBody({
+      items: [{ productId: cancelProduct!.id, quantity: 1 }],
+      shippingCost: 0,
+      address: { title: 'E2E', province: 'تهران', city: 'تهران', street: 'خیابان تست', postalCode: '1234567890', isDefault: true },
+      paymentMethod: 'online',
+    }, buyer.token))
+    expect(created.status).toBe(201)
+
+    const afterReservation = await api<Product[]>(`/products?inStock=true&search=${encodeURIComponent(cancelProduct!.name)}`)
+    const reserved = afterReservation.body.find((candidate) => candidate.id === cancelProduct!.id)
+    expect(reserved?.stock).toBe(before - 1)
+
+    const cancelled = await api<Order>(`/orders/${created.body.id}/cancel`, { method: 'POST', headers: jsonHeaders(buyer.token) })
+    expect(cancelled.status).toBe(201)
+    expect(cancelled.body.status).toBe('cancelled')
+
+    const restoredFeed = await api<Product[]>(`/products?inStock=true&search=${encodeURIComponent(cancelProduct!.name)}`)
+    const restored = restoredFeed.body.find((candidate) => candidate.id === cancelProduct!.id)
+    expect(restored?.stock).toBe(before)
+  })
 })
 
 const walletE2e = baseUrl && databaseFixturesEnabled() ? describe : describe.skip
