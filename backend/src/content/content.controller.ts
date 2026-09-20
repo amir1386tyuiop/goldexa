@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { AdminGuard } from '../common/guards/admin.guard'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { ContentService } from './content.service'
 import { CreateAdCampaignDto, CreateContentPageDto, CreatePromotionDto } from './create-content.dto'
 
@@ -17,6 +19,7 @@ export class ContentController {
   }
 
   @Post('pages')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createPage(@Body() body: CreateContentPageDto) {
     return this.contentService.createPage(body)
   }
@@ -27,6 +30,7 @@ export class ContentController {
   }
 
   @Post('promotions')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createPromotion(@Body() body: CreatePromotionDto) {
     return this.contentService.createPromotion(body)
   }
@@ -37,6 +41,7 @@ export class ContentController {
   }
 
   @Post('ads')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createAd(@Body() body: CreateAdCampaignDto) {
     return this.contentService.createAd(body)
   }
