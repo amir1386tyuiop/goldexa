@@ -134,8 +134,12 @@ services:
       dockerfile: Dockerfile
     container_name: goldeksa-ai-service
     restart: unless-stopped
+    environment:
+      AI_MODEL_DIR: /app/model_store
     expose:
       - "8000"
+    volumes:
+      - ai-models:/app/model_store
     depends_on:
       backend:
         condition: service_healthy
@@ -181,3 +185,4 @@ volumes:
   backend-uploads:
   prometheus-data:
   grafana-data:
+  ai-models:
