@@ -1,5 +1,9 @@
 # Changelog
 
+## Group-buying delivery lifecycle
+
+- Added secure group-buying shipment tracking backed by the finalized order. The leader and members can view order status, shipment carrier/tracking code, and status history; non-members are denied.
+
 ## Runtime and E2E hardening
 
 - Fixed the isolated E2E migration image path (`dist/src/data-source.js`) and exported `EscrowService` so the production-shaped Nest container starts successfully.

@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common'
 import { GroupBuyingService } from './group-buying.service'
 import { GroupBuyingStatus } from './group-buying-group.entity'
+import { OrderStatus } from '../orders/order.entity'
 
 describe('GroupBuyingService ownership rules', () => {
   it('uses the authenticated leader name instead of client input', async () => {
@@ -60,5 +61,25 @@ describe('GroupBuyingService ownership rules', () => {
     expect(walletService.refundGroupBuyingShare).toHaveBeenCalledWith('buyer-1', 'member-1', 500, manager)
     expect(members[0].paidAmount).toBe(0)
     expect(members[0].status).toBe('left')
+  })
+
+  it('returns group order tracking to a member', async () => {
+    const groups = { findOneBy: jest.fn().mockResolvedValue({ id: 'group-1', leaderId: 'leader-1', orderId: 'order-1' }) }
+    const members = { findOneBy: jest.fn().mockResolvedValue({ id: 'member-1', groupId: 'group-1', userId: 'member-1' }) }
+    const orders = { findOneBy: jest.fn().mockResolvedValue({ id: 'order-1', status: OrderStatus.SHIPPED, trackingCode: 'TRK-1' }) }
+    const shipments = { find: jest.fn().mockResolvedValue([{ id: 'shipment-1', orderId: 'order-1', carrier: 'پست', trackingCode: 'TRK-1' }]) }
+    const history = { find: jest.fn().mockResolvedValue([{ id: 'history-1', orderId: 'order-1', status: 'shipped' }]) }
+    const service = new GroupBuyingService(groups as never, {} as never, members as never, {} as never, {} as never, {} as never, {} as never, orders as never, shipments as never, history as never)
+
+    await expect(service.getTracking('group-1', 'member-1')).resolves.toEqual(expect.objectContaining({ orderId: 'order-1', orderStatus: OrderStatus.SHIPPED, trackingCode: 'TRK-1' }))
+    expect(shipments.find).toHaveBeenCalledWith({ where: { orderId: 'order-1' }, order: { createdAt: 'DESC' } })
+  })
+
+  it('denies group tracking to a non-member', async () => {
+    const groups = { findOneBy: jest.fn().mockResolvedValue({ id: 'group-1', leaderId: 'leader-1', orderId: 'order-1' }) }
+    const members = { findOneBy: jest.fn().mockResolvedValue(null) }
+    const service = new GroupBuyingService(groups as never, {} as never, members as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never)
+
+    await expect(service.getTracking('group-1', 'attacker')).rejects.toBeInstanceOf(ForbiddenException)
   })
 })

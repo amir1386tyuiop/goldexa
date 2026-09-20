@@ -425,6 +425,14 @@ export interface GroupBuyingMember {
   createdAt: string
 }
 
+export interface GroupBuyingTracking {
+  orderId: string | null
+  orderStatus: OrderStatus | null
+  trackingCode: string | null
+  shipments: Shipment[]
+  history: OrderStatusHistory[]
+}
+
 export type DesignChallengeStatus = 'draft' | 'active' | 'ended' | 'cancelled'
 
 export interface DesignChallenge {

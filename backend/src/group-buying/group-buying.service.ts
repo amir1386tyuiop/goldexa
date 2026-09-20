@@ -18,6 +18,8 @@ import {
 import { User } from '../users/user.entity'
 import { WalletService } from '../wallet/wallet.service'
 import { Order, OrderStatus, PaymentMethod } from '../orders/order.entity'
+import { Shipment } from '../orders/shipment.entity'
+import { OrderStatusHistory } from '../orders/order-status-history.entity'
 import { Product } from '../products/product.entity'
 import { CreateOrderAddressDto } from '../orders/create-order.dto'
 import { PricingService } from '../pricing/pricing.service'
@@ -37,7 +39,42 @@ export class GroupBuyingService {
     private readonly dataSource: DataSource,
     private readonly walletService: WalletService,
     @Optional() private readonly pricingService?: PricingService,
+    @Optional() @InjectRepository(Order) private readonly orderRepository?: Repository<Order>,
+    @Optional() @InjectRepository(Shipment) private readonly shipmentRepository?: Repository<Shipment>,
+    @Optional() @InjectRepository(OrderStatusHistory) private readonly statusHistoryRepository?: Repository<OrderStatusHistory>,
   ) {}
+
+  async getTracking(groupId: string, actorId: string, isAdmin = false): Promise<{
+    orderId: string | null
+    orderStatus: OrderStatus | null
+    trackingCode: string | null
+    shipments: Shipment[]
+    history: OrderStatusHistory[]
+  }> {
+    const group = await this.groupRepository.findOneBy({ id: groupId })
+    if (!group) throw new NotFoundException('گروه خرید یافت نشد')
+    if (!isAdmin && group.leaderId !== actorId) {
+      const member = await this.memberRepository.findOneBy({ groupId, userId: actorId })
+      if (!member) throw new ForbiddenException('دسترسی به رهگیری این گروه مجاز نیست')
+    }
+    if (!group.orderId) return { orderId: null, orderStatus: null, trackingCode: null, shipments: [], history: [] }
+    if (!this.orderRepository || !this.shipmentRepository || !this.statusHistoryRepository) {
+      throw new BadRequestException('سرویس رهگیری سفارش در دسترس نیست')
+    }
+    const [order, shipments, history] = await Promise.all([
+      this.orderRepository.findOneBy({ id: group.orderId }),
+      this.shipmentRepository.find({ where: { orderId: group.orderId }, order: { createdAt: 'DESC' } }),
+      this.statusHistoryRepository.find({ where: { orderId: group.orderId }, order: { createdAt: 'ASC' } }),
+    ])
+    if (!order) throw new NotFoundException('سفارش گروهی یافت نشد')
+    return {
+      orderId: order.id,
+      orderStatus: order.status,
+      trackingCode: order.trackingCode,
+      shipments,
+      history,
+    }
+  }
 
   async findAll(): Promise<GroupBuyingGroup[]> {
     return this.groupRepository.find({ order: { createdAt: 'DESC' } })

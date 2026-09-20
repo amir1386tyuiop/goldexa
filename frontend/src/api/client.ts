@@ -30,6 +30,7 @@ import type {
   GroupBuyingItem,
   GroupBuyingMember,
   GroupBuyingPaymentMode,
+  GroupBuyingTracking,
   Invoice,
   Inventory,
   JewelryDesign,
@@ -1749,6 +1750,7 @@ export const api = {
     request<PriceAlert>(`/smart-vault/alerts/${id}/reset`, { method: 'PATCH' }),
   getGroupBuyingGroups: () => request<GroupBuyingGroup[]>('/group-buying'),
   getGroupBuyingGroup: (id: string) => request<{ group: GroupBuyingGroup; items: GroupBuyingItem[]; members: GroupBuyingMember[] }>(`/group-buying/${id}`),
+  getGroupBuyingTracking: (id: string) => request<GroupBuyingTracking>(`/group-buying/${id}/tracking`),
   createGroupBuyingGroup: (body: CreateGroupBuyingGroupInput) =>
     request<GroupBuyingGroup>('/group-buying', { method: 'POST', body }),
   addGroupBuyingItem: (id: string, body: { productId: string; name: string; quantity?: number; unitPrice: number }) =>

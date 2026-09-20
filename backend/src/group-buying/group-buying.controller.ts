@@ -27,6 +27,12 @@ export class GroupBuyingController {
     return this.groupBuyingService.findOne(id)
   }
 
+  @Get(':id/tracking')
+  async tracking(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const isAdmin = req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true
+    return this.groupBuyingService.getTracking(id, req.user.sub, isAdmin)
+  }
+
   @Post()
   async create(@Body() body: CreateGroupBuyingGroupDto, @Req() req: AuthenticatedRequest) {
     return this.groupBuyingService.createGroup({ ...body, leaderId: req.user.sub })
