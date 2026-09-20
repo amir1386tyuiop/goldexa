@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
+import type { Request } from 'express'
+import { AdminGuard } from '../common/guards/admin.guard'
+import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
 import { CommunityService } from './community.service'
 import {
   CreateDesignChallengeDto,
   CreateDesignCommentDto,
   CreateDesignPostDto,
-  LikeDesignPostDto,
   SetDesignChallengeWinnerDto,
 } from './create-community.dto'
 
@@ -18,6 +20,7 @@ export class CommunityController {
   }
 
   @Post('challenges')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async createChallenge(@Body() body: CreateDesignChallengeDto) {
     return this.communityService.createChallenge(body)
   }
@@ -28,21 +31,25 @@ export class CommunityController {
   }
 
   @Post('posts')
-  async createPost(@Body() body: CreateDesignPostDto) {
-    return this.communityService.createPost(body)
+  @UseGuards(JwtAuthGuard)
+  async createPost(@Body() body: CreateDesignPostDto, @Req() req: Request & { user: JwtUser }) {
+    return this.communityService.createPost({ ...body, userId: req.user.sub })
   }
 
   @Post('posts/:id/comments')
-  async addComment(@Param('id') id: string, @Body() body: CreateDesignCommentDto) {
-    return this.communityService.addComment(id, body)
+  @UseGuards(JwtAuthGuard)
+  async addComment(@Param('id') id: string, @Body() body: CreateDesignCommentDto, @Req() req: Request & { user: JwtUser }) {
+    return this.communityService.addComment(id, { ...body, userId: req.user.sub })
   }
 
   @Post('posts/:id/like')
-  async like(@Param('id') id: string, @Body() body: LikeDesignPostDto) {
-    return this.communityService.like(id, body.userId)
+  @UseGuards(JwtAuthGuard)
+  async like(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.communityService.like(id, req.user.sub)
   }
 
   @Patch('challenges/:id/winner')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async setWinner(@Param('id') id: string, @Body() body: SetDesignChallengeWinnerDto) {
     return this.communityService.setWinner(id, body.winnerPostId)
   }

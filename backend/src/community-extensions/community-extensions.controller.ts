@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
+import type { Request } from 'express'
+import { AdminGuard } from '../common/guards/admin.guard'
+import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
 import { CommunityExtensionsService } from './community-extensions.service'
 import {
   AwardBadgeDto,
@@ -17,8 +20,9 @@ export class CommunityExtensionsController {
   }
 
   @Post('follows')
-  async follow(@Body() body: FollowUserDto) {
-    return this.communityExtensionsService.follow(body)
+  @UseGuards(JwtAuthGuard)
+  async follow(@Body() body: FollowUserDto, @Req() req: Request & { user: JwtUser }) {
+    return this.communityExtensionsService.follow({ ...body, followerId: req.user.sub })
   }
 
   @Get('saves/:userId')
@@ -27,8 +31,9 @@ export class CommunityExtensionsController {
   }
 
   @Post('saves')
-  async save(@Body() body: SaveDesignDto) {
-    return this.communityExtensionsService.save(body)
+  @UseGuards(JwtAuthGuard)
+  async save(@Body() body: SaveDesignDto, @Req() req: Request & { user: JwtUser }) {
+    return this.communityExtensionsService.save({ ...body, userId: req.user.sub })
   }
 
   @Get('badges/:userId')
@@ -37,6 +42,7 @@ export class CommunityExtensionsController {
   }
 
   @Post('badges')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async awardBadge(@Body() body: AwardBadgeDto) {
     return this.communityExtensionsService.awardBadge(body)
   }
@@ -47,6 +53,7 @@ export class CommunityExtensionsController {
   }
 
   @Post('challenge-rewards')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async awardChallengeReward(@Body() body: AwardChallengeRewardDto) {
     return this.communityExtensionsService.awardChallengeReward(body)
   }
