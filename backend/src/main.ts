@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
+import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { getSecurityConfig } from './common/security-config'
 
@@ -17,6 +18,17 @@ async function bootstrap() {
   })
 
   app.set('trust proxy', 1)
+  // Keep the explicit CSP/HSTS policy below as the application contract, while
+  // letting Helmet cover the remaining OWASP browser hardening headers.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      hsts: false,
+      frameguard: { action: 'deny' },
+      referrerPolicy: { policy: 'no-referrer' },
+      crossOriginResourcePolicy: { policy: 'same-site' },
+    }),
+  )
   app.use((_request, response, next) => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.setHeader('X-Frame-Options', 'DENY')

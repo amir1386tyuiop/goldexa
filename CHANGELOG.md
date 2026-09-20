@@ -46,3 +46,7 @@
 - Payment transaction and order-tracking reads are JWT-scoped; notification, smart-vault, custom-builder, subscription, audit, and public user-registration routes no longer trust arbitrary user IDs or roles from request bodies/paths.
 - Legacy cart price/name fields remain accepted for client compatibility but are ignored by the backend.
 - Reinstalled dependencies from clean lockfiles and verified zero vulnerabilities with npm audit for runtime and full dependency trees.
+## Security hardening
+
+- Added Helmet to the NestJS bootstrap while preserving Goldexa's explicit CSP and production HSTS policy.
+- Security regression suite remains green: 2 suites, 22 tests.

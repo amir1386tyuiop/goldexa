@@ -71,7 +71,7 @@
 
 ## الزامات غیرکارکردی (NFR) — کیفیت تحویل
 - ✅ امنیت: JWT، RBAC، هش OTP، rate-limit، عدم ذخیره‌ی اطلاعات پرداخت
-- 🟡 OWASP Top 10 (XSS/SQLi/CSRF): ORM + ValidationPipe داریم؛ **ممیزی کامل + helmet + CSRF** مانده
+- 🟡 OWASP Top 10 (XSS/SQLi/CSRF): ORM + ValidationPipe و **Helmet** فعال است؛ ممیزی route-by-route، سیاست Origin/CSRF متناسب با Bearer JWT و benchmark کامل باقی است
 - 🔒 HTTPS/TLS 1.3: در استقرار (reverse proxy) — کد آماده است
 - 🟡 عملکرد API < ۲۰۰ms: بیشتر endpointها سریع‌اند؛ **بنچمارک رسمی + ممیزی ایندکس/N+1** مانده
 - ⬜ در دسترس‌پذیری ۹۹.۹٪ + مانیتورینگ کامل (Prometheus/Grafana/ELK)
@@ -111,7 +111,7 @@
 4. 🟡 **refund آنلاین واقعی** — قرارداد endpoint/provider و credential زرین‌پال باید در محیط sandbox/production تأیید شود؛ در کد، وضعیت `refund_pending`، قفل تراکنش و rollback امن اضافه شده و refund جعلی ممنوع است.
 5. 🟡 **payout بانکی واقعی** — چرخه‌ی reserve/approve/processing/paid/reject و ثبت `providerReference` پیاده شده؛ اتصال API بانکی و reconciliation بیرونی باقی است.
 6. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (مالی، escrow، wallet، group buying، community، content و liquidity mutationها enforce شده؛ regression coverage برای routeهای حساس اضافه شده و ممیزی route-by-route سایر ماژول‌ها باقی است)
-7. ⬜ ممیزی **OWASP** (helmet، CSRF، بازبینی ورودی‌ها) + بنچمارک < ۲۰۰ms + ممیزی ایندکس/N+1
+7. 🟡 ممیزی **OWASP** — Helmet و headers پایه انجام شد؛ بررسی CSRF/Origin متناسب با Bearer JWT، بنچمارک < ۲۰۰ms و ممیزی ایندکس/N+1 باقی است
 8. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
 9. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
 10. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است
