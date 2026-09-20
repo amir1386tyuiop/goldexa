@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsObject,
+  Max,
   IsString,
   MaxLength,
   Min,
@@ -132,6 +133,7 @@ export class CreateUsedGoldListingDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(99.99)
   commissionRate?: number
 
   @IsOptional()

@@ -107,7 +107,7 @@ describe('UsedGoldListingsService', () => {
     const listing = {
       id: 'listing-1', sellerId: 'seller-1', sellerName: 'فروشنده واقعی', title: 'انگشتر',
       description: 'x', weight: 2, karat: 18, saleType: UsedGoldListingSaleType.DIRECT,
-      fixedPrice: 1000, status: UsedGoldListingStatus.ACTIVE,
+      fixedPrice: 1000, commissionRate: 5, status: UsedGoldListingStatus.ACTIVE,
     }
     const manager = {
       findOne: jest.fn(async (entity: unknown) => {
@@ -138,5 +138,6 @@ describe('UsedGoldListingsService', () => {
     expect(result.listing.status).toBe(UsedGoldListingStatus.SOLD)
     expect(result.order.status).toBe('paid')
     expect(result.escrow.status).toBe(EscrowPaymentStatus.HELD)
+    expect(result.escrow.fee).toBe(50)
   })
 })

@@ -278,6 +278,8 @@ export class UsedGoldListingsService {
       if (!Number.isFinite(amount) || amount <= 0) {
         throw new BadRequestException('قیمت آگهی نامعتبر است')
       }
+      const commissionRate = Math.min(Math.max(Number(listing.commissionRate ?? 0), 0), 99.99)
+      const commission = (amount * commissionRate) / 100
 
       const existing = await manager.findOne(EscrowPayment, {
         where: { listingId: id, buyerId },
@@ -317,7 +319,7 @@ export class UsedGoldListingsService {
         buyerId,
         sellerId: listing.sellerId,
         amount,
-        fee: 0,
+        fee: commission,
         status: EscrowPaymentStatus.INITIATED,
         authority: null,
         paymentUrl: null,
