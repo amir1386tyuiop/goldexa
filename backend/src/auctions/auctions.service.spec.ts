@@ -85,6 +85,19 @@ describe('AuctionsService', () => {
     expect(expired.winningBidderId).toBe('winner-2')
     expect(expired.winningAmount).toBe(180)
     expect(expired.paymentStatus).toBe(AuctionPaymentStatus.UNPAID)
+    expect(expired.secondWinnerId).toBeNull()
     expect(auctionRepository.save).toHaveBeenCalledWith(expired)
+  })
+
+  it('does not cancel an auction after escrow has locked the funds', async () => {
+    const auction = { id: 'auction-1', status: AuctionStatus.AWAITING_PAYMENT, paymentStatus: AuctionPaymentStatus.ESCROW_HELD }
+    const manager = { findOne: jest.fn(async () => auction), save: jest.fn() }
+    const service = new AuctionsService(
+      { findOneBy: jest.fn(), find: jest.fn(), createQueryBuilder: noOpQueryBuilder } as never,
+      {} as never, {} as never, {} as never,
+      { transaction: jest.fn(async (callback) => callback(manager)) } as never,
+      {} as never,
+    )
+    await expect(service.cancelAuction('auction-1')).rejects.toThrow('escrow')
   })
 })

@@ -360,6 +360,9 @@ export class AuctionsService {
     if (!auction) {
       throw new NotFoundException('مزایده یافت نشد')
     }
+    if (status === AuctionStatus.CANCELLED && [AuctionPaymentStatus.ESCROW_HELD, AuctionPaymentStatus.SETTLED].includes(auction.paymentStatus)) {
+      throw new BadRequestException('مزایده پس از قفل یا تسویه escrow قابل لغو نیست')
+    }
     if (!this.isAllowedTransition(auction.status, status)) {
       throw new BadRequestException(`تغییر وضعیت از ${auction.status} به ${status} مجاز نیست`)
     }
@@ -368,15 +371,21 @@ export class AuctionsService {
   }
 
   async cancelAuction(id: string): Promise<Auction | null> {
-    const auction = await this.auctionRepository.findOneBy({ id })
-    if (!auction) {
-      throw new NotFoundException('مزایده یافت نشد')
-    }
-    if ([AuctionStatus.COMPLETED, AuctionStatus.CANCELLED].includes(auction.status)) {
-      throw new BadRequestException('مزایده در وضعیت قابل لغو نیست')
-    }
-    await this.auctionRepository.update(id, { status: AuctionStatus.CANCELLED })
-    return this.auctionRepository.findOneBy({ id })
+    return this.dataSource.transaction(async (manager) => {
+      const auction = await manager.findOne(Auction, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!auction) throw new NotFoundException('مزایده یافت نشد')
+      if ([AuctionStatus.COMPLETED, AuctionStatus.CANCELLED].includes(auction.status)) {
+        throw new BadRequestException('مزایده در وضعیت قابل لغو نیست')
+      }
+      if ([AuctionPaymentStatus.ESCROW_HELD, AuctionPaymentStatus.SETTLED].includes(auction.paymentStatus)) {
+        throw new BadRequestException('مزایده پس از قفل یا تسویه escrow قابل لغو نیست')
+      }
+      auction.status = AuctionStatus.CANCELLED
+      return manager.save(auction)
+    })
   }
 
   private isAllowedTransition(from: AuctionStatus, to: AuctionStatus): boolean {
@@ -460,6 +469,9 @@ export class AuctionsService {
         auction.reserveMet = true
         auction.paymentStatus = AuctionPaymentStatus.UNPAID
         auction.paymentDeadlineAt = this.addMinutes(now, auction.paymentWindowMinutes)
+        auction.secondWinnerId = null
+        auction.secondWinnerName = null
+        auction.secondWinnerAmount = null
         await this.auctionRepository.save(auction)
       } else {
         auction.status = AuctionStatus.FAILED
