@@ -11,6 +11,7 @@ export enum WalletTransactionType {
   PAYOUT_HOLD = 'payout_hold',
   PAYOUT_REFUND = 'payout_refund',
   GROUP_BUYING_PAYMENT = 'group_buying_payment',
+  GROUP_BUYING_REFUND = 'group_buying_refund',
 }
 
 @Entity('wallet_transactions')

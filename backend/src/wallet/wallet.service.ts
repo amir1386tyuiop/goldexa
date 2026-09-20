@@ -151,6 +151,16 @@ export class WalletService {
       }
     }
 
+    if (params.type === WalletTransactionType.GROUP_BUYING_REFUND && params.groupBuyingMemberId) {
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId: params.userId, groupBuyingMemberId: params.groupBuyingMemberId, type: params.type },
+      })
+      if (existing) {
+        if (Number(existing.amount) !== params.rialDelta) throw new BadRequestException('بازپرداخت سهم تکراری با مبلغ متفاوت است')
+        return existing
+      }
+    }
+
     if (
       [
         WalletTransactionType.ESCROW_HOLD,
@@ -377,6 +387,20 @@ export class WalletService {
       metadata: { groupBuyingMemberId: memberId, amount },
     })
     return transaction
+  }
+
+  /** Credits a group member exactly once when an unpaid group is cancelled. */
+  async refundGroupBuyingShare(userId: string, memberId: string, amount: number, manager: EntityManager): Promise<WalletTransaction> {
+    if (!memberId || !Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('اطلاعات بازپرداخت سهم نامعتبر است')
+    }
+    return this.applyLedgerInManager(manager, {
+      userId,
+      type: WalletTransactionType.GROUP_BUYING_REFUND,
+      rialDelta: Math.abs(amount),
+      groupBuyingMemberId: memberId,
+      description: 'بازپرداخت سهم خرید گروهی پس از لغو گروه',
+    })
   }
 
   async refundPayout(userId: string, payoutRequestId: string, amount: number, manager: EntityManager): Promise<WalletTransaction> {

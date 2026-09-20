@@ -216,6 +216,37 @@ export class GroupBuyingService {
     })
   }
 
+  async cancelGroup(groupId: string, actorId: string): Promise<GroupBuyingGroup> {
+    return this.dataSource.transaction(async (manager) => {
+      const group = await manager.findOne(GroupBuyingGroup, {
+        where: { id: groupId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      if (!group) throw new NotFoundException('گروه خرید یافت نشد')
+      if (group.leaderId !== actorId) throw new ForbiddenException('فقط رهبر گروه می‌تواند گروه را لغو کند')
+      if (group.status === GroupBuyingStatus.CANCELLED) return group
+      if (group.status !== GroupBuyingStatus.OPEN || group.orderId) {
+        throw new BadRequestException('گروه پس از نهایی‌سازی قابل لغو نیست')
+      }
+
+      const members = await manager.find(GroupBuyingMember, {
+        where: { groupId },
+        lock: { mode: 'pessimistic_write' },
+      })
+      for (const member of members) {
+        const paidAmount = Number(member.paidAmount || 0)
+        if (paidAmount > 0) {
+          await this.walletService.refundGroupBuyingShare(member.userId, member.id, paidAmount, manager)
+        }
+        member.paidAmount = 0
+        member.status = GroupBuyingMemberStatus.LEFT
+        await manager.save(member)
+      }
+      group.status = GroupBuyingStatus.CANCELLED
+      return manager.save(group)
+    })
+  }
+
   private createInviteCode(): string {
     return `GX-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
   }

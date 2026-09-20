@@ -43,4 +43,22 @@ describe('GroupBuyingService ownership rules', () => {
     expect(group.status).toBe(GroupBuyingStatus.PAID)
     expect(group.orderId).toBe('order-1')
   })
+
+  it('refunds each paid share exactly once when the leader cancels an open group', async () => {
+    const group = { id: 'group-1', leaderId: 'leader-1', status: GroupBuyingStatus.OPEN, orderId: null }
+    const members = [{ id: 'member-1', groupId: 'group-1', userId: 'buyer-1', paidAmount: 500, status: 'paid' }]
+    const manager = {
+      findOne: jest.fn().mockResolvedValue(group),
+      find: jest.fn().mockResolvedValue(members),
+      save: jest.fn(async (value) => value),
+    }
+    const walletService = { refundGroupBuyingShare: jest.fn().mockResolvedValue({ id: 'refund-1' }) }
+    const dataSource = { transaction: jest.fn(async (callback) => callback(manager)) }
+    const service = new GroupBuyingService({} as never, {} as never, {} as never, {} as never, dataSource as never, walletService as never)
+
+    await expect(service.cancelGroup('group-1', 'leader-1')).resolves.toEqual(expect.objectContaining({ status: GroupBuyingStatus.CANCELLED }))
+    expect(walletService.refundGroupBuyingShare).toHaveBeenCalledWith('buyer-1', 'member-1', 500, manager)
+    expect(members[0].paidAmount).toBe(0)
+    expect(members[0].status).toBe('left')
+  })
 })

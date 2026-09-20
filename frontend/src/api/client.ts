@@ -1757,6 +1757,7 @@ export const api = {
     request<GroupBuyingMember>(`/group-buying/${id}/members/${memberId}/pay`, { method: 'PATCH', body }),
   finalizeGroupBuying: (id: string, address: { title: string; province: string; city: string; street: string; postalCode: string; isDefault: boolean }) =>
     request<Order>(`/group-buying/${id}/finalize`, { method: 'POST', body: { address } }),
+  cancelGroupBuying: (id: string) => request<GroupBuyingGroup>(`/group-buying/${id}/cancel`, { method: 'POST', body: {} }),
   getSubscriptionPlans: () => request<SubscriptionPlan[]>('/subscriptions/plans'),
   getDiscountCodes: () => request<DiscountCode[]>('/subscriptions/discounts'),
   getNotifications: (userId: string) => request<Notification[]>(`/notifications/user/${userId}`),

@@ -56,4 +56,9 @@ export class GroupBuyingController {
   async finalize(@Param('id') id: string, @Body() body: FinalizeGroupBuyingDto, @Req() req: AuthenticatedRequest) {
     return this.groupBuyingService.finalizeGroup(id, body.address, req.user.sub)
   }
+
+  @Post(':id/cancel')
+  async cancel(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.groupBuyingService.cancelGroup(id, req.user.sub)
+  }
 }
