@@ -27,6 +27,8 @@ import type {
   GemstoneLibrary,
   GoldPrice,
   GroupBuyingGroup,
+  GroupBuyingItem,
+  GroupBuyingMember,
   GroupBuyingPaymentMode,
   Invoice,
   Inventory,
@@ -1743,9 +1745,15 @@ export const api = {
   disablePriceAlert: (id: string) =>
     request<PriceAlert>(`/smart-vault/alerts/${id}/disable`, { method: 'PATCH' }),
   getGroupBuyingGroups: () => request<GroupBuyingGroup[]>('/group-buying'),
-  getGroupBuyingGroup: (id: string) => request<GroupBuyingGroup>(`/group-buying/${id}`),
+  getGroupBuyingGroup: (id: string) => request<{ group: GroupBuyingGroup; items: GroupBuyingItem[]; members: GroupBuyingMember[] }>(`/group-buying/${id}`),
   createGroupBuyingGroup: (body: CreateGroupBuyingGroupInput) =>
     request<GroupBuyingGroup>('/group-buying', { method: 'POST', body }),
+  addGroupBuyingItem: (id: string, body: { productId: string; name: string; quantity?: number; unitPrice: number }) =>
+    request<GroupBuyingItem>(`/group-buying/${id}/items`, { method: 'POST', body }),
+  joinGroupBuying: (id: string, body: { userId: string; userName: string; shareAmount: number }) =>
+    request<GroupBuyingMember>(`/group-buying/${id}/join`, { method: 'POST', body }),
+  payGroupBuyingShare: (id: string, memberId: string, body: { paidAmount: number }) =>
+    request<GroupBuyingMember>(`/group-buying/${id}/members/${memberId}/pay`, { method: 'PATCH', body }),
   getSubscriptionPlans: () => request<SubscriptionPlan[]>('/subscriptions/plans'),
   getDiscountCodes: () => request<DiscountCode[]>('/subscriptions/discounts'),
   getNotifications: (userId: string) => request<Notification[]>(`/notifications/user/${userId}`),

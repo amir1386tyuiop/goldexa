@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import {
@@ -15,6 +15,7 @@ import {
   JoinGroupBuyingDto,
   PayGroupBuyingShareDto,
 } from './create-group-buying.dto'
+import { User } from '../users/user.entity'
 
 @Injectable()
 export class GroupBuyingService {
@@ -25,6 +26,8 @@ export class GroupBuyingService {
     private itemRepository: Repository<GroupBuyingItem>,
     @InjectRepository(GroupBuyingMember)
     private memberRepository: Repository<GroupBuyingMember>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async findAll(): Promise<GroupBuyingGroup[]> {
@@ -51,9 +54,11 @@ export class GroupBuyingService {
   }
 
   async createGroup(data: CreateGroupBuyingGroupDto): Promise<GroupBuyingGroup> {
+    const leader = await this.userRepository.findOneBy({ id: data.leaderId })
+    if (!leader) throw new NotFoundException('رهبر گروه یافت نشد')
     const group = this.groupRepository.create({
       leaderId: data.leaderId,
-      leaderName: data.leaderName,
+      leaderName: leader.name,
       title: data.title,
       paymentMode: data.paymentMode || GroupBuyingPaymentMode.MEMBER,
       targetAmount: data.targetAmount || 0,
@@ -65,11 +70,15 @@ export class GroupBuyingService {
     return this.groupRepository.save(group)
   }
 
-  async addItem(groupId: string, data: AddGroupBuyingItemDto): Promise<GroupBuyingItem> {
+  async addItem(groupId: string, data: AddGroupBuyingItemDto, actorId: string): Promise<GroupBuyingItem> {
     const group = await this.groupRepository.findOneBy({ id: groupId })
 
     if (!group) {
       throw new NotFoundException('گروه خرید یافت نشد')
+    }
+    if (group.leaderId !== actorId) throw new ForbiddenException('فقط رهبر گروه می‌تواند محصول اضافه کند')
+    if (!Number.isFinite(Number(data.unitPrice)) || Number(data.unitPrice) <= 0 || !Number.isInteger(Number(data.quantity || 1)) || Number(data.quantity || 1) < 1) {
+      throw new BadRequestException('مقدار و قیمت محصول نامعتبر است')
     }
 
     const item = this.itemRepository.create({
@@ -90,11 +99,17 @@ export class GroupBuyingService {
     if (!group) {
       throw new NotFoundException('گروه خرید یافت نشد')
     }
+    if (group.status !== GroupBuyingStatus.OPEN) throw new BadRequestException('این گروه در حال پذیرش عضو نیست')
+    if (!Number.isFinite(Number(data.shareAmount)) || Number(data.shareAmount) <= 0) throw new BadRequestException('سهم مالی نامعتبر است')
+    const existing = await this.memberRepository.findOneBy({ groupId, userId: data.userId })
+    if (existing) return existing
+    const user = await this.userRepository.findOneBy({ id: data.userId })
+    if (!user) throw new NotFoundException('کاربر یافت نشد')
 
     const member = this.memberRepository.create({
       groupId,
       userId: data.userId,
-      userName: data.userName,
+      userName: user.name,
       shareAmount: data.shareAmount,
       status: GroupBuyingMemberStatus.JOINED,
     })
@@ -106,11 +121,16 @@ export class GroupBuyingService {
     groupId: string,
     memberId: string,
     data: PayGroupBuyingShareDto,
+    actorId: string,
   ): Promise<GroupBuyingMember> {
     const member = await this.memberRepository.findOneBy({ id: memberId, groupId })
 
     if (!member) {
       throw new NotFoundException('عضو گروه خرید یافت نشد')
+    }
+    if (member.userId !== actorId) throw new ForbiddenException('فقط صاحب سهم می‌تواند پرداخت خود را ثبت کند')
+    if (!Number.isFinite(Number(data.paidAmount)) || Number(data.paidAmount) < 0 || Number(data.paidAmount) > Number(member.shareAmount)) {
+      throw new BadRequestException('مبلغ پرداختی نامعتبر است')
     }
 
     member.paidAmount = data.paidAmount

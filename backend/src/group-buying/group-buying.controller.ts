@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
+import type { Request } from 'express'
+import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
 import { GroupBuyingService } from './group-buying.service'
 import {
   AddGroupBuyingItemDto,
@@ -7,7 +9,10 @@ import {
   PayGroupBuyingShareDto,
 } from './create-group-buying.dto'
 
+type AuthenticatedRequest = Request & { user: JwtUser }
+
 @Controller('group-buying')
+@UseGuards(JwtAuthGuard)
 export class GroupBuyingController {
   constructor(private readonly groupBuyingService: GroupBuyingService) {}
 
@@ -22,18 +27,18 @@ export class GroupBuyingController {
   }
 
   @Post()
-  async create(@Body() body: CreateGroupBuyingGroupDto) {
-    return this.groupBuyingService.createGroup(body)
+  async create(@Body() body: CreateGroupBuyingGroupDto, @Req() req: AuthenticatedRequest) {
+    return this.groupBuyingService.createGroup({ ...body, leaderId: req.user.sub })
   }
 
   @Post(':id/items')
-  async addItem(@Param('id') id: string, @Body() body: AddGroupBuyingItemDto) {
-    return this.groupBuyingService.addItem(id, body)
+  async addItem(@Param('id') id: string, @Body() body: AddGroupBuyingItemDto, @Req() req: AuthenticatedRequest) {
+    return this.groupBuyingService.addItem(id, body, req.user.sub)
   }
 
   @Post(':id/join')
-  async join(@Param('id') id: string, @Body() body: JoinGroupBuyingDto) {
-    return this.groupBuyingService.join(id, body)
+  async join(@Param('id') id: string, @Body() body: JoinGroupBuyingDto, @Req() req: AuthenticatedRequest) {
+    return this.groupBuyingService.join(id, { ...body, userId: req.user.sub })
   }
 
   @Patch(':id/members/:memberId/pay')
@@ -41,7 +46,8 @@ export class GroupBuyingController {
     @Param('id') id: string,
     @Param('memberId') memberId: string,
     @Body() body: PayGroupBuyingShareDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.groupBuyingService.payShare(id, memberId, body)
+    return this.groupBuyingService.payShare(id, memberId, body, req.user.sub)
   }
 }

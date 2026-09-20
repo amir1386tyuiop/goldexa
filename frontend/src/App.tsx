@@ -22,6 +22,7 @@ const EscrowPage = lazy(() => import('./pages/EscrowPage').then(({ EscrowPage })
 const PricingPage = lazy(() => import('./pages/PricingPage').then(({ PricingPage }) => ({ default: PricingPage })))
 const WalletPage = lazy(() => import('./pages/WalletPage').then(({ WalletPage }) => ({ default: WalletPage })))
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then(({ OrdersPage }) => ({ default: OrdersPage })))
+const GroupBuyingPage = lazy(() => import('./pages/GroupBuyingPage').then(({ GroupBuyingPage }) => ({ default: GroupBuyingPage })))
 const AdminPage = lazy(() => import('./pages/AdminPage').then(({ AdminPage }) => ({ default: AdminPage })))
 const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })))
 
@@ -86,6 +87,7 @@ function App() {
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/wallet" element={<RequireAuth><WalletPage /></RequireAuth>} />
             <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />
+            <Route path="/group-buying" element={<RequireAuth><GroupBuyingPage /></RequireAuth>} />
             <Route path="/escrow" element={<RequireAuth><EscrowPage /></RequireAuth>} />
             <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
             <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
