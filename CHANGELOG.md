@@ -51,3 +51,4 @@
 - Added Helmet to the NestJS bootstrap while preserving Goldexa's explicit CSP and production HSTS policy.
 - Security regression suite remains green: 2 suites, 22 tests.
 - AI workspace now reads user-owned predictions and recommendations through `/me` endpoints; admin-only matches, metrics, and model reruns are no longer requested by regular users.
+- Smart Vault alerts can now be reset safely by their owner, and the dashboard chart loads snapshots for every asset instead of only the first asset.
