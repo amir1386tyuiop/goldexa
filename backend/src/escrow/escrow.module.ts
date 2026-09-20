@@ -14,5 +14,6 @@ import { PlatformRevenue } from '../finance/platform-revenue.entity'
   imports: [TypeOrmModule.forFeature([EscrowPayment, MarketplaceRating, UsedGoldListing, Auction, SmartVaultAsset, PlatformRevenue]), WalletModule],
   controllers: [EscrowController],
   providers: [EscrowService],
+  exports: [EscrowService],
 })
 export class EscrowModule {}

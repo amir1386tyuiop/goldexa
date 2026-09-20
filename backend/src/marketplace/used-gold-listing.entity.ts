@@ -95,7 +95,7 @@ export class UsedGoldListing {
   @Column({ name: 'lock_type', nullable: true })
   lockType: string | null
 
-  @Column('simple-array', { default: '' })
+  @Column('text', { array: true, default: '{}' })
   images: string[]
 
   @Column({ nullable: true })

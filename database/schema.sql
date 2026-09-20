@@ -593,7 +593,7 @@ CREATE TABLE escrow_payments (
     seller_id UUID NOT NULL REFERENCES users(id),
     amount DECIMAL(15,2) NOT NULL,
     fee DECIMAL(15,2) DEFAULT 0,
-    status VARCHAR(30) DEFAULT 'held',
+    status VARCHAR(30) DEFAULT 'initiated',
     authority VARCHAR(255),
     payment_url TEXT,
     tracking_code VARCHAR(100),

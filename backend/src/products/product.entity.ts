@@ -50,7 +50,7 @@ export class Product {
   @Column('int', { default: 0 })
   stock: number
 
-  @Column('simple-array', { default: '' })
+  @Column('text', { array: true, default: '{}' })
   images: string[]
 
   @Column({ default: false, name: 'is_new' })

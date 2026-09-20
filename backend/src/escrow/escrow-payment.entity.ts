@@ -3,6 +3,7 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateCol
 export enum EscrowPaymentStatus {
   INITIATED = 'initiated',
   HELD = 'held',
+  SHIPPED = 'shipped',
   RELEASED = 'released',
   REFUNDED = 'refunded',
   DISPUTED = 'disputed',

@@ -1,5 +1,14 @@
 # Changelog
 
+## Runtime and E2E hardening
+
+- Fixed the isolated E2E migration image path (`dist/src/data-source.js`) and exported `EscrowService` so the production-shaped Nest container starts successfully.
+- Catalog responses now calculate `finalPrice` from the live 18k price used by checkout, preventing a displayed-price/order-price mismatch.
+- Added validation metadata to group-buying DTOs and aligned E2E auth clients with the real rate-limit boundary.
+- Aligned PostgreSQL `TEXT[]` image columns with TypeORM entities for products, marketplace listings, and Smart Vault assets.
+- Completed escrow shipping lifecycle: `held → shipped → released`, with tracking persistence, shipment order status, and disputes during shipping.
+- Verified the isolated real-PostgreSQL/Redis E2E stack: 4 suites and 15 tests passed.
+
 ## MVP hardening
 
 - Prevented direct wallet minting: deposits and generic ledger entries are admin-only.

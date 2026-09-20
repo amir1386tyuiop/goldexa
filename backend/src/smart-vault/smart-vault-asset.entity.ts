@@ -50,7 +50,7 @@ export class SmartVaultAsset {
   @Column('decimal', { precision: 5, scale: 2, default: 0, name: 'profit_loss_percent' })
   profitLossPercent: number
 
-  @Column('simple-array', { default: '' })
+  @Column('text', { array: true, default: '{}' })
   images: string[]
 
   @Column('simple-json', { nullable: true })

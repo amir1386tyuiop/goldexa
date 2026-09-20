@@ -41,7 +41,7 @@ services:
       DB_USERNAME: goldeksa_e2e
       DB_PASSWORD: goldeksa_e2e_only
       DB_DATABASE: goldeksa_e2e
-    command: ['node', 'node_modules/typeorm/cli.js', '-d', 'dist/data-source.js', 'migration:run']
+    command: ['node', 'node_modules/typeorm/cli.js', '-d', 'dist/src/data-source.js', 'migration:run']
     depends_on:
       postgres:
         condition: service_healthy

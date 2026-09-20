@@ -684,7 +684,7 @@ export interface AiRunResult {
   metadata?: Record<string, unknown>
 }
 
-export type EscrowPaymentStatus = 'initiated' | 'held' | 'released' | 'refunded' | 'disputed' | 'cancelled'
+export type EscrowPaymentStatus = 'initiated' | 'held' | 'shipped' | 'released' | 'refunded' | 'disputed' | 'cancelled'
 
 export interface EscrowPayment {
   id: string

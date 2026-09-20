@@ -152,7 +152,8 @@ export class EscrowService {
   ): Promise<EscrowPayment | null> {
     const transitions: Record<EscrowPaymentStatus, EscrowPaymentStatus[]> = {
       [EscrowPaymentStatus.INITIATED]: [EscrowPaymentStatus.HELD, EscrowPaymentStatus.CANCELLED],
-      [EscrowPaymentStatus.HELD]: [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.DISPUTED],
+      [EscrowPaymentStatus.HELD]: [EscrowPaymentStatus.SHIPPED, EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.DISPUTED],
+      [EscrowPaymentStatus.SHIPPED]: [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.DISPUTED],
       [EscrowPaymentStatus.DISPUTED]: [EscrowPaymentStatus.RELEASED, EscrowPaymentStatus.REFUNDED, EscrowPaymentStatus.CANCELLED],
       [EscrowPaymentStatus.RELEASED]: [],
       [EscrowPaymentStatus.REFUNDED]: [],
@@ -226,6 +227,8 @@ export class EscrowService {
           ? OrderStatus.CANCELLED
           : nextStatus === EscrowPaymentStatus.HELD
             ? OrderStatus.PAID
+            : nextStatus === EscrowPaymentStatus.SHIPPED
+              ? OrderStatus.SHIPPED
             : null
       if (orderStatus) {
         await manager.update(Order, payment.orderId, {
@@ -384,7 +387,7 @@ export class EscrowService {
       if (payment.buyerId !== userId && payment.sellerId !== userId) {
         throw new ForbiddenException('این escrow متعلق به شما نیست')
       }
-      if (payment.status !== EscrowPaymentStatus.HELD) {
+      if (![EscrowPaymentStatus.HELD, EscrowPaymentStatus.SHIPPED].includes(payment.status)) {
         throw new BadRequestException('فقط escrow نگه‌داری‌شده قابل اختلاف است')
       }
       payment.status = EscrowPaymentStatus.DISPUTED
@@ -408,6 +411,7 @@ export class EscrowService {
         throw new BadRequestException('فقط escrow نگه‌داری‌شده قابل ارسال است')
       }
       payment.trackingCode = trackingCode.trim()
+      payment.status = EscrowPaymentStatus.SHIPPED
       return manager.save(payment)
     })
   }
@@ -416,8 +420,8 @@ export class EscrowService {
     const payment = await this.escrowRepository.findOneBy({ id })
     if (!payment) throw new NotFoundException('پرداخت امانی یافت نشد')
     if (payment.buyerId !== buyerId) throw new ForbiddenException('این escrow متعلق به شما نیست')
-    if (payment.status !== EscrowPaymentStatus.HELD) {
-      throw new BadRequestException('فقط escrow نگه‌داری‌شده قابل تایید است')
+    if (payment.status !== EscrowPaymentStatus.SHIPPED) {
+      throw new BadRequestException('فقط escrow ارسال‌شده قابل تایید است')
     }
     return (await this.updatePaymentStatus(id, { status: EscrowPaymentStatus.RELEASED })) as EscrowPayment
   }

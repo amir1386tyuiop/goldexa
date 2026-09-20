@@ -85,12 +85,12 @@ databaseE2e('used-gold marketplace and escrow lifecycle', () => {
     expect(wallet.status).toBe(200)
     expect(Number(wallet.body.balance)).toBe(0)
 
-    const shipped = await api<EscrowStatusResponse>(`/escrow/payments/${purchased.body.escrow.id}/ship`, jsonBody({ trackingCode: 'E2E-TRACK-001' }, seller.token))
+    const shipped = await api<EscrowStatusResponse>(`/escrow/payments/${purchased.body.escrow.id}/ship`, { ...jsonBody({ trackingCode: 'E2E-TRACK-001' }, seller.token), method: 'PATCH' })
     expect(shipped.status).toBe(200)
     expect(shipped.body.status).toBe('shipped')
 
     const delivered = await api<EscrowStatusResponse>(`/escrow/payments/${purchased.body.escrow.id}/confirm-delivery`, jsonBody({}, buyer.token))
-    expect(delivered.status).toBe(200)
+    expect(delivered.status).toBe(201)
     expect(delivered.body.status).toBe('released')
 
     const repeated = await api(`/marketplace/listings/${created.body.id}/purchase`, jsonBody({ address: {} }, buyer.token))
@@ -122,7 +122,7 @@ databaseE2e('used-gold marketplace and escrow lifecycle', () => {
     expect(dispute.status).toBe(201)
     expect(dispute.body.status).toBe('disputed')
 
-    const noNote = await api(`/escrow/payments/${purchased.body.escrow.id}/status`, jsonBody({ status: 'refunded' }, seller.token))
+    const noNote = await api(`/escrow/payments/${purchased.body.escrow.id}/status`, { ...jsonBody({ status: 'refunded' }, seller.token), method: 'PATCH' })
     expect([401, 403]).toContain(noNote.status)
   })
 })

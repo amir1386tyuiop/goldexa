@@ -39,16 +39,18 @@ export function uniquePhone(): string {
 
 export async function createAndLogin(label: string) {
   const phone = uniquePhone()
-  const created = await api<{ id: string }>('/users', jsonBody({ name: `E2E ${label}`, phone }))
+  const clientIp = `10.250.0.${(Array.from(label).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 240) + 10}`
+  const clientHeaders = { ...jsonHeaders(), 'x-forwarded-for': clientIp }
+  const created = await api<{ id: string }>('/users', { ...jsonBody({ name: `E2E ${label}`, phone }), headers: clientHeaders })
   expect(created.status).toBe(201)
 
-  const otp = await api<{ otp?: string }>('/auth/request-otp', jsonBody({ phone }))
+  const otp = await api<{ otp?: string }>('/auth/request-otp', { ...jsonBody({ phone }), headers: clientHeaders })
   expect(otp.status).toBe(201)
   if (!otp.body?.otp) {
     throw new Error('E2E requires RETURN_OTP_IN_RESPONSE=true on the isolated test backend')
   }
 
-  const login = await api<{ user: { id: string }; accessToken: string }>('/auth/login', jsonBody({ phone, otp: otp.body.otp }))
+  const login = await api<{ user: { id: string }; accessToken: string }>('/auth/login', { ...jsonBody({ phone, otp: otp.body.otp }), headers: clientHeaders })
   expect(login.status).toBe(201)
   expect(login.body.accessToken).toBeTruthy()
   return { phone, userId: login.body.user.id, token: login.body.accessToken }

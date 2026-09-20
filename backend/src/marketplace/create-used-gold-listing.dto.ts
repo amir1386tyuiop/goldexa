@@ -35,11 +35,11 @@ export class CreateUsedGoldListingDto {
   @IsEnum(UsedGoldSource)
   source?: UsedGoldSource
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   sellerId: string
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   sellerName: string
 

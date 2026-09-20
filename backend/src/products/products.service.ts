@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Product, ProductCategory } from './product.entity'
+import { PricingService } from '../pricing/pricing.service'
 
 export interface ProductQuery {
   search?: string
@@ -24,25 +25,41 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
+    private readonly pricingService: PricingService,
   ) {}
 
+  /**
+   * Catalog responses must expose the same live price used by cart/order
+   * creation. The persisted final_price is retained as a query/index hint,
+   * but must never be presented as an authoritative checkout price.
+   */
+  private async withLivePrices(products: Product[]): Promise<Product[]> {
+    const prices = await Promise.all(
+      products.map(async (product) => [product.id, await this.pricingService.calculateProductPrice(product)] as const),
+    )
+    const priceById = new Map(prices)
+    return products.map((product) => Object.assign(product, { finalPrice: priceById.get(product.id) ?? product.finalPrice }))
+  }
+
   async findAll(): Promise<Product[]> {
-    return this.productRepository.find({ order: { createdAt: 'DESC' } })
+    return this.withLivePrices(await this.productRepository.find({ order: { createdAt: 'DESC' } }))
   }
 
   async findOne(id: string): Promise<Product | null> {
-    return this.productRepository.findOneBy({ id })
+    const product = await this.productRepository.findOneBy({ id })
+    return product ? (await this.withLivePrices([product]))[0] : null
   }
 
   async findByCategory(category: ProductCategory): Promise<Product[]> {
-    return this.productRepository.findBy({ category })
+    return this.withLivePrices(await this.productRepository.findBy({ category }))
   }
 
   async search(query: string): Promise<Product[]> {
-    return this.productRepository
+    const products = await this.productRepository
       .createQueryBuilder('product')
       .where('product.name ILIKE :query OR product.description ILIKE :query', { query: `%${query}%` })
       .getMany()
+    return this.withLivePrices(products)
   }
 
   /**
@@ -108,7 +125,7 @@ export class ProductsService {
     qb.skip((page - 1) * limit).take(limit)
 
     const [items, total] = await qb.getManyAndCount()
-    return { items, total, page, limit, pages: Math.ceil(total / limit) || 1 }
+    return { items: await this.withLivePrices(items), total, page, limit, pages: Math.ceil(total / limit) || 1 }
   }
 
   /**
@@ -122,19 +139,19 @@ export class ProductsService {
         order: { isFeatured: 'DESC', createdAt: 'DESC' },
         take: limit,
       })
-      if (sameCategory.length) return sameCategory
+      if (sameCategory.length) return this.withLivePrices(sameCategory)
     }
     const featured = await this.productRepository.find({
       where: { isFeatured: true },
       order: { createdAt: 'DESC' },
       take: limit,
     })
-    if (featured.length >= limit) return featured
+    if (featured.length >= limit) return this.withLivePrices(featured)
     const newest = await this.productRepository.find({
       order: { createdAt: 'DESC' },
       take: limit,
     })
-    return newest
+    return this.withLivePrices(newest)
   }
 
   /** Dynamic home feed: newest, featured and discounted products. */
@@ -149,6 +166,11 @@ export class ProductsService {
         .take(8)
         .getMany(),
     ])
-    return { newProducts, featured, discounted }
+    const [liveNew, liveFeatured, liveDiscounted] = await Promise.all([
+      this.withLivePrices(newProducts),
+      this.withLivePrices(featured),
+      this.withLivePrices(discounted),
+    ])
+    return { newProducts: liveNew, featured: liveFeatured, discounted: liveDiscounted }
   }
 }
