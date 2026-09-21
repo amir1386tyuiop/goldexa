@@ -1784,6 +1784,10 @@ export const api = {
   getAiMatches: () => request<AiMarketMatch[]>('/ai-engine/matches'),
   getAiMetrics: () => request<AiServiceMetric[]>('/ai-engine/metrics'),
   getAiProviders: () => request<AiProviderPublicConfig[]>('/ai-engine/providers'),
+  executeAiPrediction: (body: { currentPrice: number; historicalPrices?: number[]; horizonDays?: number }) =>
+    request<AiPricePrediction>('/ai-engine/predictions/execute', { method: 'POST', body }),
+  executeAiRecommendation: (body: { userHistory?: string[]; budget?: number; style?: string }) =>
+    request<AiDesignRecommendation>('/ai-engine/recommendations/execute', { method: 'POST', body }),
   runAiTask: (body: RunAiTaskInput) => request<AiRunResult>('/ai-engine/text', { method: 'POST', body }),
   chatWithAi: (body: RunAiTaskInput) => request<AiRunResult>('/ai-engine/chat', { method: 'POST', body }),
   askCodeAi: (body: RunAiTaskInput) => request<AiRunResult>('/ai-engine/code', { method: 'POST', body }),

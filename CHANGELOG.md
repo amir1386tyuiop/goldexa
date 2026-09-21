@@ -1,5 +1,12 @@
 # Changelog
 
+## AI workspace execution
+
+- Removed fabricated prediction, recommendation, matching, and metric cards from the frontend workspace; empty and error states now reflect API state only.
+- Added authenticated user actions for running a price prediction from the live 18k feed and generating a recommendation from the local AI service.
+- Enabled the local AI engine by default in the development Docker Compose stack; external provider keys remain optional for local deterministic inference.
+- Verified the live Docker path with a seeded buyer: prediction and recommendation records were persisted using the current gold price.
+
 ## Group-buying delivery lifecycle
 
 - Added secure group-buying shipment tracking backed by the finalized order. The leader and members can view order status, shipment carrier/tracking code, and status history; non-members are denied.
