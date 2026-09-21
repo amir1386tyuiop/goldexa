@@ -44,8 +44,8 @@ export function Navbar() {
               <Icon className="h-4 w-4" />{label}
             </Link>
           ))}
+          {currentUser && currentUser.role !== 'admin' && <Link to="/ai-workspace" className={cn('flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors hover:bg-amber-50', location.pathname === '/ai-workspace' ? 'bg-stone-950 text-white hover:bg-stone-800' : 'text-amber-900')}><Bot className="h-4 w-4" />طراح هوشمند</Link>}
           {currentUser?.role === 'admin' && <Link to="/admin" className="rounded-xl bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900">مدیریت</Link>}
-          {currentUser?.role === 'admin' && <Link to="/ai-workspace" className={cn('flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors hover:bg-amber-50', location.pathname === '/ai-workspace' ? 'bg-stone-950 text-white hover:bg-stone-800' : 'text-amber-900')}><Bot className="h-4 w-4" />هوش مصنوعی</Link>}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -64,6 +64,7 @@ export function Navbar() {
         <nav className="mx-auto flex max-w-7xl flex-col gap-1" aria-label="منوی موبایل">
           {navItems.map(({ label, path, icon: Icon }) => <Link key={path} to={path} onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><Icon className="h-5 w-5 text-amber-700" />{label}</Link>)}
           <Link to="/dashboard" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><PackageCheck className="h-5 w-5 text-amber-700" />داشبورد و سفارش‌ها</Link>
+          {currentUser && currentUser.role !== 'admin' && <Link to="/ai-workspace" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 font-semibold text-amber-900 hover:bg-amber-100"><Bot className="h-5 w-5 text-amber-700" />طراح هوشمند جواهر</Link>}
           {currentUser?.role === 'admin' && <Link to="/admin" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 font-semibold text-amber-900 hover:bg-amber-100"><ShieldCheck className="h-5 w-5 text-amber-700" />پنل مدیریت</Link>}
           {currentUser?.role === 'admin' && <Link to="/ai-workspace" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-semibold text-amber-900 hover:bg-amber-100"><Bot className="h-5 w-5 text-amber-700" />مرکز هوش مصنوعی</Link>}
           <Link to="/wallet" onClick={closeMenu} className="flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 font-medium hover:bg-amber-50"><Wallet className="h-5 w-5 text-amber-700" />کیف پول</Link>
