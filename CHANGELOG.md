@@ -7,6 +7,7 @@
 - Enabled the local AI engine by default in the development Docker Compose stack; external provider keys remain optional for local deterministic inference.
 - Verified the live Docker path with a seeded buyer: prediction and recommendation records were persisted using the current gold price.
 - Re-verified the isolated PostgreSQL/Redis E2E stack: 4 suites and 15 tests passed, covering checkout/refund, wallet, group buying, marketplace, escrow, and API smoke flows.
+- Replaced the AI overview's fixed sample chart with the real persisted 18k price-history API.
 
 ## Group-buying delivery lifecycle
 

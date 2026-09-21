@@ -26,6 +26,7 @@ import type {
   EventLog,
   GemstoneLibrary,
   GoldPrice,
+  GoldPriceType,
   GroupBuyingGroup,
   GroupBuyingItem,
   GroupBuyingMember,
@@ -1695,6 +1696,8 @@ export const api = {
   refreshToken: (refreshTokenValue: string) => refreshToken(refreshTokenValue),
   registerUser: (body: { name: string; phone: string; email?: string; role?: UserRole }) => registerUser(body),
   getGoldPrices: () => request<GoldPrice[]>('/gold-pricing'),
+  getGoldPriceHistory: (type: GoldPriceType = 'gold18', limit = 30) =>
+    request<Array<{ value: number; change?: number; changePercent?: number; source?: string; recordedAt: string }>>(`/gold-pricing/history/${type}?limit=${limit}`),
   getGoldPricingStatus: () => request<GoldPricingStatus>('/gold-pricing/status'),
   createPricingQuote: (category: string, goldWeight: number) =>
     request<{ quoteId: string; total: number; expiresAt: string }>('/pricing/quote/' + category, { method: 'POST', body: { goldWeight } }),
