@@ -9,6 +9,7 @@
 - Re-verified the isolated PostgreSQL/Redis E2E stack: 4 suites and 15 tests passed, covering checkout/refund, wallet, group buying, marketplace, escrow, and API smoke flows.
 - Replaced the AI overview's fixed sample chart with the real persisted 18k price-history API.
 - Added `/health/ready`, which verifies PostgreSQL and Redis connectivity; the Docker backend healthcheck now uses readiness instead of process-only health.
+- Removed the AI workspace's local-preview fallback so prediction, recommendation, and matching views never present fabricated data when an API request fails.
 
 ## Group-buying delivery lifecycle
 
