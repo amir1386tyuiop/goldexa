@@ -1,12 +1,14 @@
 import { Controller, Get, Header, Optional } from '@nestjs/common'
 import { DataSource } from 'typeorm'
 import { CacheService } from './common/cache.service'
+import { GoldPricingService } from './gold-pricing/gold-pricing.service'
 
 @Controller()
 export class AppController {
   constructor(
     @Optional() private readonly dataSource?: DataSource,
     @Optional() private readonly cache?: CacheService,
+    @Optional() private readonly goldPricing?: GoldPricingService,
   ) {}
 
   @Get()
@@ -30,7 +32,7 @@ export class AppController {
   /** Dependency readiness for orchestrators and production load balancers. */
   @Get('health/ready')
   async readiness() {
-    const checks: Record<string, string> = { database: 'unknown', cache: 'unknown' }
+    const checks: Record<string, string> = { database: 'unknown', cache: 'unknown', priceFeed: 'unknown' }
     try {
       await this.dataSource?.query('SELECT 1')
       checks.database = 'ok'
@@ -40,7 +42,13 @@ export class AppController {
 
     const cacheDriver = this.cache?.driver
     checks.cache = cacheDriver === 'redis' ? 'ok' : cacheDriver === 'memory' ? 'degraded' : 'unknown'
-    const ready = checks.database === 'ok' && (process.env.NODE_ENV !== 'production' || checks.cache === 'ok')
+    const feed = this.goldPricing?.getFeedStatus()
+    if (feed) {
+      const ageMs = feed.lastFetchAt ? Date.now() - new Date(feed.lastFetchAt).getTime() : Number.POSITIVE_INFINITY
+      checks.priceFeed = feed.source !== 'mock' && ageMs <= 180_000 ? 'ok' : 'degraded'
+    }
+    const productionPriceReady = !feed || checks.priceFeed === 'ok'
+    const ready = checks.database === 'ok' && (process.env.NODE_ENV !== 'production' || (checks.cache === 'ok' && productionPriceReady))
     return {
       service: 'Goldexa API',
       status: ready ? 'ready' : 'not_ready',

@@ -10,6 +10,7 @@
 - Replaced the AI overview's fixed sample chart with the real persisted 18k price-history API.
 - Added `/health/ready`, which verifies PostgreSQL and Redis connectivity; the Docker backend healthcheck now uses readiness instead of process-only health.
 - Removed the AI workspace's local-preview fallback so prediction, recommendation, and matching views never present fabricated data when an API request fails.
+- Extended production readiness to require a fresh non-mock gold-price feed in addition to PostgreSQL and Redis.
 
 ## Group-buying delivery lifecycle
 
