@@ -1,0 +1,6 @@
+services:
+  # Windows reserves the documented 56379 port on some Docker/WSL hosts.
+  # The backend still uses the internal service port; only the optional host
+  # inspection port changes for this local override.
+  redis:
+    ports: !reset []

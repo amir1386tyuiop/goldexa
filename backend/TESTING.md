@@ -44,6 +44,14 @@ npm run test:e2e -- --runInBand
 docker compose -f test/docker-compose.e2e.yml down -v
 ```
 
+On Windows hosts where Docker reserves port `56379`, add the local override
+file to the compose command. It removes the optional Redis host mapping while
+keeping the backend-to-Redis connection on the isolated Docker network:
+
+```powershell
+docker compose -f test/docker-compose.e2e.yml -f test/docker-compose.e2e.override.yml up -d --build
+```
+
 The E2E backend uses `CACHE_DRIVER=redis` and the dedicated Redis service on
 the internal compose network. The host mapping `56379` is available for
 optional cache inspection and does not share the development Redis instance.
@@ -65,9 +73,10 @@ The suite covers:
 `wallet checkout contract` is skipped unless the isolated database fixture
 environment is explicitly enabled. A skipped suite is not a production signoff.
 
-The isolated stack was verified on 2026-08-29 with both PostgreSQL and Redis:
-2 suites and 11 tests passed, including checkout, wallet payment, refund
-ownership, over-refund rejection, idempotency, and quote/cache behavior.
+The isolated stack was re-verified with both PostgreSQL and Redis: 4 suites and
+15 tests passed, including checkout, wallet payment, refund ownership,
+over-refund rejection, idempotency, quote/cache behavior, group buying, and
+marketplace/escrow.
 
 The current backend contract hardening also verifies that checkout carries quote
 IDs into order validation, online checkout requests a gateway transaction, and
