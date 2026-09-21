@@ -1773,6 +1773,7 @@ export const api = {
   getAdminCustomBuilderDesigns: () => request<JewelryDesign[]>('/custom-builder/admin/designs'),
   getJewelryDesignsByUser: (userId: string) => request<JewelryDesign[]>(`/custom-builder/designs/user/${userId}`),
   getJewelryDesignVersions: (designId: string) => request<JewelryDesignVersion[]>(`/custom-builder/designs/${designId}/versions`),
+  updateJewelryDesignStatus: (id: string, status: JewelryDesign['status']) => request<JewelryDesign>(`/custom-builder/designs/${id}/status`, { method: 'PATCH', body: { status } }),
   createJewelryDesign: (body: CreateJewelryDesignInput) =>
     request<JewelryDesign>('/custom-builder/designs', { method: 'POST', body }),
   getGemstones: () => request<GemstoneLibrary[]>('/custom-builder/gemstones'),
