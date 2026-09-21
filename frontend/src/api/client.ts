@@ -1770,6 +1770,7 @@ export const api = {
   getNotifications: (userId: string) => request<Notification[]>(`/notifications/user/${userId}`),
   markNotificationRead: (notificationId: string) => markNotificationRead(notificationId),
   getJewelryDesigns: () => request<JewelryDesign[]>('/custom-builder/designs'),
+  getAdminCustomBuilderDesigns: () => request<JewelryDesign[]>('/custom-builder/admin/designs'),
   getJewelryDesignsByUser: (userId: string) => request<JewelryDesign[]>(`/custom-builder/designs/user/${userId}`),
   getJewelryDesignVersions: (designId: string) => request<JewelryDesignVersion[]>(`/custom-builder/designs/${designId}/versions`),
   createJewelryDesign: (body: CreateJewelryDesignInput) =>
@@ -1778,6 +1779,8 @@ export const api = {
   createGemstone: (body: CreateGemstoneInput) =>
     request<GemstoneLibrary>('/custom-builder/gemstones', { method: 'POST', body }),
   getCustomBuilderQuotes: (userId: string) => request<CustomBuilderQuote[]>(`/custom-builder/quotes/user/${userId}`),
+  getAdminCustomBuilderQuotes: () => request<CustomBuilderQuote[]>('/custom-builder/quotes'),
+  updateCustomBuilderQuoteStatus: (id: string, status: string) => request<CustomBuilderQuote>(`/custom-builder/quotes/${id}/status`, { method: 'PATCH', body: { status } }),
   createCustomBuilderQuote: (body: CreateCustomBuilderQuoteInput) =>
     request<CustomBuilderQuote>('/custom-builder/quotes', { method: 'POST', body }),
   // User-owned AI data must use the /me routes. The parameterized routes are

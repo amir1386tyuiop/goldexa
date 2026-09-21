@@ -21,6 +21,10 @@ export class CustomBuilderController {
   @Get('designs')
   async findDesigns() { return this.customBuilderService.findDesigns() }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Get('admin/designs')
+  async findAdminDesigns() { return this.customBuilderService.findAllDesignsForAdmin() }
+
   @UseGuards(JwtAuthGuard)
   @Get('designs/user/:userId')
   async findDesignsByUser(@Req() req: AuthenticatedRequest) { return this.customBuilderService.findDesignsByUser(req.user.sub) }

@@ -26,7 +26,7 @@ import {
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { AiEnginePanel } from './AiEnginePage'
-import type { Auction, EscrowPayment, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission, UsedGoldListing } from '@/types'
+import type { Auction, CustomBuilderQuote, EscrowPayment, JewelryDesign, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission, UsedGoldListing } from '@/types'
 
 interface AdminStats {
   totalUsers: number
@@ -72,6 +72,7 @@ const menuItems = [
   { id: 'disputes', icon: <ShieldCheck className="h-5 w-5" />, label: 'اختلاف‌های escrow' },
   { id: 'auctions', icon: <Gavel className="h-5 w-5" />, label: 'مزایده‌ها' },
   { id: 'marketplace', icon: <ShieldCheck className="h-5 w-5" />, label: 'بازار دست‌دوم' },
+  { id: 'custom-builder', icon: <Wand2 className="h-5 w-5" />, label: 'سفارش‌های اختصاصی' },
   { id: 'users', icon: <Users className="h-5 w-5" />, label: 'کاربران' },
   { id: 'roles', icon: <ShieldCheck className="h-5 w-5" />, label: 'نقش‌ها' },
   { id: 'ai', icon: <Brain className="h-5 w-5" />, label: 'هوش مصنوعی' },
@@ -150,6 +151,18 @@ export function AdminPage() {
   const { data: escrowDisputes = [] } = useQuery<EscrowPayment[]>({
     queryKey: ['admin-escrow-disputes'],
     queryFn: () => api.getAdminEscrowDisputes(100),
+    initialData: [],
+  })
+
+  const { data: customDesigns = [] } = useQuery<JewelryDesign[]>({
+    queryKey: ['admin-custom-designs'],
+    queryFn: api.getAdminCustomBuilderDesigns,
+    initialData: [],
+  })
+
+  const { data: customQuotes = [] } = useQuery<CustomBuilderQuote[]>({
+    queryKey: ['admin-custom-quotes'],
+    queryFn: api.getAdminCustomBuilderQuotes,
     initialData: [],
   })
 
@@ -277,6 +290,7 @@ export function AdminPage() {
             {activeTab === 'auctions' && <AuctionsTable auctions={auctions} />}
 
             {activeTab === 'marketplace' && <MarketplaceModerationPanel listings={marketplaceListings} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-marketplace-listings'] })} />}
+            {activeTab === 'custom-builder' && <CustomBuilderAdminPanel designs={customDesigns} quotes={customQuotes} onChanged={() => { void queryClient.invalidateQueries({ queryKey: ['admin-custom-designs'] }); void queryClient.invalidateQueries({ queryKey: ['admin-custom-quotes'] }) }} />}
 
             {activeTab === 'users' && <UsersTable users={adminUsers} />}
 
@@ -685,6 +699,18 @@ function MarketplaceModerationPanel({ listings, onResolved }: { listings: UsedGo
       </div>
     </div>
   )
+}
+
+function CustomBuilderAdminPanel({ designs, quotes, onChanged }: { designs: JewelryDesign[]; quotes: CustomBuilderQuote[]; onChanged: () => void }) {
+  const updateQuote = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => api.updateCustomBuilderQuoteStatus(id, status),
+    onSuccess: onChanged,
+  })
+  const statusLabel = (status: string) => ({ draft: 'پیش‌نویس', in_progress: 'در حال ساخت', ready_for_review: 'آماده بررسی', approved: 'تأیید شده', rejected: 'رد شده', sent: 'ارسال شده', accepted: 'پذیرفته شده', expired: 'منقضی' }[status] || status)
+  return <div className="space-y-6">
+    <section className="card p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><p className="eyebrow">CUSTOM DESIGNS</p><h2 className="mt-1 text-xl font-black">صف سفارش‌های سفارشی</h2></div><span className="badge badge-gold">{designs.length} طرح</span></div>{designs.length ? <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[760px] text-right text-sm"><thead><tr className="border-b border-stone-200 text-xs text-stone-500"><th className="pb-3 pr-3">طرح</th><th className="pb-3">کاربر</th><th className="pb-3">وزن/عیار</th><th className="pb-3">قیمت</th><th className="pb-3">وضعیت</th></tr></thead><tbody>{designs.map((design) => <tr key={design.id} className="border-b border-stone-100 last:border-0"><td className="py-4 pr-3"><p className="font-black">{design.title}</p><p className="mt-1 text-xs text-stone-500">{design.category} · {design.id.slice(0, 8)}</p></td><td className="py-4 text-stone-600">{design.userName || design.userId.slice(0, 8)}</td><td className="py-4">{design.weight} گرم · {design.karat} عیار</td><td className="py-4 font-bold">{formatPrice(design.totalPrice)} تومان</td><td className="py-4"><span className="badge badge-info">{statusLabel(design.status)}</span></td></tr>)}</tbody></table></div> : <p className="mt-5 text-sm text-stone-500">هنوز طرح سفارشی ثبت نشده است.</p>}</section>
+    <section className="card p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><p className="eyebrow">CUSTOM QUOTES</p><h2 className="mt-1 text-xl font-black">مدیریت پیش‌فاکتورهای ساخت</h2></div><span className="badge badge-gold">{quotes.length} پیش‌فاکتور</span></div>{quotes.length ? <div className="mt-5 space-y-3">{quotes.map((quote) => <article key={quote.id} className="rounded-2xl border border-stone-200 bg-stone-50 p-4"><div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><p className="text-xs text-stone-500">{quote.id.slice(0, 8)} · کاربر {quote.userId.slice(0, 8)}</p><h3 className="mt-2 text-xl font-black">{formatPrice(quote.total)} تومان</h3><p className="mt-1 text-xs text-stone-600">{quote.goldWeight} گرم · قیمت مرجع {formatPrice(quote.goldPriceSnapshot)} · انقضا {quote.expiresAt ? new Date(quote.expiresAt).toLocaleString('fa-IR') : '—'}</p></div><span className="badge badge-info">{statusLabel(quote.status)}</span></div><div className="mt-4 flex flex-wrap gap-2">{quote.status === 'draft' ? <button type="button" className="btn btn-primary min-h-10" disabled={updateQuote.isPending} onClick={() => updateQuote.mutate({ id: quote.id, status: 'sent' })}>ارسال برای مشتری</button> : null}{quote.status === 'sent' ? <><button type="button" className="btn btn-primary min-h-10" disabled={updateQuote.isPending} onClick={() => updateQuote.mutate({ id: quote.id, status: 'accepted' })}>تأیید</button><button type="button" className="btn btn-outline min-h-10 border-red-300 text-red-800" disabled={updateQuote.isPending} onClick={() => updateQuote.mutate({ id: quote.id, status: 'rejected' })}>رد</button></> : null}</div>{updateQuote.isError ? <p className="mt-2 text-sm text-red-700" role="alert">به‌روزرسانی پیش‌فاکتور انجام نشد.</p> : null}</article>)}</div> : <p className="mt-5 text-sm text-stone-500">پیش‌فاکتوری برای بررسی وجود ندارد.</p>}</section>
+  </div>
 }
 
 function PayoutsPanel({ payouts, onResolved }: { payouts: PayoutRequest[]; onResolved: () => void }) {

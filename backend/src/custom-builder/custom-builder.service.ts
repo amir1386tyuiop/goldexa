@@ -40,6 +40,10 @@ export class CustomBuilderService {
     return this.designRepository.find({ where: { status: JewelryDesignStatus.APPROVED }, order: { createdAt: 'DESC' } })
   }
 
+  async findAllDesignsForAdmin(): Promise<JewelryDesign[]> {
+    return this.designRepository.find({ order: { updatedAt: 'DESC' } })
+  }
+
   async findDesignsByUser(userId: string): Promise<JewelryDesign[]> {
     return this.designRepository.findBy({ userId })
   }

@@ -11,6 +11,7 @@
 - Added `/health/ready`, which verifies PostgreSQL and Redis connectivity; the Docker backend healthcheck now uses readiness instead of process-only health.
 - Removed the AI workspace's local-preview fallback so prediction, recommendation, and matching views never present fabricated data when an API request fails.
 - Extended production readiness to require a fresh non-mock gold-price feed in addition to PostgreSQL and Redis.
+- Added the admin custom-builder queue: administrators can inspect all customer designs and move custom quotes through sent, accepted, or rejected states.
 
 ## Group-buying delivery lifecycle
 
