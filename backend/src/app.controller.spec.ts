@@ -9,4 +9,17 @@ describe('AppController observability', () => {
     expect(result).toContain('goldexa_process_uptime_seconds ')
     expect(result.endsWith('\n')).toBe(true)
   })
+
+  it('reports database and Redis readiness explicitly', async () => {
+    const controller = new AppController(
+      { query: jest.fn().mockResolvedValue([{ ok: 1 }]) } as never,
+      { driver: 'redis' } as never,
+    )
+
+    await expect(controller.readiness()).resolves.toEqual(expect.objectContaining({
+      status: 'ready',
+      ready: true,
+      checks: { database: 'ok', cache: 'ok' },
+    }))
+  })
 })

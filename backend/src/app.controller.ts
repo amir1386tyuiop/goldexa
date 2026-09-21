@@ -1,7 +1,14 @@
-import { Controller, Get, Header } from '@nestjs/common'
+import { Controller, Get, Header, Optional } from '@nestjs/common'
+import { DataSource } from 'typeorm'
+import { CacheService } from './common/cache.service'
 
 @Controller()
 export class AppController {
+  constructor(
+    @Optional() private readonly dataSource?: DataSource,
+    @Optional() private readonly cache?: CacheService,
+  ) {}
+
   @Get()
   getHealth() {
     return {
@@ -16,6 +23,29 @@ export class AppController {
     return {
       service: 'Goldexa API',
       status: 'ok',
+      timestamp: new Date().toISOString(),
+    }
+  }
+
+  /** Dependency readiness for orchestrators and production load balancers. */
+  @Get('health/ready')
+  async readiness() {
+    const checks: Record<string, string> = { database: 'unknown', cache: 'unknown' }
+    try {
+      await this.dataSource?.query('SELECT 1')
+      checks.database = 'ok'
+    } catch {
+      checks.database = 'error'
+    }
+
+    const cacheDriver = this.cache?.driver
+    checks.cache = cacheDriver === 'redis' ? 'ok' : cacheDriver === 'memory' ? 'degraded' : 'unknown'
+    const ready = checks.database === 'ok' && (process.env.NODE_ENV !== 'production' || checks.cache === 'ok')
+    return {
+      service: 'Goldexa API',
+      status: ready ? 'ready' : 'not_ready',
+      ready,
+      checks,
       timestamp: new Date().toISOString(),
     }
   }

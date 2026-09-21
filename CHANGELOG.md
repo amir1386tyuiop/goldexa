@@ -8,6 +8,7 @@
 - Verified the live Docker path with a seeded buyer: prediction and recommendation records were persisted using the current gold price.
 - Re-verified the isolated PostgreSQL/Redis E2E stack: 4 suites and 15 tests passed, covering checkout/refund, wallet, group buying, marketplace, escrow, and API smoke flows.
 - Replaced the AI overview's fixed sample chart with the real persisted 18k price-history API.
+- Added `/health/ready`, which verifies PostgreSQL and Redis connectivity; the Docker backend healthcheck now uses readiness instead of process-only health.
 
 ## Group-buying delivery lifecycle
 
