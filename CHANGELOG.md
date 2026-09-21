@@ -76,3 +76,4 @@
 - AI workspace now reads user-owned predictions and recommendations through `/me` endpoints; admin-only matches, metrics, and model reruns are no longer requested by regular users.
 - Smart Vault alerts can now be reset safely by their owner, and the dashboard chart loads snapshots for every asset instead of only the first asset.
 - Saved community designs are now protected by JWT ownership checks; security regression coverage is 23 tests.
+- Security endpoint policy is now an always-on test gate; authentication, admin/permission checks, and owner-scoped access can no longer be silently skipped in local or CI runs.

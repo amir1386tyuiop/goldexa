@@ -11,14 +11,13 @@ npm test -- --runInBand
 
 ## Security policy
 
-برای enforce کردن ماتریس guardهای endpointهای حساس:
+برای اجرای ماتریس guardهای endpointهای حساس:
 
 ```powershell
-$env:ENFORCE_SECURITY_TESTS = '1'
 npm run test:security
 ```
 
-این gate باید بدون finding پاس شود. مسیر callback زرین‌پال عمداً عمومی است، اما مسیر direct verification نیازمند JWT است.
+این gate همیشه فعال است و باید بدون finding پاس شود؛ مسیر callback زرین‌پال عمداً عمومی است، اما مسیر direct verification نیازمند JWT است.
 
 ## E2E checkout/refund
 
@@ -123,8 +122,8 @@ Expected headers include `X-Content-Type-Options`, `X-Frame-Options`,
 
 ## CI gate
 
-GitHub Actions runs backend lint/build/unit tests, the security regression suite
-with `ENFORCE_SECURITY_TESTS=1`, production dependency audits, frontend
+GitHub Actions runs backend lint/build/unit tests, the always-on security regression suite,
+production dependency audits, frontend
 lint/build/audit, compose validation, Docker image builds, and the isolated E2E
 suite with real PostgreSQL and Redis. The E2E job waits for `/health` before
 running and always tears down its dedicated stack; it must never point to a

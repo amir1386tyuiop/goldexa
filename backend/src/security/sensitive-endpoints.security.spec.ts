@@ -2,14 +2,11 @@ import 'reflect-metadata'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-const enforceSecurity = process.env.ENFORCE_SECURITY_TESTS === '1'
-const securityIt = enforceSecurity ? it : it.skip
-
 describe('sensitive endpoint guard policy', () => {
-  // These tests are intentionally opt-in until the corresponding production
-  // controllers are hardened. Run with ENFORCE_SECURITY_TESTS=1 to make the
-  // current gaps fail CI instead of allowing them to be forgotten.
-  securityIt.each([
+  // These are production security gates. Keep them enabled in every test run
+  // so a newly added sensitive route cannot silently bypass authentication or
+  // the required admin/permission policy.
+  it.each([
     ['auth role sync', '../auth/auth.controller.ts', 'syncRoles', true],
     ['auth role assignment', '../auth/auth.controller.ts', 'assignRole', true],
     ['auth permission assignment', '../auth/auth.controller.ts', 'assignPermission', true],
@@ -51,13 +48,13 @@ describe('sensitive endpoint guard policy', () => {
     }
   })
 
-  securityIt('keeps user-scoped liquidity reads behind an owner-or-admin check', () => {
+  it('keeps user-scoped liquidity reads behind an owner-or-admin check', () => {
     const source = readFileSync(join(__dirname, '../liquidity/liquidity.controller.ts'), 'utf8')
     expect(source).toContain('assertOwnerOrAdmin(userId, req.user)')
     expect(source).toContain("user.role !== 'admin'")
   })
 
-  securityIt('keeps saved designs behind authentication and ownership checks', () => {
+  it('keeps saved designs behind authentication and ownership checks', () => {
     const source = readFileSync(join(__dirname, '../community-extensions/community-extensions.controller.ts'), 'utf8')
     const methodIndex = source.indexOf('async findSaves(')
     const routeDecoratorIndex = source.lastIndexOf("@Get('saves/:userId')", methodIndex)
@@ -67,7 +64,7 @@ describe('sensitive endpoint guard policy', () => {
     expect(source).toContain('req.user.sub !== userId')
   })
 
-  securityIt('binds AI chat ownership to the authenticated JWT subject', () => {
+  it('binds AI chat ownership to the authenticated JWT subject', () => {
     const source = readFileSync(join(__dirname, '../ai-engine/ai-engine.controller.ts'), 'utf8')
     expect(source).toContain('userId: request.user.sub')
   })

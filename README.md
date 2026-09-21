@@ -7,7 +7,7 @@
 و E2E واقعی با PostgreSQL و Redis اجرا و تأیید شود.
 
 - Backend build: موفق (`npm run build`).
-- Backend unit tests: در آخرین اجرای محلی ۵۵ تست موفق؛ security gate جداگانه ۱۵ تست موفق دارد. تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
+- Backend unit tests: suiteهای unit و security در CI اجرا می‌شوند؛ security gate شامل ۲۵ assertion اجباری برای احراز هویت، نقش، permission و مالکیت است. تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
 - E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۲ suite، ۱۱ تست موفق).
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
