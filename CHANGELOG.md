@@ -15,6 +15,7 @@
 - Added custom-design stage controls in the admin queue: start production, approve, or reject designs while keeping the owner-scoped backend transition rules.
 - Extended production readiness to reject mock or unconfigured ZarinPal payment mode; local development remains explicitly degraded but runnable.
 - Upgraded backend `bcrypt` to 6.x, removing the vulnerable `@mapbox/node-pre-gyp`/`tar` extraction chain; backend production audit now has zero critical vulnerabilities.
+- Added compatible Lodash and Multer overrides; backend production dependency audit now reports zero high or critical vulnerabilities without a NestJS major upgrade.
 
 ## Group-buying delivery lifecycle
 
