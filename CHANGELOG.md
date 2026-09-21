@@ -17,6 +17,7 @@
 - Upgraded backend `bcrypt` to 6.x, removing the vulnerable `@mapbox/node-pre-gyp`/`tar` extraction chain; backend production audit now has zero critical vulnerabilities.
 - Added compatible Lodash and Multer overrides; backend production dependency audit now reports zero high or critical vulnerabilities without a NestJS major upgrade.
 - CI now executes the AI service's nine unit/training tests in addition to compile checks; the suite passes in the running AI container.
+- Added a real lazy-loaded GLB/glTF `<model-viewer>` to the AR page with WebXR, Scene Viewer, and Quick Look modes; the viewer remains gated by the AR flag and a valid model URL.
 
 ## Group-buying delivery lifecycle
 

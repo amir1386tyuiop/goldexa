@@ -1,5 +1,5 @@
 import { Camera, ExternalLink, Sparkles, Smartphone } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { ArModel } from '@/types'
@@ -24,12 +24,18 @@ const arSteps = [
 
 export function ARPage() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [viewerReady, setViewerReady] = useState(false)
   const arEnabled = import.meta.env.VITE_AR_ENABLED === 'true'
   const { data: models = [], isLoading, isError } = useQuery<ArModel[]>({
     queryKey: ['ar-models'],
     queryFn: api.getArModels,
     initialData: [],
   })
+  const activeModel = models.find((model) => model.id === selectedModel) || null
+  useEffect(() => {
+    if (!arEnabled || !activeModel?.modelUrl || viewerReady) return
+    void import('@google/model-viewer').then(() => setViewerReady(true)).catch(() => setViewerReady(false))
+  }, [activeModel?.modelUrl, arEnabled, viewerReady])
 
   return (
     <div className="pt-20 pb-16">
@@ -67,7 +73,7 @@ export function ARPage() {
             {arEnabled ? 'شروع پرو مجازی' : 'در انتظار فعال‌سازی سرویس'}
           </button>
           {models.length > 0 && <div className="mt-8 grid gap-4 text-right sm:grid-cols-2">{models.map((model) => <button type="button" key={model.id} onClick={() => setSelectedModel(model.id)} className={`rounded-2xl border p-4 text-right transition ${selectedModel === model.id ? 'border-amber-600 bg-amber-50' : 'border-stone-200 hover:border-amber-400'}`}><span className="flex items-center justify-between gap-3"><span className="font-bold">{model.name}</span><ExternalLink className="h-4 w-4 text-amber-700" aria-hidden="true" /></span><span className="mt-2 block text-xs text-stone-500">مدل سه‌بعدی {model.modelUrl ? 'آماده' : 'ثبت نشده'}</span></button>)}</div>}
-          {selectedModel && <p className="mt-4 text-sm text-amber-800" role="status">مدل انتخاب شد. اتصال به سرویس WebAR با feature flag انجام می‌شود.</p>}
+          {activeModel?.modelUrl && arEnabled && viewerReady ? <div className="mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-stone-950 p-2"><model-viewer src={activeModel.modelUrl} poster={activeModel.thumbnailUrl || undefined} alt={`پیش‌نمایش سه‌بعدی ${activeModel.name}`} ar ar-modes="webxr scene-viewer quick-look" camera-controls auto-rotate exposure="1" shadow-intensity="1" interaction-prompt="auto" className="h-[22rem] w-full rounded-2xl bg-stone-900" /><p className="px-3 py-2 text-right text-xs text-stone-300">مدل را بچرخانید و در دستگاه سازگار، گزینه‌ی AR را برای مشاهده روی محیط واقعی انتخاب کنید.</p></div> : selectedModel ? <p className="mt-4 text-sm text-amber-800" role="status">{activeModel?.modelUrl && arEnabled ? 'در حال آماده‌سازی viewer سه‌بعدی…' : 'برای این مدل، فایل GLB/glTF معتبر یا فعال‌سازی WebAR هنوز تنظیم نشده است.'}</p> : null}
           <div className="mt-6 text-right" aria-live="polite">
             {isLoading ? <p className="text-sm text-muted-foreground">در حال بررسی مدل‌های AR...</p> : null}
             {isError ? <p role="alert" className="text-sm text-red-700">مدل‌های AR فعلاً در دسترس نیستند.</p> : null}
