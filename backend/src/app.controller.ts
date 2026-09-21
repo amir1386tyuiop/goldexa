@@ -32,7 +32,7 @@ export class AppController {
   /** Dependency readiness for orchestrators and production load balancers. */
   @Get('health/ready')
   async readiness() {
-    const checks: Record<string, string> = { database: 'unknown', cache: 'unknown', priceFeed: 'unknown' }
+    const checks: Record<string, string> = { database: 'unknown', cache: 'unknown', priceFeed: 'unknown', paymentGateway: 'unknown' }
     try {
       await this.dataSource?.query('SELECT 1')
       checks.database = 'ok'
@@ -47,8 +47,16 @@ export class AppController {
       const ageMs = feed.lastFetchAt ? Date.now() - new Date(feed.lastFetchAt).getTime() : Number.POSITIVE_INFINITY
       checks.priceFeed = feed.source !== 'mock' && ageMs <= 180_000 ? 'ok' : 'degraded'
     }
+    const paymentMode = String(process.env.PAYMENT_MODE ?? '').toLowerCase()
+    const merchantConfigured = Boolean(process.env.ZARINPAL_MERCHANT_ID)
+    checks.paymentGateway = paymentMode === 'mock' || (!merchantConfigured && process.env.NODE_ENV !== 'production')
+      ? 'degraded'
+      : merchantConfigured && paymentMode !== 'mock'
+        ? 'ok'
+        : 'error'
     const productionPriceReady = !feed || checks.priceFeed === 'ok'
-    const ready = checks.database === 'ok' && (process.env.NODE_ENV !== 'production' || (checks.cache === 'ok' && productionPriceReady))
+    const productionPaymentReady = checks.paymentGateway === 'ok'
+    const ready = checks.database === 'ok' && (process.env.NODE_ENV !== 'production' || (checks.cache === 'ok' && productionPriceReady && productionPaymentReady))
     return {
       service: 'Goldexa API',
       status: ready ? 'ready' : 'not_ready',

@@ -13,6 +13,7 @@
 - Extended production readiness to require a fresh non-mock gold-price feed in addition to PostgreSQL and Redis.
 - Added the admin custom-builder queue: administrators can inspect all customer designs and move custom quotes through sent, accepted, or rejected states.
 - Added custom-design stage controls in the admin queue: start production, approve, or reject designs while keeping the owner-scoped backend transition rules.
+- Extended production readiness to reject mock or unconfigured ZarinPal payment mode; local development remains explicitly degraded but runnable.
 
 ## Group-buying delivery lifecycle
 

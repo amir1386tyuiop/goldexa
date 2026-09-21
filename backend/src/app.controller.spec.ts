@@ -20,7 +20,7 @@ describe('AppController observability', () => {
     await expect(controller.readiness()).resolves.toEqual(expect.objectContaining({
       status: 'ready',
       ready: true,
-      checks: { database: 'ok', cache: 'ok', priceFeed: 'ok' },
+      checks: { database: 'ok', cache: 'ok', priceFeed: 'ok', paymentGateway: 'degraded' },
     }))
   })
 
@@ -37,11 +37,40 @@ describe('AppController observability', () => {
       await expect(controller.readiness()).resolves.toEqual(expect.objectContaining({
         status: 'not_ready',
         ready: false,
-        checks: { database: 'ok', cache: 'ok', priceFeed: 'degraded' },
+        checks: { database: 'ok', cache: 'ok', priceFeed: 'degraded', paymentGateway: 'error' },
       }))
     } finally {
       if (previousNodeEnv === undefined) delete process.env.NODE_ENV
       else process.env.NODE_ENV = previousNodeEnv
+    }
+  })
+
+  it('reports production readiness when the live price feed and payment gateway are configured', async () => {
+    const previousNodeEnv = process.env.NODE_ENV
+    const previousMode = process.env.PAYMENT_MODE
+    const previousMerchant = process.env.ZARINPAL_MERCHANT_ID
+    process.env.NODE_ENV = 'production'
+    process.env.PAYMENT_MODE = 'real'
+    process.env.ZARINPAL_MERCHANT_ID = 'merchant-test'
+    try {
+      const controller = new AppController(
+        { query: jest.fn().mockResolvedValue([{ ok: 1 }]) } as never,
+        { driver: 'redis' } as never,
+        { getFeedStatus: jest.fn().mockReturnValue({ source: 'tgju', lastFetchAt: new Date() }) } as never,
+      )
+
+      await expect(controller.readiness()).resolves.toEqual(expect.objectContaining({
+        status: 'ready',
+        ready: true,
+        checks: { database: 'ok', cache: 'ok', priceFeed: 'ok', paymentGateway: 'ok' },
+      }))
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = previousNodeEnv
+      if (previousMode === undefined) delete process.env.PAYMENT_MODE
+      else process.env.PAYMENT_MODE = previousMode
+      if (previousMerchant === undefined) delete process.env.ZARINPAL_MERCHANT_ID
+      else process.env.ZARINPAL_MERCHANT_ID = previousMerchant
     }
   })
 })
