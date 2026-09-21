@@ -27,16 +27,27 @@ describe('sensitive endpoint guard policy', () => {
     ['liquidity status update', '../liquidity/liquidity.controller.ts', 'updateRequestStatus', true],
     ['community challenge creation', '../community/community.controller.ts', 'createChallenge', true],
     ['community challenge winner', '../community/community.controller.ts', 'setWinner', true],
+    ['AI code generation', '../ai-engine/ai-engine.controller.ts', 'code', true],
+    ['AI KYC analysis', '../ai-engine/ai-engine.controller.ts', 'kycDocument', true],
+    ['AI image generation', '../ai-engine/ai-engine.controller.ts', 'image', true],
+    ['AI notification creation', '../ai-engine/ai-engine.controller.ts', 'notification', true],
+    ['AI market matching', '../ai-engine/ai-engine.controller.ts', 'executeMatch', true],
   ])('%s requires the declared security policy', (_label, relativeFile, method, adminRequired) => {
     const source = readFileSync(join(__dirname, relativeFile), 'utf8')
     const methodIndex = source.indexOf(`async ${method}(`)
     const routeDecoratorIndex = source.lastIndexOf('@Post', methodIndex)
-    const decorators = source.slice(Math.max(0, routeDecoratorIndex), methodIndex)
+    const classDecoratorIndex = source.indexOf('export class')
+    const decorators = `${source.slice(0, classDecoratorIndex)}\n${source.slice(Math.max(0, routeDecoratorIndex), methodIndex)}`
 
     expect(methodIndex).toBeGreaterThanOrEqual(0)
     expect(decorators).toContain('JwtAuthGuard')
     if (adminRequired) {
-      expect(decorators).toContain('AdminGuard')
+      const isAiEndpoint = relativeFile.includes('../ai-engine/')
+      if (isAiEndpoint) {
+        expect(decorators).toContain("@Permissions('VIEW_REPORTS')")
+      } else {
+        expect(decorators).toContain('AdminGuard')
+      }
     }
   })
 
@@ -54,5 +65,10 @@ describe('sensitive endpoint guard policy', () => {
     expect(methodIndex).toBeGreaterThanOrEqual(0)
     expect(decorators).toContain('JwtAuthGuard')
     expect(source).toContain('req.user.sub !== userId')
+  })
+
+  securityIt('binds AI chat ownership to the authenticated JWT subject', () => {
+    const source = readFileSync(join(__dirname, '../ai-engine/ai-engine.controller.ts'), 'utf8')
+    expect(source).toContain('userId: request.user.sub')
   })
 })

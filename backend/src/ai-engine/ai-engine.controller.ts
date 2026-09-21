@@ -42,96 +42,114 @@ export class AiEngineController {
   }
 
   @Post('chat')
-  async chat(@Body() body: RunAiTaskInput) {
-    return this.aiEngineService.chat(body)
+  async chat(@Body() body: RunAiTaskInput, @Req() request: Request & { user: JwtUser }) {
+    return this.aiEngineService.chat({ ...body, userId: request.user.sub })
   }
 
   @Post('code')
+  @Permissions('VIEW_REPORTS')
   async code(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.code(body)
   }
 
   @Post('architecture')
+  @Permissions('VIEW_REPORTS')
   async architecture(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'architecture' })
   }
 
   @Post('kyc-document')
+  @Permissions('VIEW_REPORTS')
   async kycDocument(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.analyzeDocument(body)
   }
 
   @Post('safety-check')
+  @Permissions('VIEW_REPORTS')
   async safetyCheck(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.safetyCheck(body)
   }
 
   @Post('marketing-image')
+  @Permissions('VIEW_REPORTS')
   async marketingImage(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'marketing_image' })
   }
 
   @Post('vector-asset')
+  @Permissions('VIEW_REPORTS')
   async vectorAsset(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'vector_asset' })
   }
 
   @Post('product-image')
+  @Permissions('VIEW_REPORTS')
   async productImage(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'product_image' })
   }
 
   @Post('image-workflow')
+  @Permissions('VIEW_REPORTS')
   async imageWorkflow(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'image_workflow' })
   }
 
   @Post('generate-content')
+  @Permissions('VIEW_REPORTS')
   async generateContent(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.generateContent(body)
   }
 
   @Post('analyze')
+  @Permissions('VIEW_REPORTS')
   async analyze(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'analysis' })
   }
 
   @Post('text')
+  @Permissions('VIEW_REPORTS')
   async text(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'text' })
   }
 
   @Post('image-to-text')
+  @Permissions('VIEW_REPORTS')
   async imageToText(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'image_to_text' })
   }
 
   @Post('notification')
+  @Permissions('VIEW_REPORTS')
   async notification(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'notification' })
   }
 
   @Post('daily-notification')
+  @Permissions('VIEW_REPORTS')
   async dailyNotification(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.createDailyNotification(body)
   }
 
   @Post('content')
+  @Permissions('VIEW_REPORTS')
   async content(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'content' })
   }
 
   @Post('rag')
+  @Permissions('VIEW_REPORTS')
   async rag(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'rag' })
   }
 
   @Post('summarize')
+  @Permissions('VIEW_REPORTS')
   async summarize(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'summary' })
   }
 
   @Post('image')
+  @Permissions('VIEW_REPORTS')
   async image(@Body() body: RunAiTaskInput) {
     return this.aiEngineService.runTask({ ...body, task: 'image_generation' })
   }
