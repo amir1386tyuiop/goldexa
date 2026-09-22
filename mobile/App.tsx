@@ -1,44 +1,42 @@
-import React from 'react'
-import { NavigationContainer } from '@react-navigation/native'
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 
-const Stack = createNativeStackNavigator()
-const Tab = createBottomTabNavigator()
+type User = { id: string; name?: string; phone?: string; role?: string }
+type Session = { user: User; accessToken: string; refreshToken?: string }
+type Product = { id: string; name: string; finalPrice: number; weight?: number; category?: string }
+type HomeFeed = { newProducts?: Product[]; featured?: Product[]; discounted?: Product[] }
+const API_URL = ((globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process?.env?.EXPO_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '')
 
-function HomeScreen() {
-  return null
+async function api<T>(path: string, token?: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers); headers.set('Accept', 'application/json'); if (init.body) headers.set('Content-Type', 'application/json'); if (token) headers.set('Authorization', `Bearer ${token}`)
+  const response = await fetch(`${API_URL}${path}`, { ...init, headers }); const text = await response.text(); let payload: unknown = null
+  try { payload = text ? JSON.parse(text) : null } catch { payload = text }
+  if (!response.ok) { const message = payload && typeof payload === 'object' && 'message' in payload ? (payload as { message?: unknown }).message : null; throw new Error(Array.isArray(message) ? message.join('، ') : typeof message === 'string' ? message : 'ارتباط با سرور ناموفق بود') }
+  return payload as T
+}
+const money = (value: number) => `${Number(value || 0).toLocaleString('fa-IR')} تومان`
+
+export default function App() { const [session, setSession] = useState<Session | null>(null); return session ? <MainApp session={session} onLogout={() => setSession(null)} /> : <LoginScreen onLogin={setSession} /> }
+
+function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
+  const [phone, setPhone] = useState(''); const [otp, setOtp] = useState(''); const [sentOtp, setSentOtp] = useState<string | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState<string | null>(null)
+  async function requestOtp() { setLoading(true); setError(null); try { const result = await api<{ otp?: string }>('/auth/request-otp', undefined, { method: 'POST', body: JSON.stringify({ phone, role: 'customer' }) }); setSentOtp(result.otp || null) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ارسال کد ناموفق بود') } finally { setLoading(false) } }
+  async function login() { setLoading(true); setError(null); try { const result = await api<{ user: User; accessToken?: string; token?: string; refreshToken?: string }>('/auth/login', undefined, { method: 'POST', body: JSON.stringify({ phone, otp, role: 'customer' }) }); const accessToken = result.accessToken || result.token; if (!accessToken) throw new Error('توکن ورود از سرور دریافت نشد'); onLogin({ user: result.user, accessToken, refreshToken: result.refreshToken }) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ورود ناموفق بود') } finally { setLoading(false) } }
+  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.authContent} keyboardShouldPersistTaps="handled"><Text style={styles.brand}>Goldexa</Text><Text style={styles.title}>ورود امن به حساب</Text><Text style={styles.muted}>برای ادامه، شماره موبایل خود را وارد کنید.</Text><Text style={styles.label}>شماره موبایل</Text><TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09120000000" textAlign="right" maxLength={11} />{!sentOtp ? <Button title={loading ? 'در حال ارسال…' : 'دریافت کد ورود'} onPress={requestOtp} disabled={loading || phone.replace(/\D/g, '').length < 10} /> : <><Text style={styles.devHint}>کد تستی: {sentOtp}</Text><Text style={styles.label}>کد یک‌بارمصرف</Text><TextInput style={styles.input} value={otp} onChangeText={setOtp} keyboardType="number-pad" placeholder="123456" textAlign="right" maxLength={6} /><Button title={loading ? 'در حال ورود…' : 'ورود به حساب'} onPress={login} disabled={loading || otp.length < 4} /><Pressable onPress={() => setSentOtp(null)}><Text style={styles.link}>تغییر شماره</Text></Pressable></>}{error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}</ScrollView></SafeAreaView>
 }
 
-function ShopScreen() {
-  return null
-}
+function MainApp({ session, onLogout }: { session: Session; onLogout: () => void }) { const [tab, setTab] = useState<'home' | 'shop' | 'profile'>('home'); return <SafeAreaView style={styles.safe}>{tab === 'home' ? <HomeScreen session={session} /> : tab === 'shop' ? <ShopScreen session={session} /> : <ProfileScreen session={session} onLogout={onLogout} />}<View style={styles.tabs}><Tab title="خانه" active={tab === 'home'} onPress={() => setTab('home')} /><Tab title="فروشگاه" active={tab === 'shop'} onPress={() => setTab('shop')} /><Tab title="پروفایل" active={tab === 'profile'} onPress={() => setTab('profile')} /></View></SafeAreaView> }
 
-function ARScreen() {
-  return null
-}
+function HomeScreen({ session }: { session: Session }) { const [feed, setFeed] = useState<HomeFeed | null>(null); const [error, setError] = useState<string | null>(null); const [refreshing, setRefreshing] = useState(false); const load = useCallback(async () => { setError(null); try { setFeed(await api<HomeFeed>('/products/home', session.accessToken)) } catch (cause) { setError(cause instanceof Error ? cause.message : 'دریافت خانه ناموفق بود') } }, [session.accessToken]); useEffect(() => { void load() }, [load]); const products = useMemo(() => [...(feed?.featured || []), ...(feed?.newProducts || [])].slice(0, 6), [feed]); return <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false) }} />}><Text style={styles.brand}>Goldexa</Text><Text style={styles.title}>سلام {session.user.name || 'همراه گلدکسا'}</Text><Text style={styles.muted}>قیمت و محصولات واقعی از API سامانه دریافت می‌شوند.</Text>{error ? <State error={error} onRetry={() => void load()} /> : !feed ? <State loading /> : <><Text style={styles.sectionTitle}>پیشنهادهای امروز</Text>{products.length ? products.map((product) => <ProductRow key={product.id} product={product} />) : <State empty />}</>}</ScrollView> }
 
-function ProfileScreen() {
-  return null
-}
+function ShopScreen({ session }: { session: Session }) { const [products, setProducts] = useState<Product[] | null>(null); const [error, setError] = useState<string | null>(null); const load = useCallback(async () => { setError(null); try { const data = await api<Product[] | { items?: Product[] }>('/products', session.accessToken); setProducts(Array.isArray(data) ? data : data.items || []) } catch (cause) { setError(cause instanceof Error ? cause.message : 'دریافت فروشگاه ناموفق بود') } }, [session.accessToken]); useEffect(() => { void load() }, [load]); return <View style={styles.flex}><View style={styles.content}><Text style={styles.brand}>فروشگاه</Text><Text style={styles.title}>انتخابی برای ماندن</Text>{error ? <State error={error} onRetry={() => void load()} /> : !products ? <State loading /> : products.length === 0 ? <State empty /> : null}</View>{products?.length ? <FlatList data={products} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) => <ProductRow product={item} />} /> : null}</View> }
 
-function TabNavigator() {
-  return (
-    <Tab.Navigator>
-      <Tab.Screen name="خانه" component={HomeScreen} />
-      <Tab.Screen name="فروشگاه" component={ShopScreen} />
-      <Tab.Screen name="پرو مجازی" component={ARScreen} />
-      <Tab.Screen name="پروفایل" component={ProfileScreen} />
-    </Tab.Navigator>
-  )
-}
+function ProfileScreen({ session, onLogout }: { session: Session; onLogout: () => void }) { const [wallet, setWallet] = useState<{ balance?: number; goldBalanceGrams?: number } | null>(null); const [orders, setOrders] = useState<Array<{ id: string; totalAmount?: number; status?: string }> | null>(null); const [error, setError] = useState<string | null>(null); useEffect(() => { let active = true; Promise.all([api<{ balance?: number; goldBalanceGrams?: number } | null>(`/wallet/user/${session.user.id}`, session.accessToken), api<Array<{ id: string; totalAmount?: number; status?: string }>>(`/orders/user/${session.user.id}`, session.accessToken)]).then(([walletResult, ordersResult]) => { if (active) { setWallet(walletResult); setOrders(ordersResult) } }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'دریافت پروفایل ناموفق بود') }); return () => { active = false } }, [session]); return <ScrollView contentContainerStyle={styles.content}><Text style={styles.brand}>حساب من</Text><Text style={styles.title}>{session.user.name || session.user.phone || 'کاربر'}</Text><Text style={styles.muted}>{session.user.phone || ''}</Text>{error ? <State error={error} /> : <><View style={styles.metrics}><Metric label="موجودی کیف پول" value={money(wallet?.balance || 0)} /><Metric label="طلای دیجیتال" value={`${(wallet?.goldBalanceGrams || 0).toLocaleString('fa-IR')} گرم`} /></View><Text style={styles.sectionTitle}>آخرین سفارش‌ها</Text>{orders?.length ? orders.slice(0, 5).map((order) => <View style={styles.card} key={order.id}><Text style={styles.body}>سفارش {order.id.slice(0, 8)}</Text><Text style={styles.muted}>{money(order.totalAmount || 0)} · {order.status || 'در حال بررسی'}</Text></View>) : <State empty />}</>}<Button title="خروج از حساب" onPress={onLogout} tone="danger" /></ScrollView> }
 
-export default function App() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Main" component={TabNavigator} options={{ headerShown: false }} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  )
-}
+function ProductRow({ product }: { product: Product }) { return <View style={styles.card}><Text style={styles.heading}>{product.name}</Text><Text style={styles.muted}>{product.weight ? `${product.weight} گرم` : product.category || 'محصول طلا'}</Text><Text style={styles.price}>{money(product.finalPrice)}</Text></View> }
+function Button({ title, onPress, disabled, tone = 'dark' }: { title: string; onPress: () => void; disabled?: boolean; tone?: 'dark' | 'danger' }) { return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button, tone === 'danger' && styles.dangerButton, disabled && styles.disabled]}><Text style={styles.buttonText}>{title}</Text></Pressable> }
+function Tab({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: active }}><Text style={[styles.tabText, active && styles.activeTab]}>{title}</Text></Pressable> }
+function State({ loading, error, empty, onRetry }: { loading?: boolean; error?: string; empty?: boolean; onRetry?: () => void }) { if (loading) return <View style={styles.state}><ActivityIndicator color="#A16207" /><Text style={styles.muted}>در حال دریافت اطلاعات…</Text></View>; if (error) return <View style={styles.state}><Text style={styles.error}>{error}</Text>{onRetry ? <Button title="تلاش دوباره" onPress={onRetry} /> : null}</View>; if (empty) return <View style={styles.state}><Text style={styles.muted}>داده‌ای برای نمایش وجود ندارد.</Text></View>; return null }
+function Metric({ label, value }: { label: string; value: string }) { return <View style={[styles.card, styles.metric]}><Text style={styles.heading}>{value}</Text><Text style={styles.muted}>{label}</Text></View> }
+
+const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: '#FAFAF9' }, flex: { flex: 1 }, content: { padding: 20, paddingBottom: 32 }, authContent: { flexGrow: 1, justifyContent: 'center', padding: 24 }, brand: { color: '#A16207', fontSize: 18, fontWeight: '800', textAlign: 'right', marginBottom: 12 }, title: { color: '#1C1917', fontSize: 27, fontWeight: '800', textAlign: 'right', writingDirection: 'rtl' }, sectionTitle: { color: '#1C1917', fontSize: 18, fontWeight: '800', textAlign: 'right', marginTop: 24, marginBottom: 12, writingDirection: 'rtl' }, heading: { color: '#1C1917', fontSize: 16, fontWeight: '800', textAlign: 'right', writingDirection: 'rtl' }, body: { color: '#1C1917', fontSize: 14, textAlign: 'right', writingDirection: 'rtl' }, muted: { color: '#78716C', fontSize: 13, textAlign: 'right', writingDirection: 'rtl', marginTop: 7 }, label: { color: '#44403C', fontSize: 14, fontWeight: '700', textAlign: 'right', marginTop: 22, marginBottom: 8, writingDirection: 'rtl' }, input: { minHeight: 52, borderColor: '#E7E5E4', borderWidth: 1, borderRadius: 12, backgroundColor: '#FFF', paddingHorizontal: 15, fontSize: 16, color: '#1C1917' }, button: { minHeight: 50, borderRadius: 13, backgroundColor: '#1C1917', justifyContent: 'center', alignItems: 'center', marginTop: 18 }, dangerButton: { backgroundColor: '#B91C1C' }, disabled: { opacity: 0.45 }, buttonText: { color: '#FFF', fontSize: 15, fontWeight: '800' }, link: { color: '#A16207', fontWeight: '700', textAlign: 'center', marginTop: 18 }, devHint: { color: '#166534', backgroundColor: '#F0FDF4', padding: 12, borderRadius: 10, marginTop: 16, textAlign: 'right' }, error: { color: '#B91C1C', backgroundColor: '#FEF2F2', padding: 12, borderRadius: 10, marginTop: 16, textAlign: 'right', writingDirection: 'rtl' }, card: { backgroundColor: '#FFF', borderColor: '#E7E5E4', borderWidth: 1, borderRadius: 17, padding: 16, marginBottom: 12 }, price: { color: '#A16207', fontSize: 17, fontWeight: '800', textAlign: 'right', marginTop: 10 }, state: { alignItems: 'center', padding: 24, marginTop: 12, backgroundColor: '#FFF', borderRadius: 16 }, list: { paddingHorizontal: 20, paddingBottom: 24 }, metrics: { flexDirection: 'row-reverse', gap: 8, marginTop: 20 }, metric: { flex: 1, marginBottom: 0 }, tabs: { flexDirection: 'row-reverse', borderTopWidth: 1, borderTopColor: '#E7E5E4', backgroundColor: '#FFF', paddingVertical: 10 }, tab: { flex: 1, alignItems: 'center', paddingVertical: 10 }, tabText: { color: '#78716C', fontWeight: '700', fontSize: 13 }, activeTab: { color: '#A16207' } })
