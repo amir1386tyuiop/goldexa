@@ -69,6 +69,7 @@ goldexacode/
 - [x] Setup Repositoryهای Git
 - [x] تعیین Tech Stack نهایی
 - [x] Setup CI/CD Pipeline برای lint/build/test/security/audit و compose validation
+- [x] type-check و web export اپ Expo موبایل در CI
 - [x] اسکریپت recovery امن برای خطاهای stale socket در Docker Desktop ویندوز (`scripts/start-goldexa-docker.ps1`)
 - [x] ایجاد Design System
 
