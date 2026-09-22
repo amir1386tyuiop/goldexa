@@ -40,8 +40,9 @@ export class OpenRouterAiClient {
     publicProvider: AiProviderPublicConfig,
     messages: OpenRouterMessage[],
     options: OpenRouterChatOptions = {},
+    modelOverride?: string,
   ): Promise<OpenRouterChatResult> {
-    const model = this.getModel(provider)
+    const model = modelOverride || this.getModel(provider)
     const baseUrl = this.getBaseUrl()
     const body = this.buildChatBody(model, messages, options)
 
@@ -73,8 +74,9 @@ export class OpenRouterAiClient {
       steps?: number
       imageConfig?: Record<string, unknown>
     } = {},
+    modelOverride?: string,
   ): Promise<OpenRouterImageResult> {
-    const model = this.getModel(provider)
+    const model = modelOverride || this.getModel(provider)
     const baseUrl = this.getBaseUrl()
     const imageConfig = this.buildImageConfig(options)
 

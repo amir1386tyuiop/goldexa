@@ -49,4 +49,37 @@ describe('AiEngineService execution contract', () => {
     openRouter.chat.mockResolvedValueOnce({ output: 'not-json', raw: {} })
     await expect(service.executePrediction({ currentPrice: 6000000 }, 'jwt-user')).rejects.toBeInstanceOf(BadRequestException)
   })
+
+  it('forwards an explicitly selected allow-listed model to OpenRouter', async () => {
+    const openRouter = {
+      toPublicProvider: jest.fn((provider) => ({ key: provider.key, modelId: 'default/model', configured: true })),
+      chat: jest.fn(async () => ({ output: 'ok', raw: {}, usage: {} })),
+    }
+    const service = new AiEngineService(
+      repository() as never, repository() as never, repository() as never, repository() as never,
+      repository() as never, openRouter as never, { isConfigured: jest.fn(() => false) } as never,
+      config({ AI_ENGINE_ENABLED: 'true', OPENROUTER_ALLOWED_MODELS: 'allowed/model' }) as never,
+      {} as never, {} as never,
+    )
+
+    await service.runTask({ task: 'assistant', prompt: 'طرح انگشتر', modelId: 'allowed/model' })
+
+    expect(openRouter.chat).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.any(Array), expect.any(Object), 'allowed/model',
+    )
+  })
+
+  it('rejects a model that is not in the configured allow-list', async () => {
+    const openRouter = { toPublicProvider: jest.fn((provider) => ({ key: provider.key, modelId: 'default/model' })), chat: jest.fn() }
+    const service = new AiEngineService(
+      repository() as never, repository() as never, repository() as never, repository() as never,
+      repository() as never, openRouter as never, { isConfigured: jest.fn(() => false) } as never,
+      config({ AI_ENGINE_ENABLED: 'true', OPENROUTER_ALLOWED_MODELS: 'allowed/model' }) as never,
+      {} as never, {} as never,
+    )
+
+    await expect(service.runTask({ task: 'assistant', prompt: 'طرح انگشتر', modelId: 'unknown/model' }))
+      .rejects.toBeInstanceOf(BadRequestException)
+    expect(openRouter.chat).not.toHaveBeenCalled()
+  })
 })

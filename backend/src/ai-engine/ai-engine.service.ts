@@ -224,6 +224,7 @@ export class AiEngineService {
         publicProvider,
         this.buildMessages(provider, input),
         this.buildChatOptions(input),
+        this.resolveModel(provider, input.modelId),
       )
       const metadata = await this.applySideEffects(task, input, result.output, publicProvider)
 
@@ -232,7 +233,7 @@ export class AiEngineService {
       return {
         task,
         provider: publicProvider,
-        model: this.resolveModel(provider),
+        model: this.resolveModel(provider, input.modelId),
         output: result.output,
         usage: result.usage,
         raw: result.raw,
@@ -400,6 +401,7 @@ export class AiEngineService {
       publicProvider,
       this.buildVisionMessages(provider, input),
       this.buildChatOptions(input),
+      this.resolveModel(provider, input.modelId),
     )
     const metadata = await this.applySideEffects(task, input, result.output, publicProvider)
 
@@ -408,7 +410,7 @@ export class AiEngineService {
     return {
       task,
       provider: publicProvider,
-      model: this.resolveModel(provider),
+      model: this.resolveModel(provider, input.modelId),
       output: result.output,
       usage: result.usage,
       raw: result.raw,
@@ -435,7 +437,7 @@ export class AiEngineService {
       height: this.normalizeDimension(input.height, 1024),
       steps: input.steps,
       imageConfig: input.imageConfig,
-    })
+    }, this.resolveModel(provider, input.modelId))
     const metadata = await this.applySideEffects(task, input, result.output, publicProvider)
 
     await this.recordSuccess(provider, publicProvider, startedAt, result.usage, metadata)
@@ -443,7 +445,7 @@ export class AiEngineService {
     return {
       task,
       provider: publicProvider,
-      model: this.resolveModel(provider),
+      model: this.resolveModel(provider, input.modelId),
       output: result.output,
       usage: result.usage,
       raw: result.raw,
@@ -632,8 +634,22 @@ export class AiEngineService {
     return ['image_to_text', 'kyc_document'].includes(task)
   }
 
-  private resolveModel(provider: AiProviderConfig): string {
-    return this.configService.get<string>(provider.modelEnvKey) || provider.modelId
+  private resolveModel(provider: AiProviderConfig, requestedModel?: string): string {
+    const configuredModel = this.configService.get<string>(provider.modelEnvKey) || provider.modelId
+    const allowedModels = new Set(
+      [
+        configuredModel,
+        provider.modelId,
+        ...(this.configService.get<string>('OPENROUTER_ALLOWED_MODELS') || '')
+          .split(',')
+          .map((model) => model.trim())
+          .filter(Boolean),
+      ],
+    )
+    if (requestedModel && !allowedModels.has(requestedModel)) {
+      throw new BadRequestException('مدل انتخابی در allow-list هوش مصنوعی پیکربندی نشده است')
+    }
+    return requestedModel || configuredModel
   }
 
   private stringifyContext(value: unknown): string {
