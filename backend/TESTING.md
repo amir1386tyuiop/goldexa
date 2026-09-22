@@ -101,8 +101,8 @@ npm audit --omit=dev --offline --json
 ```
 
 The current backend lockfile has no high or critical production findings, but
-the upstream NestJS 10 dependency line still reports 11 lower-severity findings
-(1 low and 10 moderate) in the current npm advisory database. The CI gate fails
+the upstream NestJS 10 dependency line still reports 7 moderate findings in the
+current npm advisory database. The CI gate fails
 on high/critical findings; upgrade to the NestJS 12 line requires a separate
 compatibility migration and must not be applied blindly. Run the same audit
 without `--omit=dev` before shipping development tooling changes.
