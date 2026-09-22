@@ -5,7 +5,8 @@
 `p95 <= 200ms` است.
 
 ```powershell
-node .\scripts\benchmark-backend.mjs
+cd backend
+npm run benchmark
 ```
 
 برای محیط یا endpoint دیگر:
