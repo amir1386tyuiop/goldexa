@@ -78,3 +78,4 @@
 - Saved community designs are now protected by JWT ownership checks; security regression coverage is 23 tests.
 - Security endpoint policy is now an always-on test gate; authentication, admin/permission checks, and owner-scoped access can no longer be silently skipped in local or CI runs.
 - Hardened transitive runtime dependencies with safe `body-parser`, `file-type`, and `qs` overrides; the production audit now reports zero high/critical findings and seven remaining moderate NestJS-major-line advisories.
+- Added a reversible Windows Docker recovery script that isolates stale runtime socket directories without touching project volumes or database data.
