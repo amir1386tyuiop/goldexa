@@ -1,5 +1,6 @@
 import { validate } from 'class-validator'
 import { RunAiTaskDto } from './create-ai-engine.dto'
+import { NotificationChannel } from '../notifications/notification.entity'
 
 describe('RunAiTaskDto', () => {
   it('accepts bounded, well-formed text requests', async () => {
@@ -9,6 +10,8 @@ describe('RunAiTaskDto', () => {
       prompt: 'یک طرح انگشتر بساز',
       temperature: 0.4,
       maxTokens: 1200,
+      channel: NotificationChannel.IN_APP,
+      createDailyNotification: true,
     })
 
     await expect(validate(dto)).resolves.toHaveLength(0)

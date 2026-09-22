@@ -1,5 +1,6 @@
 import { IsArray, IsBase64, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 import type { AiTaskKey, RunAiTaskInput } from './ai-engine.types'
+import { NotificationChannel } from '../notifications/notification.entity'
 
 const AI_TASKS: AiTaskKey[] = [
   'analysis', 'assistant', 'code', 'architecture', 'kyc_document', 'safety_check',
@@ -78,6 +79,14 @@ export class RunAiTaskDto implements RunAiTaskInput {
   @IsString()
   @MaxLength(200)
   userId?: string | null
+
+  @IsOptional()
+  @IsIn(Object.values(NotificationChannel))
+  channel?: NotificationChannel
+
+  @IsOptional()
+  @IsBoolean()
+  createDailyNotification?: boolean
 
   @IsOptional()
   @IsString()
