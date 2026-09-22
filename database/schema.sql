@@ -1047,6 +1047,7 @@ CREATE INDEX idx_gold_prices_type ON gold_prices(type);
 CREATE INDEX idx_gold_prices_created_at ON gold_prices(created_at DESC);
 CREATE INDEX idx_products_category ON products(category);
 CREATE INDEX idx_products_name ON products(name);
+CREATE UNIQUE INDEX idx_products_identity_unique ON products(name, category, weight, karat);
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_created_at ON orders(created_at DESC);

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm'
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm'
 
 export enum ProductCategory {
   RING = 'ring',
@@ -10,6 +10,7 @@ export enum ProductCategory {
 }
 
 @Entity('products')
+@Index('idx_products_identity_unique', ['name', 'category', 'weight', 'karat'], { unique: true })
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string
