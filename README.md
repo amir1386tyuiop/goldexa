@@ -70,6 +70,7 @@ goldexacode/
 - [x] تعیین Tech Stack نهایی
 - [x] Setup CI/CD Pipeline برای lint/build/test/security/audit و compose validation
 - [x] type-check و web export اپ Expo موبایل در CI
+- [x] اسکریپت benchmark قابل‌تکرار برای ثبت p50/p95/max API (`scripts/benchmark-backend.mjs`)
 - [x] اسکریپت recovery امن برای خطاهای stale socket در Docker Desktop ویندوز (`scripts/start-goldexa-docker.ps1`)
 - [x] ایجاد Design System
 
