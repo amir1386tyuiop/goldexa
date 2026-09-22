@@ -20,6 +20,7 @@ import { User } from '../users/user.entity'
 import { FeatureFlagGuard } from '../common/feature-flag.guard'
 import { Product } from '../products/product.entity'
 import { GoldPricingModule } from '../gold-pricing/gold-pricing.module'
+import { RateLimitGuard } from '../common/rate-limit.guard'
 
 @Module({
   imports: [
@@ -33,6 +34,6 @@ import { GoldPricingModule } from '../gold-pricing/gold-pricing.module'
     GoldPricingModule,
   ],
   controllers: [AiEngineController],
-  providers: [AiEngineService, OpenRouterAiClient, LocalAiClient, RoleService, FeatureFlagGuard],
+  providers: [AiEngineService, OpenRouterAiClient, LocalAiClient, RoleService, FeatureFlagGuard, RateLimitGuard],
 })
 export class AiEngineModule {}

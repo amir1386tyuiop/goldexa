@@ -15,11 +15,13 @@ import { Permissions } from '../common/decorators/permissions.decorator'
 import { PermissionsGuard } from '../common/guards/permissions.guard'
 import { FeatureFlag, FeatureFlagGuard } from '../common/feature-flag.guard'
 import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard'
 
 // AI engine is a phase-2 module: disabled by default, behind AI_ENGINE_ENABLED.
 @Controller('ai-engine')
-@UseGuards(FeatureFlagGuard, JwtAuthGuard, PermissionsGuard)
+@UseGuards(FeatureFlagGuard, JwtAuthGuard, PermissionsGuard, RateLimitGuard)
 @FeatureFlag('AI_ENGINE_ENABLED')
+@RateLimit({ limit: 30, windowMs: 60_000 })
 export class AiEngineController {
   constructor(private readonly aiEngineService: AiEngineService) {}
 

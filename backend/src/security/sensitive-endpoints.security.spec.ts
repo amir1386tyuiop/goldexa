@@ -68,4 +68,10 @@ describe('sensitive endpoint guard policy', () => {
     const source = readFileSync(join(__dirname, '../ai-engine/ai-engine.controller.ts'), 'utf8')
     expect(source).toContain('userId: request.user.sub')
   })
+
+  it('rate-limits all AI provider-backed routes before production keys are enabled', () => {
+    const source = readFileSync(join(__dirname, '../ai-engine/ai-engine.controller.ts'), 'utf8')
+    expect(source).toContain('RateLimitGuard')
+    expect(source).toContain('@RateLimit({ limit: 30, windowMs: 60_000 })')
+  })
 })
