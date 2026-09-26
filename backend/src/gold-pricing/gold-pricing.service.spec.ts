@@ -3,6 +3,11 @@ import { GoldPricingService } from './gold-pricing.service'
 
 describe('GoldPricingService external-source fallback', () => {
   const originalNodeEnv = process.env.NODE_ENV
+  type PrivateSurface = {
+    fetchFromTgju: () => Promise<GoldPrice[]>
+    getMockPrices: () => GoldPrice[]
+    fetchFromExternalAPI: () => Promise<GoldPrice[]>
+  }
 
   afterEach(() => {
     jest.restoreAllMocks()
@@ -25,11 +30,12 @@ describe('GoldPricingService external-source fallback', () => {
   it('uses the last valid database price when TGJU is unavailable', async () => {
     const existing = { type: GoldPriceType.GOLD_18, value: 3_600_000, isValid: true } as GoldPrice
     const { service } = build(existing)
-    const fetchFromTgju = jest.spyOn(service as any, 'fetchFromTgju')
+    const privateService = service as unknown as PrivateSurface
+    const fetchFromTgju = jest.spyOn(privateService, 'fetchFromTgju')
     fetchFromTgju.mockRejectedValue(new Error('network down'))
-    const getMockPrices = jest.spyOn(service as any, 'getMockPrices')
+    const getMockPrices = jest.spyOn(privateService, 'getMockPrices')
 
-    const prices = await (service as any).fetchFromExternalAPI()
+    const prices = await privateService.fetchFromExternalAPI()
 
     expect(prices).toEqual([existing])
     expect(getMockPrices).not.toHaveBeenCalled()
@@ -38,9 +44,10 @@ describe('GoldPricingService external-source fallback', () => {
   it('fails closed when an external source is configured but no valid price exists', async () => {
     process.env.NODE_ENV = 'development'
     const { service } = build(null)
-    const fetchFromTgju = jest.spyOn(service as any, 'fetchFromTgju')
+    const privateService = service as unknown as PrivateSurface
+    const fetchFromTgju = jest.spyOn(privateService, 'fetchFromTgju')
     fetchFromTgju.mockRejectedValue(new Error('network down'))
 
-    await expect((service as any).fetchFromExternalAPI()).rejects.toThrow('هیچ قیمت معتبر قبلی')
+    await expect(privateService.fetchFromExternalAPI()).rejects.toThrow('هیچ قیمت معتبر قبلی')
   })
 })
