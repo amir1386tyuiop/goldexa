@@ -10,7 +10,31 @@ const backendChecks = [
   ['/products/home', 'کاتالوگ محصولات'],
   ['/gold-pricing/status', 'وضعیت قیمت طلا'],
 ]
-const frontendChecks = ['/', '/home', '/shop', '/pricing', '/ai-workspace']
+// These are SPA entry points, so the gate verifies that every product area is
+// served by the deployed frontend. Authenticated pages intentionally return
+// the shell here; API authorization is covered by the backend security/E2E
+// suites.
+const frontendChecks = [
+  '/',
+  '/login',
+  '/home',
+  '/shop',
+  '/product/release-smoke',
+  '/checkout',
+  '/ar',
+  '/auctions',
+  '/marketplace',
+  '/builder',
+  '/ai-workspace',
+  '/ai-engine',
+  '/pricing',
+  '/wallet',
+  '/orders',
+  '/group-buying',
+  '/escrow',
+  '/admin',
+  '/dashboard',
+]
 const failures = []
 
 async function check(url, label, validate) {
