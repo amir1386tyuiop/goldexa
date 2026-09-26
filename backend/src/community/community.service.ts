@@ -6,6 +6,8 @@ import { DesignPost, DesignPostStatus } from './design-post.entity'
 import { DesignComment } from './design-comment.entity'
 import { DesignVote } from './design-vote.entity'
 import { User } from '../users/user.entity'
+import { UserBadge } from '../community-extensions/user-badge.entity'
+import { ChallengeReward } from '../community-extensions/challenge-reward.entity'
 import {
   CreateDesignChallengeDto,
   CreateDesignCommentDto,
@@ -25,6 +27,10 @@ export class CommunityService {
     private voteRepository: Repository<DesignVote>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(UserBadge)
+    private badgeRepository: Repository<UserBadge>,
+    @InjectRepository(ChallengeReward)
+    private rewardRepository: Repository<ChallengeReward>,
   ) {}
 
   async findChallenges(): Promise<DesignChallenge[]> {
@@ -141,8 +147,36 @@ export class CommunityService {
       throw new NotFoundException('طرح برنده یافت نشد')
     }
 
+    if (post.challengeId !== challengeId) {
+      throw new BadRequestException('طرح انتخاب‌شده متعلق به این چالش نیست')
+    }
+
     challenge.winnerPostId = winnerPostId
     challenge.status = DesignChallengeStatus.ENDED
-    return this.challengeRepository.save(challenge)
+    const savedChallenge = await this.challengeRepository.save(challenge)
+
+    const reward = await this.rewardRepository.findOneBy({ challengeId, postId: winnerPostId, userId: post.userId })
+    if (!reward) {
+      await this.rewardRepository.save(this.rewardRepository.create({
+        challengeId,
+        postId: winnerPostId,
+        userId: post.userId,
+        rewardType: challenge.rewardType || 'design_challenge_winner',
+        rewardValue: Number(challenge.rewardValue || 0),
+      }))
+    }
+
+    const badgeName = `برنده چالش: ${challenge.title}`
+    const badge = await this.badgeRepository.findOneBy({ userId: post.userId, name: badgeName })
+    if (!badge) {
+      await this.badgeRepository.save(this.badgeRepository.create({
+        userId: post.userId,
+        name: badgeName,
+        description: 'نشان برنده‌ی چالش طراحی Goldexa',
+        icon_url: null,
+      }))
+    }
+
+    return savedChallenge
   }
 }

@@ -7,9 +7,11 @@ import { DesignVote } from './design-vote.entity'
 import { CommunityController } from './community.controller'
 import { CommunityService } from './community.service'
 import { User } from '../users/user.entity'
+import { UserBadge } from '../community-extensions/user-badge.entity'
+import { ChallengeReward } from '../community-extensions/challenge-reward.entity'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DesignChallenge, DesignPost, DesignComment, DesignVote, User])],
+  imports: [TypeOrmModule.forFeature([DesignChallenge, DesignPost, DesignComment, DesignVote, User, UserBadge, ChallengeReward])],
   controllers: [CommunityController],
   providers: [CommunityService],
   exports: [CommunityService],
