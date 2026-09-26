@@ -2,6 +2,7 @@
 
 const backendUrl = (process.env.RELEASE_BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '')
 const frontendUrl = (process.env.RELEASE_FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '')
+const aiUrl = (process.env.RELEASE_AI_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 const backendChecks = [
   ['/health/ready', 'آمادگی سرویس‌ها'],
@@ -35,10 +36,16 @@ for (const [path, label] of backendChecks) {
 
 for (const path of frontendChecks) await check(`${frontendUrl}${path}`, `فرانت ${path}`)
 
+await check(`${aiUrl}/health`, 'سلامت سرویس AI', (body) => {
+  const payload = JSON.parse(body)
+  if (payload.status !== 'healthy' || payload.service !== 'goldexa-ai-service') throw new Error('AI service healthy نیست')
+  if (!payload.models || typeof payload.models !== 'object') throw new Error('وضعیت مدل‌های AI گزارش نشده است')
+})
+
 if (failures.length) {
   console.error(`\nRelease gate failed (${failures.length}):`)
   for (const failure of failures) console.error(`- ${failure}`)
   process.exitCode = 1
 } else {
-  console.log('\nRelease gate passed: backend readiness, pricing, catalog, frontend routes.')
+  console.log('\nRelease gate passed: backend readiness, pricing, catalog, AI health, frontend routes.')
 }
