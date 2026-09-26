@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Post,
   UploadedFile,
@@ -79,5 +80,51 @@ export class UploadsController {
 
     const url = `/uploads/products/${filename}`
     return { url, filename, size: webp.length, format: 'webp', withinLimit: true }
+  }
+
+  /**
+   * Stores an admin-provided image or GLB/glTF asset for a custom-builder
+   * construction stage. Arbitrary extensions and MIME types are rejected
+   * before anything is written to disk.
+   */
+  @UseGuards(PermissionsGuard)
+  @Permissions('UPLOAD_BUILDER_ASSET')
+  @Post('design-stage-asset')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 25 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed = file.mimetype.startsWith('image/') || ['model/gltf+json', 'model/gltf-binary', 'application/octet-stream'].includes(file.mimetype)
+        if (!allowed) return cb(new BadRequestException('فقط تصویر یا فایل GLB/glTF مجاز است'), false)
+        cb(null, true)
+      },
+    }),
+  )
+  async uploadDesignStageAsset(@Body('assetType') assetType: string, @UploadedFile() file?: UploadedImage) {
+    if (!file) throw new BadRequestException('فایلی ارسال نشده است')
+    if (!['image', 'model'].includes(assetType)) throw new BadRequestException('نوع asset باید image یا model باشد')
+
+    const extension = file.originalname.toLowerCase().split('.').pop() || ''
+    const isModel = assetType === 'model'
+    if (isModel && !['glb', 'gltf'].includes(extension)) throw new BadRequestException('مدل فقط باید GLB یا glTF باشد')
+    if (!isModel && !file.mimetype.startsWith('image/')) throw new BadRequestException('برای asset تصویر، فایل تصویری ارسال کنید')
+    if (isModel && extension === 'glb' && file.buffer.subarray(0, 4).toString('ascii') !== 'glTF') throw new BadRequestException('ساختار فایل GLB معتبر نیست')
+    if (isModel && extension === 'gltf') {
+      try { JSON.parse(file.buffer.toString('utf8')) } catch { throw new BadRequestException('ساختار فایل glTF معتبر نیست') }
+    }
+
+    const dir = join(process.cwd(), 'uploads', 'custom-builder', 'stages')
+    await mkdir(dir, { recursive: true })
+    let output = file.buffer
+    let format = extension
+    if (!isModel) {
+      output = await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer()
+      format = 'webp'
+    }
+    if (output.length > 25 * 1024 * 1024) throw new BadRequestException('حجم asset بیشتر از ۲۵ مگابایت است')
+    const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${format}`
+    await writeFile(join(dir, filename), output)
+    return { url: `/uploads/custom-builder/stages/${filename}`, filename, size: output.length, format, assetType }
   }
 }

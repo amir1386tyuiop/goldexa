@@ -222,6 +222,7 @@ export class RoleService {
       ['BLOCK_USER', 'Block or unblock users'],
       ['CREATE_PRODUCT', 'Create products'],
       ['UPDATE_ANY_PRODUCT', 'Update any product'],
+      ['UPLOAD_BUILDER_ASSET', 'Upload custom-builder stage assets'],
       ['DELETE_PRODUCT', 'Delete products'],
       ['VIEW_ALL_ORDERS', 'View all orders'],
       ['UPDATE_ORDER_STATUS', 'Update order status'],

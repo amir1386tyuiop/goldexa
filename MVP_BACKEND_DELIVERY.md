@@ -100,6 +100,7 @@
 - ممیزی dependency در این مرحله، Axios را به `1.20.0`، Sharp را به `0.35.4`، TypeORM را به `0.3.31` و Socket.IO parser را به `4.2.7` ارتقا داد؛ آسیب‌پذیری‌های باقی‌مانده به زنجیره‌ی Nest 10 و ابزارهای transitive مربوط‌اند و رفع کامل آن‌ها نیازمند migration کنترل‌شده به Nest 12 است، بنابراین `npm audit fix --force` اجرا نشده است.
 - Custom Builder قیمت design و version را از قیمت زنده‌ی ۱۸ عیار، اجرت، سود و مالیات سمت سرور محاسبه می‌کند؛ مبلغ‌های forged ارسالی frontend نادیده گرفته می‌شوند و audit خودکار mutation routeها در `scripts/audit-route-guards.mjs` به CI متصل است.
 - برای پنل مدیریت v2، جدول و API مرحله‌های ساخت سفارشی (`GET/POST /custom-builder/designs/:id/stages`) با migration، کنترل مالکیت و دسترسی admin اضافه شد؛ asset upload مرحله و workflow کامل UI در backlog باقی است.
+- آپلود asset مرحله‌ی ساخت (`POST /uploads/design-stage-asset`) فقط برای permission `UPLOAD_BUILDER_ASSET` فعال است، تصویر را به WebP تبدیل می‌کند و ساختار GLB/glTF را قبل از ذخیره بررسی می‌کند؛ frontend پنل مدیریت URL برگشتی را مستقیماً به مرحله متصل می‌کند.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.

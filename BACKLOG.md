@@ -85,7 +85,7 @@
 - ⬜ **AR Try-On** (WebView + WebAR: 8th Wall/MediaPipe؛ ≥۲۵fps، شروع <۳s) — 🎨 عمدتاً frontend/mobile؛ backend: ar-models/previews موجود
 - ✅ **Smart Vault** (Digital Twin، ارزش لحظه‌ای، سود/زیان با کل مبلغ پرداختی، نمودار روند، هشدار قیمت) — محاسبه‌ی live، snapshot زمان‌بندی‌شده، نمودار چنددارایی و lifecycle کامل هشدار شامل ساخت/غیرفعال‌سازی/reset پیاده شد
 - 🟡 **Custom Jewelry Builder** (انتخاب پایه/وزن/عیار/سنگ، پیش‌نمایش سه‌بعدی، قیمت لحظه‌ای <۲۰۰ms، ذخیره/بازیابی، مرحله‌ی ساخت) — backend موجود
-- 🟡 **پنل مدیریت v2** (صف سفارش سفارشی و API مرحله‌های ساخت با migration و کنترل مالکیت اضافه شد؛ آپلود فایل asset مرحله و workflow کامل UI هنوز باقی است)
+- 🟡 **پنل مدیریت v2** (صف سفارش سفارشی، API مرحله‌های ساخت، upload امن تصویر/GLB/glTF و workflow UI پیاده شد؛ گزارش تفصیلی و مدیریت فایل در object storage هنوز باقی است)
 
 ## فاز ۳ — اکوسیستم و جامعه (خارج از MVP؛ کد اولیه موجود)
 - 🟡 **بازار دست‌دوم + مزایده C2C** (ثبت آگهی یک‌کلیک از صندوقچه، فروش مستقیم/مزایده، بالاترین پیشنهاد، **Escrow**، تأیید کارشناس، انتقال مالکیت و امتیازدهی) — ثبت آگهی از Smart Vault، خرید مستقیم با کمیسیون قابل‌تنظیم، escrow با lifecycle کامل `held → shipped → released`، WebSocket، cron lifecycle، distributed lock، moderation ادمین، انتقال مالکیت به Smart Vault و امتیازدهی مبتنی بر معامله پیاده شده؛ payout بانکی provider-backed و الزامات حقوقی/عملیاتی باقی است

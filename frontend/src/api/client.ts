@@ -219,18 +219,19 @@ export class ApiError extends Error {
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
   const headers: Record<string, string> = {
     ...(!options.skipAuth ? authHeaders() : {}),
   }
 
-  if (options.body) {
+  if (options.body && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
   const response = await fetch(`${API_BASE}${path}`, {
     method: options.method || 'GET',
     headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.body ? (isFormData ? options.body as FormData : JSON.stringify(options.body)) : undefined,
   })
 
   const data = await response.json().catch(() => null)
@@ -245,8 +246,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       setAuthPayload(refreshed)
       const retryResponse = await fetch(`${API_BASE}${path}`, {
         method: options.method || 'GET',
-        headers: { ...authHeaders(), ...(options.body ? { 'Content-Type': 'application/json' } : {}) },
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        headers: { ...authHeaders(), ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}) },
+        body: options.body ? (isFormData ? options.body as FormData : JSON.stringify(options.body)) : undefined,
       })
       const retryData = await retryResponse.json().catch(() => null)
       if (!retryResponse.ok) {
@@ -1792,6 +1793,12 @@ export const api = {
   getJewelryDesignStages: (designId: string) => request<JewelryDesignStage[]>(`/custom-builder/designs/${designId}/stages`),
   createJewelryDesignStage: (designId: string, body: { title: string; status?: JewelryDesignStage['status']; note?: string; imageUrl?: string; modelUrl?: string }) =>
     request<JewelryDesignStage>(`/custom-builder/designs/${designId}/stages`, { method: 'POST', body }),
+  uploadJewelryDesignStageAsset: (file: File, assetType: 'image' | 'model') => {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('assetType', assetType)
+    return request<{ url: string; filename: string; size: number; format: string; assetType: string }>('/uploads/design-stage-asset', { method: 'POST', body })
+  },
   updateJewelryDesignStatus: (id: string, status: JewelryDesign['status']) => request<JewelryDesign>(`/custom-builder/designs/${id}/status`, { method: 'PATCH', body: { status } }),
   createJewelryDesign: (body: CreateJewelryDesignInput) =>
     request<JewelryDesign>('/custom-builder/designs', { method: 'POST', body }),

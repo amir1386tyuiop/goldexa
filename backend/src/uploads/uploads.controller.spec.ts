@@ -24,4 +24,32 @@ describe('UploadsController', () => {
     expect(result.withinLimit).toBe(true)
     await rm(join(process.cwd(), 'uploads', 'products', result.filename), { force: true })
   })
+
+  it('stores validated custom-builder stage images as WebP', async () => {
+    const controller = new UploadsController()
+    const source = await sharp({
+      create: { width: 800, height: 600, channels: 3, background: { r: 30, g: 30, b: 30 } },
+    }).png().toBuffer()
+
+    const result = await controller.uploadDesignStageAsset('image', {
+      buffer: source,
+      mimetype: 'image/png',
+      originalname: 'stage.png',
+      size: source.length,
+    })
+
+    expect(result.assetType).toBe('image')
+    expect(result.format).toBe('webp')
+    await rm(join(process.cwd(), 'uploads', 'custom-builder', 'stages', result.filename), { force: true })
+  })
+
+  it('rejects a forged GLB payload', async () => {
+    const controller = new UploadsController()
+    await expect(controller.uploadDesignStageAsset('model', {
+      buffer: Buffer.from('not-a-glb'),
+      mimetype: 'model/gltf-binary',
+      originalname: 'ring.glb',
+      size: 9,
+    })).rejects.toThrow('ساختار فایل GLB معتبر نیست')
+  })
 })
