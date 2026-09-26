@@ -8,11 +8,12 @@
 
 - Backend build: موفق (`npm run build`).
 - Backend unit tests: suiteهای unit و security در CI اجرا می‌شوند؛ security gate شامل ۲۵ assertion اجباری برای احراز هویت، نقش، permission و مالکیت است. تست‌های E2E فقط با `E2E_BASE_URL` و test database فعال می‌شوند.
-- E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۲ suite، ۱۱ تست موفق).
+- E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۴ suite، ۱۵ تست موفق).
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
 - Frontend از APIهای واقعی استفاده می‌کند؛ داده‌های mock اجرایی حذف شده و صفحات سنگین به‌صورت lazy-load بارگذاری می‌شوند.
 - پرداخت امانی فروشنده و مبلغ را از listing/auction معتبر سمت سرور تطبیق می‌دهد.
+- release gate محلی برای کنترل آمادگی backend، قیمت‌گذاری، کاتالوگ و routeهای کلیدی فرانت در `scripts/release-gate.mjs` قرار دارد.
 
 راهنمای تست در [backend/TESTING.md](backend/TESTING.md) و راهنمای اجرای امن MVP در [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) است.
 
@@ -71,6 +72,7 @@ goldexacode/
 - [x] Setup CI/CD Pipeline برای lint/build/test/security/audit و compose validation
 - [x] type-check و web export اپ Expo موبایل در CI
 - [x] اسکریپت benchmark قابل‌تکرار برای ثبت p50/p95/max API (`scripts/benchmark-backend.mjs`)
+- [x] release gate قابل‌تکرار برای readiness و smoke routeهای اصلی (`scripts/release-gate.mjs`)
 - [x] اسکریپت recovery امن برای خطاهای stale socket در Docker Desktop ویندوز (`scripts/start-goldexa-docker.ps1`)
 - [x] ایجاد Design System
 

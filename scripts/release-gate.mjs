@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+
+const backendUrl = (process.env.RELEASE_BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '')
+const frontendUrl = (process.env.RELEASE_FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '')
+
+const backendChecks = [
+  ['/health/ready', 'آمادگی سرویس‌ها'],
+  ['/health', 'سلامت API'],
+  ['/products/home', 'کاتالوگ محصولات'],
+  ['/gold-pricing/status', 'وضعیت قیمت طلا'],
+]
+const frontendChecks = ['/', '/home', '/shop', '/pricing', '/ai-workspace']
+const failures = []
+
+async function check(url, label, validate) {
+  try {
+    const response = await fetch(url, { headers: { accept: 'application/json,text/html' } })
+    const body = await response.text()
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (validate) validate(body)
+    console.log(`PASS ${label}: ${response.status} ${url}`)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    failures.push(`${label}: ${message}`)
+    console.error(`FAIL ${label}: ${message}`)
+  }
+}
+
+for (const [path, label] of backendChecks) {
+  await check(`${backendUrl}${path}`, label, path === '/health/ready' ? (body) => {
+    const payload = JSON.parse(body)
+    if (payload.ready !== true || payload.status !== 'ready') throw new Error('سرویس آماده نیست')
+  } : undefined)
+}
+
+for (const path of frontendChecks) await check(`${frontendUrl}${path}`, `فرانت ${path}`)
+
+if (failures.length) {
+  console.error(`\nRelease gate failed (${failures.length}):`)
+  for (const failure of failures) console.error(`- ${failure}`)
+  process.exitCode = 1
+} else {
+  console.log('\nRelease gate passed: backend readiness, pricing, catalog, frontend routes.')
+}
