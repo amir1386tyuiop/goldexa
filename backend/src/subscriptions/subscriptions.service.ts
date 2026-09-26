@@ -46,7 +46,9 @@ export class SubscriptionsService {
     return this.userSubscriptionRepository.save(
       this.userSubscriptionRepository.create({
         ...data,
-        status: data.status || UserSubscriptionStatus.ACTIVE,
+        // A user may subscribe, but cannot create an already-cancelled or
+        // expired subscription by tampering with the request body.
+        status: UserSubscriptionStatus.ACTIVE,
       }) as UserSubscription,
     )
   }
