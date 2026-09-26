@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ChallengeReward } from './challenge-reward.entity'
@@ -38,6 +38,18 @@ export class CommunityExtensionsService {
   }
 
   async save(data: SaveDesignDto): Promise<DesignSave> {
+    if (!data.postId && !data.designId) {
+      throw new BadRequestException('طرح یا محصول برای ذخیره‌سازی الزامی است')
+    }
+
+    const existing = data.postId
+      ? await this.saveRepository.findOneBy({ userId: data.userId, postId: data.postId })
+      : await this.saveRepository.findOneBy({ userId: data.userId, designId: data.designId })
+
+    if (existing) {
+      throw new BadRequestException('این طرح قبلاً ذخیره شده است')
+    }
+
     return this.saveRepository.save(
       this.saveRepository.create({
         ...data,
@@ -45,6 +57,20 @@ export class CommunityExtensionsService {
         designId: data.designId ?? null,
       }),
     )
+  }
+
+  async removeSave(id: string, userId: string): Promise<void> {
+    const save = await this.saveRepository.findOneBy({ id })
+
+    if (!save) {
+      throw new NotFoundException('ذخیره یافت نشد')
+    }
+
+    if (save.userId !== userId) {
+      throw new ForbiddenException('حذف ذخیره‌ی کاربر دیگر مجاز نیست')
+    }
+
+    await this.saveRepository.remove(save)
   }
 
   async findBadges(userId: string): Promise<UserBadge[]> {

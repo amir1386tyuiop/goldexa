@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
 import type { Request } from 'express'
 import { AdminGuard } from '../common/guards/admin.guard'
 import { JwtAuthGuard, JwtUser } from '../common/guards/jwt-auth.guard'
@@ -39,6 +39,12 @@ export class CommunityExtensionsController {
   @UseGuards(JwtAuthGuard)
   async save(@Body() body: SaveDesignDto, @Req() req: Request & { user: JwtUser }) {
     return this.communityExtensionsService.save({ ...body, userId: req.user.sub })
+  }
+
+  @Delete('saves/:id')
+  @UseGuards(JwtAuthGuard)
+  async removeSave(@Param('id') id: string, @Req() req: Request & { user: JwtUser }) {
+    return this.communityExtensionsService.removeSave(id, req.user.sub)
   }
 
   @Get('badges/:userId')
