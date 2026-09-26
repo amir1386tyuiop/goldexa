@@ -50,6 +50,9 @@ jobs:
       - run: npm ci
       - name: Run security regression gate
         run: npm run test:security -- --runInBand
+      - name: Audit state-changing controller routes
+        working-directory: .
+        run: node scripts/audit-route-guards.mjs
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 

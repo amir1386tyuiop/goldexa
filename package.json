@@ -2,6 +2,7 @@
   "name": "goldexa-workspace",
   "private": true,
   "scripts": {
-    "release:gate": "node scripts/release-gate.mjs"
+    "release:gate": "node scripts/release-gate.mjs",
+    "security:route-audit": "node scripts/audit-route-guards.mjs"
   }
 }
