@@ -128,4 +128,35 @@ describe('sensitive endpoint guard policy', () => {
     expect(escrow).toContain('confirmDelivery(id, req.user.sub)')
     expect(escrow).toContain('openDispute(id, req.user.sub')
   })
+
+  it.each([
+    ['AI user predictions', '../ai-engine/ai-engine.controller.ts', 'findPredictionsByUser'],
+    ['AI user recommendations', '../ai-engine/ai-engine.controller.ts', 'findRecommendations'],
+    ['custom designs by user', '../custom-builder/custom-builder.controller.ts', 'findDesignsByUser'],
+    ['custom quotes by user', '../custom-builder/custom-builder.controller.ts', 'findQuotesByUser'],
+    ['notifications by user', '../notifications/notifications.controller.ts', 'findByUser'],
+    ['smart vault assets by user', '../smart-vault/smart-vault.controller.ts', 'findAssets'],
+    ['smart vault alerts by user', '../smart-vault/smart-vault.controller.ts', 'findAlerts'],
+    ['subscriptions by user', '../subscriptions/subscriptions.controller.ts', 'findUserSubscriptions'],
+  ])('%s is authenticated and uses the JWT subject', (_label, relativeFile, method) => {
+    const decorators = methodPolicy(relativeFile, method)
+    expect(decorators).toContain('JwtAuthGuard')
+  })
+
+  it('prevents user-scoped reads from trusting a path userId', () => {
+    const ai = readFileSync(join(__dirname, '../ai-engine/ai-engine.controller.ts'), 'utf8')
+    const customBuilder = readFileSync(join(__dirname, '../custom-builder/custom-builder.controller.ts'), 'utf8')
+    const notifications = readFileSync(join(__dirname, '../notifications/notifications.controller.ts'), 'utf8')
+    const smartVault = readFileSync(join(__dirname, '../smart-vault/smart-vault.controller.ts'), 'utf8')
+    const subscriptions = readFileSync(join(__dirname, '../subscriptions/subscriptions.controller.ts'), 'utf8')
+
+    expect(ai).toContain('findPredictionsByUser(request.user.sub)')
+    expect(ai).toContain('findRecommendations(request.user.sub)')
+    expect(customBuilder).toContain('findDesignsByUser(req.user.sub)')
+    expect(customBuilder).toContain('findQuotesByUser(req.user.sub)')
+    expect(notifications).toContain('findByUser(req.user.sub)')
+    expect(smartVault).toContain('findAssets(req.user.sub)')
+    expect(smartVault).toContain('findAlerts(req.user.sub)')
+    expect(subscriptions).toContain('findUserSubscriptions(req.user.sub)')
+  })
 })
