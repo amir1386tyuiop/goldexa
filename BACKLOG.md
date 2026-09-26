@@ -73,7 +73,7 @@
 - ✅ امنیت: JWT، RBAC، هش OTP، rate-limit، عدم ذخیره‌ی اطلاعات پرداخت
 - 🟡 OWASP Top 10 (XSS/SQLi/CSRF): ORM + ValidationPipe و **Helmet** فعال است؛ ممیزی route-by-route، سیاست Origin/CSRF متناسب با Bearer JWT و benchmark کامل باقی است
 - 🔒 HTTPS/TLS 1.3: در استقرار (reverse proxy) — کد آماده است
-- 🟡 عملکرد API < ۲۰۰ms: بیشتر endpointها سریع‌اند؛ **بنچمارک رسمی + ممیزی ایندکس/N+1** مانده
+- 🟡 عملکرد API < ۲۰۰ms: benchmark قابل‌تکرار برای `/health`، `/health/ready`، `/gold-pricing/status` و `/products/home` اجرا شده و p95 آخرین اجرای catalog برابر ۸۹ms است؛ **ممیزی کامل ایندکس/N+1 و benchmark همه‌ی endpointهای پرترافیک** باقی است.
 - ⬜ در دسترس‌پذیری ۹۹.۹٪ + مانیتورینگ کامل (Prometheus/Grafana/ELK)
 - ✅ observability پایه: AuditLogger مالی + `/metrics` + لاگ ساختاریافته
 - 🟡 معماری: مسیر Modular-Monolith → Microservice (فاز بعد) — لایه‌بندی Hexagonal کامل نشده
