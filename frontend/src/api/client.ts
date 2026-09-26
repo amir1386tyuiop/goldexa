@@ -35,6 +35,7 @@ import type {
   Invoice,
   Inventory,
   JewelryDesign,
+  JewelryDesignStage,
   JewelryDesignVersion,
   KycProfile,
   LaborCostRule,
@@ -499,6 +500,7 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
     if (path.includes('subscriptions/plans')) return data.map(normalizeSubscriptionPlan)
     if (path.includes('subscriptions/discounts')) return data.map(normalizeDiscountCode)
     if (path.includes('notifications')) return data.map(normalizeNotification)
+    if (path.includes('custom-builder/designs') && path.includes('/stages')) return data.map(normalizeJewelryDesignStage)
     if (path.includes('custom-builder/designs')) return data.map(normalizeJewelryDesign)
     if (path.includes('custom-builder/gemstones')) return data.map(normalizeGemstone)
     if (path.includes('custom-builder/quotes')) return data.map(normalizeCustomBuilderQuote)
@@ -586,6 +588,7 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
   if (path.includes('subscriptions/plans')) return normalizeSubscriptionPlan(data as Record<string, unknown>)
   if (path.includes('subscriptions/discounts')) return normalizeDiscountCode(data as Record<string, unknown>)
   if (path.includes('notifications')) return normalizeNotification(data as Record<string, unknown>)
+  if (path.includes('custom-builder/designs') && path.includes('/stages')) return normalizeJewelryDesignStage(data as Record<string, unknown>)
   if (path.includes('custom-builder/designs') && !path.includes('versions')) return normalizeJewelryDesign(data as Record<string, unknown>)
   if (path.includes('custom-builder/designs') && path.includes('versions')) return normalizeJewelryDesignVersion(data as Record<string, unknown>)
   if (path.includes('custom-builder/gemstones')) return normalizeGemstone(data as Record<string, unknown>)
@@ -716,6 +719,19 @@ function normalizeCustomBuilderQuote(value: Record<string, unknown>) {
     total: toNumber(value.total),
     expiresAt: value.expiresAt ?? value.expires_at ?? null,
     status: value.status || 'draft',
+    createdAt: String(value.createdAt || value.created_at || ''),
+  }
+}
+
+function normalizeJewelryDesignStage(value: Record<string, unknown>) {
+  return {
+    ...value,
+    designId: String(value.designId || value.design_id || ''),
+    title: String(value.title || ''),
+    status: (value.status || 'planned') as JewelryDesignStage['status'],
+    note: value.note ?? null,
+    imageUrl: value.imageUrl ?? value.image_url ?? null,
+    modelUrl: value.modelUrl ?? value.model_url ?? null,
     createdAt: String(value.createdAt || value.created_at || ''),
   }
 }
@@ -1773,6 +1789,9 @@ export const api = {
   getAdminCustomBuilderDesigns: () => request<JewelryDesign[]>('/custom-builder/admin/designs'),
   getJewelryDesignsByUser: (userId: string) => request<JewelryDesign[]>(`/custom-builder/designs/user/${userId}`),
   getJewelryDesignVersions: (designId: string) => request<JewelryDesignVersion[]>(`/custom-builder/designs/${designId}/versions`),
+  getJewelryDesignStages: (designId: string) => request<JewelryDesignStage[]>(`/custom-builder/designs/${designId}/stages`),
+  createJewelryDesignStage: (designId: string, body: { title: string; status?: JewelryDesignStage['status']; note?: string; imageUrl?: string; modelUrl?: string }) =>
+    request<JewelryDesignStage>(`/custom-builder/designs/${designId}/stages`, { method: 'POST', body }),
   updateJewelryDesignStatus: (id: string, status: JewelryDesign['status']) => request<JewelryDesign>(`/custom-builder/designs/${id}/status`, { method: 'PATCH', body: { status } }),
   createJewelryDesign: (body: CreateJewelryDesignInput) =>
     request<JewelryDesign>('/custom-builder/designs', { method: 'POST', body }),

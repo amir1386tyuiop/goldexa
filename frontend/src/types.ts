@@ -556,6 +556,19 @@ export interface JewelryDesignVersion {
   createdAt: string
 }
 
+export type JewelryDesignStageStatus = 'planned' | 'in_progress' | 'completed'
+
+export interface JewelryDesignStage {
+  id: string
+  designId: string
+  title: string
+  status: JewelryDesignStageStatus
+  note?: string | null
+  imageUrl?: string | null
+  modelUrl?: string | null
+  createdAt: string
+}
+
 export interface GemstoneLibrary {
   id: string
   name: string
