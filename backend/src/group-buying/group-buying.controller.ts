@@ -23,8 +23,9 @@ export class GroupBuyingController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.groupBuyingService.findOne(id)
+  async findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const isAdmin = req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true
+    return this.groupBuyingService.findOne(id, req.user.sub, isAdmin)
   }
 
   @Get(':id/tracking')

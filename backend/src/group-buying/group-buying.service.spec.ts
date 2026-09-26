@@ -82,4 +82,25 @@ describe('GroupBuyingService ownership rules', () => {
 
     await expect(service.getTracking('group-1', 'attacker')).rejects.toBeInstanceOf(ForbiddenException)
   })
+
+  it('hides group members from a non-member while the group is open', async () => {
+    const groups = { findOneBy: jest.fn().mockResolvedValue({ id: 'group-1', leaderId: 'leader-1', status: GroupBuyingStatus.OPEN }) }
+    const items = { findBy: jest.fn().mockResolvedValue([{ id: 'item-1' }]) }
+    const members = { findOneBy: jest.fn().mockResolvedValue(null), findBy: jest.fn().mockResolvedValue([{ id: 'member-1' }]) }
+    const service = new GroupBuyingService(groups as never, items as never, members as never, {} as never, {} as never, {} as never)
+
+    const result = await service.findOne('group-1', 'outsider')
+
+    expect(result?.items).toHaveLength(1)
+    expect(result?.members).toEqual([])
+    expect(members.findBy).not.toHaveBeenCalled()
+  })
+
+  it('denies closed group details to an outsider', async () => {
+    const groups = { findOneBy: jest.fn().mockResolvedValue({ id: 'group-1', leaderId: 'leader-1', status: GroupBuyingStatus.PAID }) }
+    const members = { findOneBy: jest.fn().mockResolvedValue(null) }
+    const service = new GroupBuyingService(groups as never, {} as never, members as never, {} as never, {} as never, {} as never)
+
+    await expect(service.findOne('group-1', 'outsider')).rejects.toBeInstanceOf(ForbiddenException)
+  })
 })

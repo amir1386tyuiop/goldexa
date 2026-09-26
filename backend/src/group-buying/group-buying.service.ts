@@ -80,7 +80,7 @@ export class GroupBuyingService {
     return this.groupRepository.find({ order: { createdAt: 'DESC' } })
   }
 
-  async findOne(id: string): Promise<{
+  async findOne(id: string, actorId?: string, isAdmin = false): Promise<{
     group: GroupBuyingGroup
     items: GroupBuyingItem[]
     members: GroupBuyingMember[]
@@ -91,9 +91,17 @@ export class GroupBuyingService {
       return null
     }
 
+    const isLeader = actorId === group.leaderId
+    const isMember = actorId
+      ? Boolean(await this.memberRepository.findOneBy({ groupId: id, userId: actorId }))
+      : false
+    if (!isAdmin && !isLeader && !isMember && group.status !== GroupBuyingStatus.OPEN) {
+      throw new ForbiddenException('دسترسی به جزئیات این گروه مجاز نیست')
+    }
+
     const [items, members] = await Promise.all([
       this.itemRepository.findBy({ groupId: id }),
-      this.memberRepository.findBy({ groupId: id }),
+      isAdmin || isLeader || isMember ? this.memberRepository.findBy({ groupId: id }) : Promise.resolve([]),
     ])
 
     return { group, items, members }
