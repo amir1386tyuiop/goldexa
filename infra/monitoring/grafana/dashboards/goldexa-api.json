@@ -1,0 +1,47 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "API up",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "goldexa_up", "refId": "A" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Process uptime",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "targets": [{ "expr": "goldexa_process_uptime_seconds", "legendFormat": "uptime", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Memory",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "goldexa_process_resident_memory_bytes", "legendFormat": "RSS", "refId": "A" },
+        { "expr": "goldexa_process_heap_used_bytes", "legendFormat": "heap used", "refId": "B" },
+        { "expr": "goldexa_process_heap_total_bytes", "legendFormat": "heap total", "refId": "C" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["goldexa", "api"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Goldexa API",
+  "uid": "goldexa-api",
+  "version": 1
+}
