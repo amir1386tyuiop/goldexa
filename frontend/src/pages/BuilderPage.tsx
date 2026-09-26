@@ -44,7 +44,6 @@ export function BuilderPage() {
     if (!auth) return
     const formData = new FormData(event.currentTarget)
     const weight = Number(formData.get('weight'))
-    const totalPrice = Number(formData.get('totalPrice'))
 
     designMutation.mutate({
       userId: auth?.user.id || '',
@@ -55,11 +54,6 @@ export function BuilderPage() {
       weight,
       karat: Number(formData.get('karat')),
       metalColor: String(formData.get('metalColor')),
-      totalPrice,
-      estimatedGoldPrice: Math.round(totalPrice * 0.72),
-      laborCost: Number(formData.get('laborCost')),
-      profit: Number(formData.get('profit')),
-      tax: Number(formData.get('tax')),
       imageUrl: '/images/custom-ring.svg',
       modelUrl: '/models/custom-ring.glb',
       preview3dUrl: '/models/custom-ring-preview.glb',
@@ -210,6 +204,7 @@ function CreateDesignPanel({ onSubmit, disabled }: { onSubmit: (event: FormEvent
   return (
     <form onSubmit={onSubmit} className="card p-6 space-y-4">
       <h2 className="text-xl font-black text-navy-900">طراحی جدید</h2>
+      <p className="text-sm leading-7 text-muted-foreground">قیمت خام، اجرت، سود و مالیات بر اساس قیمت زنده‌ی طلا در سرور محاسبه می‌شود و قابل ویرایش دستی نیست.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input name="title" className="input" placeholder="عنوان طرح" required />
         <select name="category" className="input" required>
@@ -228,10 +223,6 @@ function CreateDesignPanel({ onSubmit, disabled }: { onSubmit: (event: FormEvent
         <input name="metalColor" className="input" placeholder="رنگ فلز" />
         <input name="weight" type="number" step="0.01" className="input" placeholder="وزن گرم" required />
         <input name="karat" type="number" className="input" placeholder="عیار" defaultValue={18} required />
-        <input name="laborCost" type="number" className="input" placeholder="اجرت ساخت" defaultValue={0} required />
-        <input name="profit" type="number" className="input" placeholder="سود" defaultValue={0} required />
-        <input name="tax" type="number" className="input" placeholder="مالیات درصد" defaultValue={9} required />
-        <input name="totalPrice" type="number" className="input" placeholder="قیمت کل" required />
       </div>
       <button type="submit" className="button-primary w-full" disabled={disabled}>
         <Plus className="h-4 w-4 ml-2" />
