@@ -2,6 +2,18 @@ import 'reflect-metadata'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
+function methodPolicy(relativeFile: string, method: string): string {
+  const source = readFileSync(join(__dirname, relativeFile), 'utf8')
+  const methodIndex = source.indexOf(`async ${method}(`)
+  expect(methodIndex).toBeGreaterThanOrEqual(0)
+  const classDecoratorIndex = source.indexOf('export class')
+  const decoratorCandidates = ['@Post', '@Patch', '@Put', '@Delete', '@Get']
+    .map((decorator) => source.lastIndexOf(decorator, methodIndex))
+    .filter((index) => index >= classDecoratorIndex)
+  const routeDecoratorIndex = Math.max(...decoratorCandidates)
+  return `${source.slice(0, classDecoratorIndex)}\n${source.slice(routeDecoratorIndex, methodIndex)}`
+}
+
 describe('sensitive endpoint guard policy', () => {
   // These are production security gates. Keep them enabled in every test run
   // so a newly added sensitive route cannot silently bypass authentication or
@@ -73,5 +85,47 @@ describe('sensitive endpoint guard policy', () => {
     const source = readFileSync(join(__dirname, '../ai-engine/ai-engine.controller.ts'), 'utf8')
     expect(source).toContain('RateLimitGuard')
     expect(source).toContain('@RateLimit({ limit: 30, windowMs: 60_000 })')
+  })
+
+  it.each([
+    ['auction creation', '../auctions/auctions.controller.ts', 'create', false],
+    ['auction bid', '../auctions/auctions.controller.ts', 'placeBid', false],
+    ['auction settlement', '../auctions/auctions.controller.ts', 'settle', true],
+    ['auction review', '../auctions/auctions.controller.ts', 'updateReview', true],
+    ['auction status', '../auctions/auctions.controller.ts', 'updateStatus', true],
+    ['auction cancellation', '../auctions/auctions.controller.ts', 'cancel', true],
+    ['escrow creation', '../escrow/escrow.controller.ts', 'createPayment', false],
+    ['escrow payment', '../escrow/escrow.controller.ts', 'payFromWallet', false],
+    ['escrow shipping', '../escrow/escrow.controller.ts', 'markShipped', false],
+    ['escrow delivery confirmation', '../escrow/escrow.controller.ts', 'confirmDelivery', false],
+    ['escrow dispute', '../escrow/escrow.controller.ts', 'openDispute', false],
+    ['escrow status mutation', '../escrow/escrow.controller.ts', 'updatePaymentStatus', true],
+    ['marketplace listing creation', '../marketplace/used-gold-listings.controller.ts', 'create', false],
+    ['marketplace cancellation', '../marketplace/used-gold-listings.controller.ts', 'cancelOwn', false],
+    ['marketplace purchase', '../marketplace/used-gold-listings.controller.ts', 'purchase', false],
+    ['marketplace review', '../marketplace/used-gold-listings.controller.ts', 'review', true],
+    ['marketplace status', '../marketplace/used-gold-listings.controller.ts', 'updateStatus', true],
+    ['catalog category mutation', '../catalog/catalog.controller.ts', 'createCategory', true],
+    ['catalog inventory mutation', '../catalog/catalog.controller.ts', 'upsertInventory', true],
+    ['catalog stock mutation', '../catalog/catalog.controller.ts', 'updateStock', true],
+  ])('%s keeps its auth/admin policy', (_label, relativeFile, method, adminRequired) => {
+    const decorators = methodPolicy(relativeFile, method)
+    expect(decorators).toContain('JwtAuthGuard')
+    if (adminRequired) expect(decorators).toContain('AdminGuard')
+  })
+
+  it('binds auction, marketplace and escrow mutations to the authenticated subject', () => {
+    const auction = readFileSync(join(__dirname, '../auctions/auctions.controller.ts'), 'utf8')
+    const marketplace = readFileSync(join(__dirname, '../marketplace/used-gold-listings.controller.ts'), 'utf8')
+    const escrow = readFileSync(join(__dirname, '../escrow/escrow.controller.ts'), 'utf8')
+    expect(auction).toContain('createAuction(body, req.user.sub)')
+    expect(auction).toContain('placeBid(id, body, req.user.sub)')
+    expect(marketplace).toContain('sellerId: req.user.sub')
+    expect(marketplace).toContain('cancelOwnListing(id, req.user.sub)')
+    expect(marketplace).toContain('purchaseDirect(id, body, req.user.sub)')
+    expect(escrow).toContain('buyerId: req.user.sub')
+    expect(escrow).toContain('markShipped(id, req.user.sub')
+    expect(escrow).toContain('confirmDelivery(id, req.user.sub)')
+    expect(escrow).toContain('openDispute(id, req.user.sub')
   })
 })
