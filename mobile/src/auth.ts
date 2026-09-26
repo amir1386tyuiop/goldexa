@@ -1,5 +1,7 @@
 /** Authentication state and UI authorization helpers for the Expo client. */
 
+import * as SecureStore from 'expo-secure-store'
+
 export type UserRole =
   | 'buyer'
   | 'seller'
@@ -54,30 +56,24 @@ export interface OtpLoginResponse {
 const STORAGE_KEY = 'goldexacode.auth.session'
 let memorySession: AuthSession | null = null
 
-type AsyncStorageLike = {
-  getItem(key: string): Promise<string | null>
-  setItem(key: string, value: string): Promise<void>
-  removeItem(key: string): Promise<void>
+type SecureStoreLike = {
+  getItemAsync(key: string): Promise<string | null>
+  setItemAsync(key: string, value: string): Promise<void>
+  deleteItemAsync(key: string): Promise<void>
 }
 
-function getAsyncStorage(): AsyncStorageLike | null {
-  try {
-    // Optional resolution keeps the mobile bundle usable without the package.
-    const optionalRequire = Function('moduleName', 'return require(moduleName)') as (name: string) => unknown
-    const loaded = optionalRequire('@react-native-async-storage/async-storage') as
-      | { default?: AsyncStorageLike }
-      | AsyncStorageLike
-    return 'getItem' in loaded ? loaded : loaded.default ?? null
-  } catch {
-    return null
+function getSecureStore(): SecureStoreLike {
+  return {
+    getItemAsync: SecureStore.getItemAsync,
+    setItemAsync: SecureStore.setItemAsync,
+    deleteItemAsync: SecureStore.deleteItemAsync,
   }
 }
 
 export async function getSession(): Promise<AuthSession | null> {
-  const storage = getAsyncStorage()
-  if (!storage) return memorySession
+  const storage = getSecureStore()
   try {
-    const raw = await storage.getItem(STORAGE_KEY)
+    const raw = await storage.getItemAsync(STORAGE_KEY)
     if (!raw) return memorySession
     const parsed = JSON.parse(raw) as AuthSession
     memorySession = parsed
@@ -89,10 +85,9 @@ export async function getSession(): Promise<AuthSession | null> {
 
 export async function setSession(session: AuthSession): Promise<void> {
   memorySession = session
-  const storage = getAsyncStorage()
-  if (!storage) return
+  const storage = getSecureStore()
   try {
-    await storage.setItem(STORAGE_KEY, JSON.stringify(session))
+    await storage.setItemAsync(STORAGE_KEY, JSON.stringify(session))
   } catch {
     // Memory remains the safe fallback when persistence is unavailable.
   }
@@ -100,10 +95,9 @@ export async function setSession(session: AuthSession): Promise<void> {
 
 export async function clearSession(): Promise<void> {
   memorySession = null
-  const storage = getAsyncStorage()
-  if (!storage) return
+  const storage = getSecureStore()
   try {
-    await storage.removeItem(STORAGE_KEY)
+    await storage.deleteItemAsync(STORAGE_KEY)
   } catch {
     // Clearing memory still signs the current process out.
   }
