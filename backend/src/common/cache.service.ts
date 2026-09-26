@@ -68,6 +68,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       try {
         raw = await this.client.get(namespacedKey)
       } catch {
+        if (this.isProductionQuoteKey(key)) {
+          throw new Error('Redis برای quoteهای checkout در محیط production در دسترس نیست')
+        }
         // Redis is an acceleration/distribution layer, not a reason to crash
         // the request. Read the expiring local fallback when Redis is down.
         raw = this.getFromMemory(namespacedKey)
@@ -93,6 +96,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         await this.client.set(namespacedKey, raw, 'EX', ttl)
         return
       } catch {
+        if (this.isProductionQuoteKey(key)) {
+          throw new Error('Redis برای quoteهای checkout در محیط production در دسترس نیست')
+        }
         // Keep a bounded, expiring fallback for local development and a
         // graceful degradation path during a short Redis outage.
       }
@@ -109,6 +115,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         this.memory.delete(namespacedKey)
         return
       } catch {
+        if (this.isProductionQuoteKey(key)) {
+          throw new Error('Redis برای quoteهای checkout در محیط production در دسترس نیست')
+        }
         /* fall through */
       }
     }
@@ -192,9 +201,13 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   private assertDistributedInProduction(key: string): void {
-    if (process.env.NODE_ENV === 'production' && key.replace(/^:+/, '').startsWith('pricing:quote:') && !this.redisReady) {
+    if (this.isProductionQuoteKey(key) && !this.redisReady) {
       throw new Error('Redis برای quoteهای checkout در محیط production الزامی است')
     }
+  }
+
+  private isProductionQuoteKey(key: string): boolean {
+    return process.env.NODE_ENV === 'production' && key.replace(/^:+/, '').startsWith('pricing:quote:')
   }
 
   private normaliseNamespace(namespace: string): string {
