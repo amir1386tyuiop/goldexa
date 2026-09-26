@@ -17,7 +17,7 @@
 - **Adapter اختصاصی tgju.org** (`call.tgju.org/ajax.json`): پارس `geram18/mesghal/ons/sekee`، با `GOLD_PRICE_TGJU_DIVISOR` برای تبدیل ریال→تومان.
 - **فرمول قیمت نهایی (اصلاح‌شده):** `وزن×قیمت روز + اجرت + سود + مالیات`. **مالیات ارزش افزوده فقط روی (اجرت+سود)** محاسبه می‌شود (طبق قانون طلای ایران) — باگ قبلی که روی کل مبلغ مالیات می‌گرفت رفع شد.
 - قیمت در `calculate` **داخلی و زنده** خوانده می‌شود (مشتری نمی‌تواند قیمت دلخواه بفرستد).
-- **کش in-memory** (TTL 15s)، **اعتبارسنجی نوسان** (رد جهش >15٪)، **ثبت `price_history`** (append هنگام تغییر).
+- **کش in-memory** (TTL 15s)، **اعتبارسنجی نوسان** (رد جهش بیش از ۲٪)، **ثبت `price_history`** (append هنگام تغییر).
 - Endpointها: `GET /gold-pricing`, `/gold-pricing/:type`, `/gold-pricing/status`, `/gold-pricing/history/:type`, `POST|GET /pricing/calculate/:category`.
 
 ## ردیف ۵ — کاتالوگ و فروشگاه ✅
@@ -112,6 +112,6 @@
 - **۵.۵ WebP < ۲۰۰KB:** آپلود با کاهش تطبیقی کیفیت/ابعاد، خروجی را زیر ۲۰۰KB نگه می‌دارد (تست: منبع ۴۵۲KB → ۱۶۹KB).
 
 ## تست
-- suite فعلی Jest شامل ۱۲ تست موفق است؛ پوشش آن عمدتاً unit-level است.
+- suite فعلی Jest شامل ۲۹ suite و ۱۷۹ تست موفق است؛ E2E ایزوله‌ی PostgreSQL/Redis نیز ۴ suite و ۱۵ تست موفق دارد.
 - smoke/e2e setup در `backend/test/e2e` اضافه شده و با `E2E_BASE_URL` اجرا می‌شود. compose ایزوله‌ی `backend/test/docker-compose.e2e.yml` PostgreSQL و Redis جدا دارد؛ `E2E_ALLOW_DB_FIXTURES=1` فقط در همین دیتابیس تست برای seed کیف پول مجاز است.
 - security enforcement با `ENFORCE_SECURITY_TESTS=1` آماده است و تا رفع findingهای endpointهای حساس نباید pass کامل تلقی شود.
