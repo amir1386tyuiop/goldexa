@@ -50,6 +50,25 @@ describe('AiEngineService execution contract', () => {
     await expect(service.executePrediction({ currentPrice: 6000000 }, 'jwt-user')).rejects.toBeInstanceOf(BadRequestException)
   })
 
+  it('keeps the local design chat as the preferred workspace even when OpenRouter is configured', async () => {
+    const openRouter = {
+      toPublicProvider: jest.fn(() => ({ key: 'assistant', modelId: 'local-design-builder-v1', configured: true })),
+      chat: jest.fn(),
+    }
+    const local = { isConfigured: jest.fn(() => true), health: jest.fn(), predict: jest.fn(), recommend: jest.fn(), match: jest.fn() }
+    const service = new AiEngineService(
+      repository() as never, repository() as never, repository() as never, repository() as never,
+      repository() as never, openRouter as never, local as never,
+      config({ AI_PREFER_LOCAL: 'true', OPENROUTER_API_KEY: 'configured' }) as never,
+      {} as never, {} as never, { getPriceByType: jest.fn(async () => ({ value: 6000000 })) } as never,
+    )
+
+    const result = await service.chat({ task: 'assistant', prompt: 'یک انگشتر مینیمال ۳ گرم طراحی کن', userId: 'user-1' })
+
+    expect(result.raw).toEqual(expect.objectContaining({ design: expect.objectContaining({ weight: 3 }) }))
+    expect(openRouter.chat).not.toHaveBeenCalled()
+  })
+
   it('forwards an explicitly selected allow-listed model to OpenRouter', async () => {
     const openRouter = {
       toPublicProvider: jest.fn((provider) => ({ key: provider.key, modelId: 'default/model', configured: true })),

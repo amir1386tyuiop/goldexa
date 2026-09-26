@@ -150,7 +150,10 @@ export class AiEngineService {
   }
 
   async chat(input: RunAiTaskInput): Promise<AiRunResult> {
-    if (this.preferLocal() && !this.configuredOpenRouter()) {
+    // The local design builder is the first-party experience used by the
+    // workspace. An OpenRouter key may exist for other tasks, but it must not
+    // silently replace the local builder while local preference is enabled.
+    if (this.preferLocal() && this.localAiClient.isConfigured()) {
       return this.runLocalDesignChat(input)
     }
     return this.runTask({ ...input, task: 'assistant' })
