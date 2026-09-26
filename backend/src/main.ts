@@ -6,6 +6,7 @@ import { existsSync, mkdirSync } from 'fs'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { getSecurityConfig } from './common/security-config'
+import { isAllowedMutationOrigin, isUnsafeMethod } from './common/origin-policy'
 
 async function bootstrap() {
   const { isProduction, origins } = getSecurityConfig()
@@ -15,6 +16,15 @@ async function bootstrap() {
   app.enableCors({
     origin: origins,
     credentials: true,
+  })
+
+  app.use((request, response, next) => {
+    const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined
+    if (isUnsafeMethod(request.method) && !isAllowedMutationOrigin(origin, origins)) {
+      response.status(403).json({ statusCode: 403, message: 'Origin مجاز نیست' })
+      return
+    }
+    next()
   })
 
   app.set('trust proxy', 1)
