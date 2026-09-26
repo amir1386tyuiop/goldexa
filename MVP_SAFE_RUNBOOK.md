@@ -20,6 +20,20 @@ npm run test:security
 
 5. تا pass شدن security gate و اجرای e2e روی test environment، endpointهای مالی و مدیریتی را در اختیار کاربر واقعی قرار ندهید.
 
+برای اجرای E2E واقعی روی stack ایزوله‌ی PostgreSQL/Redis در Windows PowerShell:
+
+```powershell
+docker compose -f backend/test/docker-compose.e2e.yml up -d --build
+$env:E2E_BASE_URL='http://localhost:3011'
+$env:E2E_ALLOW_DB_FIXTURES='1'
+$env:DB_HOST='localhost'; $env:DB_PORT='55432'
+$env:DB_USERNAME='goldeksa_e2e'; $env:DB_PASSWORD='goldeksa_e2e_only'; $env:DB_DATABASE='goldeksa_e2e'
+cd backend
+npm run test:e2e -- --runInBand
+```
+
+در پایان stack تست را با `docker compose -f backend/test/docker-compose.e2e.yml down -v` جمع کنید؛ این volume فقط متعلق به محیط E2E است.
+
 ## کنترل‌های runtime
 
 - CORS فقط originهای صریح `FRONTEND_URL` را می‌پذیرد؛ wildcard و origin نامعتبر رد می‌شود.
