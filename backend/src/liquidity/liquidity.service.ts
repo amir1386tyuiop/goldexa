@@ -28,7 +28,7 @@ export class LiquidityService {
         assetId: data.assetId ?? null,
         listingId: data.listingId ?? null,
         notes: data.notes ?? null,
-        status: (data.status as LiquidityRequestStatus | undefined) || LiquidityRequestStatus.DRAFT,
+        status: LiquidityRequestStatus.DRAFT,
       }),
     )
   }
@@ -68,7 +68,7 @@ export class LiquidityService {
         category: data.category ?? null,
         minWeight: data.minWeight ?? 0,
         maxWeight: data.maxWeight ?? 0,
-        status: (data.status as BuyerRequestStatus | undefined) || BuyerRequestStatus.OPEN,
+        status: BuyerRequestStatus.OPEN,
       }),
     )
   }
