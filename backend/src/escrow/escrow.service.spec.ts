@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { BadRequestException, ForbiddenException } from '@nestjs/common'
 import { DataSource } from 'typeorm'
+import { QueryFailedError } from 'typeorm'
 import { EscrowService } from './escrow.service'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
 import { MarketplaceRating } from './marketplace-rating.entity'
@@ -104,6 +105,17 @@ describe('EscrowService security boundaries', () => {
     })
     await expect(service.createPayment({ buyerId: 'buyer-1', listingId: 'listing-1', amount: 100 }))
       .rejects.toThrow('listing برای پرداخت فعال نیست')
+  })
+
+  it('translates a database uniqueness race into an active-escrow conflict', async () => {
+    listingRepository.findOneBy.mockResolvedValue({
+      id: 'listing-1', sellerId: 'seller-1', status: UsedGoldListingStatus.ACTIVE,
+      saleType: UsedGoldListingSaleType.DIRECT, fixedPrice: 100,
+    })
+    escrowRepository.save.mockRejectedValueOnce(new QueryFailedError('INSERT', [], { code: '23505' } as never))
+
+    await expect(service.createPayment({ buyerId: 'buyer-1', listingId: 'listing-1', amount: 100 }))
+      .rejects.toThrow('برای این معامله یک escrow فعال از قبل وجود دارد')
   })
 
   it('requires the winning bidder and authoritative amount for auction payment', async () => {

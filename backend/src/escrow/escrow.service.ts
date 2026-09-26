@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { DataSource, EntityManager, Repository } from 'typeorm'
+import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm'
 import { EscrowPayment, EscrowPaymentStatus } from './escrow-payment.entity'
 import { MarketplaceRating } from './marketplace-rating.entity'
 import {
@@ -83,27 +83,36 @@ export class EscrowService {
     })
     if (existing) throw new BadRequestException('برای این معامله یک escrow فعال از قبل وجود دارد')
 
-    return this.escrowRepository.save(
-      this.escrowRepository.create({
-        ...data,
-        buyerId: data.buyerId,
-        sellerId,
-        listingId: data.listingId ?? null,
-        auctionId: data.auctionId ?? null,
-        orderId: data.orderId ?? null,
-        fee: data.fee ?? 0,
-        authority: data.authority ?? null,
-        paymentUrl: data.paymentUrl ?? null,
-        trackingCode: data.trackingCode ?? null,
-        disputeReason: null,
-        disputedBy: null,
-        disputedAt: null,
-        resolutionNote: null,
-        resolvedAt: null,
-        // Funds are not considered held until the payment provider confirms them.
-        status: EscrowPaymentStatus.INITIATED,
-      }),
-    )
+    try {
+      return await this.escrowRepository.save(
+        this.escrowRepository.create({
+          ...data,
+          buyerId: data.buyerId,
+          sellerId,
+          listingId: data.listingId ?? null,
+          auctionId: data.auctionId ?? null,
+          orderId: data.orderId ?? null,
+          fee: data.fee ?? 0,
+          authority: data.authority ?? null,
+          paymentUrl: data.paymentUrl ?? null,
+          trackingCode: data.trackingCode ?? null,
+          disputeReason: null,
+          disputedBy: null,
+          disputedAt: null,
+          resolutionNote: null,
+          resolvedAt: null,
+          // Funds are not considered held until the payment provider confirms them.
+          status: EscrowPaymentStatus.INITIATED,
+        }),
+      )
+    } catch (error) {
+      // The database partial unique index is the race-safe final guard. Convert
+      // its violation into the same domain error as the pre-check above.
+      if (error instanceof QueryFailedError && (error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23505') {
+        throw new BadRequestException('برای این معامله یک escrow فعال از قبل وجود دارد')
+      }
+      throw error
+    }
   }
 
   private async resolveSellerId(data: CreateEscrowPaymentDto): Promise<string> {

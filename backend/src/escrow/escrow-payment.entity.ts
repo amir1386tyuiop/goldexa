@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
 
 export enum EscrowPaymentStatus {
   INITIATED = 'initiated',
@@ -11,6 +11,14 @@ export enum EscrowPaymentStatus {
 }
 
 @Entity('escrow_payments')
+@Index('idx_escrow_active_listing_buyer_unique', ['listingId', 'buyerId'], {
+  unique: true,
+  where: '"listing_id" IS NOT NULL AND "status" = \'initiated\'',
+})
+@Index('idx_escrow_active_auction_buyer_unique', ['auctionId', 'buyerId'], {
+  unique: true,
+  where: '"auction_id" IS NOT NULL AND "status" = \'initiated\'',
+})
 export class EscrowPayment {
   @PrimaryGeneratedColumn('uuid')
   id: string

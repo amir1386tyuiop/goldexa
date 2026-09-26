@@ -1076,6 +1076,12 @@ CREATE INDEX idx_ai_design_recommendations_user_id ON ai_design_recommendations(
 CREATE INDEX idx_ai_market_matches_buyer_id ON ai_market_matches(buyer_id);
 CREATE INDEX idx_escrow_payments_order_id ON escrow_payments(order_id);
 CREATE UNIQUE INDEX idx_escrow_payments_idempotency ON escrow_payments(idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE UNIQUE INDEX idx_escrow_active_listing_buyer_unique
+    ON escrow_payments (listing_id, buyer_id)
+    WHERE listing_id IS NOT NULL AND status = 'initiated';
+CREATE UNIQUE INDEX idx_escrow_active_auction_buyer_unique
+    ON escrow_payments (auction_id, buyer_id)
+    WHERE auction_id IS NOT NULL AND status = 'initiated';
 CREATE INDEX idx_marketplace_ratings_reviewee_id ON marketplace_ratings(reviewee_id);
 CREATE INDEX idx_payment_transactions_order_id ON payment_transactions(order_id);
 CREATE INDEX idx_order_tracking_events_order_id ON order_tracking_events(order_id);
