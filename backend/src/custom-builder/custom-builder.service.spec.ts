@@ -39,4 +39,17 @@ describe('CustomBuilderService', () => {
     })
     expect(result).toMatchObject({ estimatedGoldPrice: 2000, laborCost: 240, profit: 179, tax: 1, totalPrice: 2423 })
   })
+
+  it('ignores forged version totals and keeps the server-side design price', async () => {
+    designs.findOneBy.mockResolvedValue({ ...design, karat: 18 })
+    versions.save.mockImplementation(async (value) => value)
+    const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never)
+    const result = await service.createDesignVersion(
+      'd1',
+      { version: 2, changes: { title: 'updated' }, totalPrice: 1 },
+      'u1',
+    )
+    expect(result.totalPrice).toBe(140)
+    expect(designs.save).toHaveBeenCalledWith(expect.objectContaining({ totalPrice: 140 }))
+  })
 })
