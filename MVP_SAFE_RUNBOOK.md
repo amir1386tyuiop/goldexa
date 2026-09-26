@@ -64,7 +64,8 @@ curl --fail https://api.example.com/health
 4. backup رمزگذاری‌شده PostgreSQL و آزمون restore ثبت‌شده داشته باشید.
 5. بعد از deploy، وضعیت `docker compose ps` و `/health` را بررسی کنید و لاگ‌های
    migration/backend را نگه دارید.
-6. Grafana با datasource و dashboard پایه‌ی Goldexa به‌صورت خودکار provision می‌شود؛
+6. Prometheus و Grafana healthcheck دارند و Grafana فقط بعد از ready شدن Prometheus
+   بالا می‌آید. Grafana با datasource و dashboard پایه‌ی Goldexa به‌صورت خودکار provision می‌شود؛
    دسترسی آن را فقط از شبکه‌ی مدیریت و با secret اختصاصی باز کنید.
 
 ## CI/CD
