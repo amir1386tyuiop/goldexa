@@ -842,6 +842,7 @@ export interface Cart {
   id: string
   userId: string
   isActive: boolean
+  items?: CartItem[]
   createdAt: string
   updatedAt: string
 }

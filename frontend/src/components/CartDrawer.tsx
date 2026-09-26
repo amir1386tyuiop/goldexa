@@ -1,8 +1,11 @@
+import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, X } from 'lucide-react'
 import { useStore } from '@/store/store'
 import { cn } from '@/lib/utils'
 import { formatPrice } from '@/utils/helpers'
+import { api } from '@/api/client'
+import { getStoredAuth } from '@/auth'
 
 export function CartDrawer() {
   const navigate = useNavigate()
@@ -14,8 +17,65 @@ export function CartDrawer() {
     updateQuantity,
     getCartTotal,
     getCartCount,
+    showToast,
     toast,
   } = useStore()
+  const replaceCart = useStore((state) => state.replaceCart)
+  const auth = getStoredAuth()
+  const userId = auth?.user.id || ''
+  const hydratedUser = useRef('')
+  const syncing = useRef(false)
+
+  const syncCart = useCallback(async (items: typeof cart, ownerId: string) => {
+    if (syncing.current) return
+    syncing.current = true
+    try {
+      const backendCart = (await api.getCart(ownerId)) || (await api.createCart(ownerId))
+      await api.clearCart(backendCart.id)
+      await Promise.all(items.map((item) => api.addCartItem({
+        cartId: backendCart.id,
+        productId: item.product.id,
+        quantity: item.quantity,
+      })))
+    } finally {
+      syncing.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!userId || hydratedUser.current === userId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const backendCart = await api.getCart(userId)
+        const serverItems = backendCart?.items || []
+        const localItems = useStore.getState().cart
+        if (!localItems.length && serverItems.length) {
+          const items = await Promise.all(serverItems.map(async (item) => ({
+            product: await api.getProduct(item.productId),
+            quantity: item.quantity,
+            reservedUntil: item.reservedUntil || new Date().toISOString(),
+            backendItemId: item.id,
+          })))
+          if (!cancelled) replaceCart(items)
+        } else if (localItems.length) {
+          await syncCart(localItems, userId)
+        }
+        if (!cancelled) hydratedUser.current = userId
+      } catch {
+        if (!cancelled) showToast('همگام‌سازی سبد خرید انجام نشد.', 'error')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [replaceCart, showToast, syncCart, userId])
+
+  useEffect(() => {
+    if (!userId || hydratedUser.current !== userId || syncing.current) return
+    const timer = window.setTimeout(() => {
+      void syncCart(cart, userId).catch(() => showToast('به‌روزرسانی رزرو سبد انجام نشد.', 'error'))
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [cart, showToast, syncCart, userId])
   const total = getCartTotal()
   const count = getCartCount()
 
