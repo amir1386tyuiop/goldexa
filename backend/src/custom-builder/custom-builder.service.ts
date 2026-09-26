@@ -13,11 +13,13 @@ import {
   JewelryBaseType,
 } from './jewelry-design.entity'
 import { JewelryDesignVersion } from './jewelry-design-version.entity'
+import { JewelryDesignStage, JewelryDesignStageStatus } from './jewelry-design-stage.entity'
 import {
   CreateCustomBuilderQuoteDto,
   CreateGemstoneDto,
   CreateJewelryDesignDto,
   CreateJewelryDesignVersionDto,
+  CreateJewelryDesignStageDto,
 } from './create-custom-builder.dto'
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 import { GoldPriceType } from '../gold-pricing/gold-price.entity'
@@ -34,6 +36,8 @@ export class CustomBuilderService {
     @InjectRepository(CustomBuilderQuote)
     private quoteRepository: Repository<CustomBuilderQuote>,
     @Optional() private readonly goldPricing?: GoldPricingService,
+    @Optional() @InjectRepository(JewelryDesignStage)
+    private readonly stageRepository?: Repository<JewelryDesignStage>,
   ) {}
 
   async findDesigns(): Promise<JewelryDesign[]> {
@@ -78,6 +82,26 @@ export class CustomBuilderService {
   async findDesignVersions(designId: string, userId?: string, isAdmin = false): Promise<JewelryDesignVersion[]> {
     await this.assertDesignOwner(designId, userId, isAdmin)
     return this.versionRepository.findBy({ designId })
+  }
+
+  async findDesignStages(designId: string, userId?: string, isAdmin = false): Promise<JewelryDesignStage[]> {
+    await this.assertDesignOwner(designId, userId, isAdmin)
+    if (!this.stageRepository) return []
+    return this.stageRepository.find({ where: { designId }, order: { createdAt: 'ASC' } })
+  }
+
+  async createDesignStage(designId: string, data: CreateJewelryDesignStageDto): Promise<JewelryDesignStage> {
+    const design = await this.designRepository.findOneBy({ id: designId })
+    if (!design) throw new NotFoundException('طرح یافت نشد')
+    if (!this.stageRepository) throw new NotFoundException('مخزن مرحله‌های ساخت آماده نیست')
+    return this.stageRepository.save(this.stageRepository.create({
+      designId,
+      title: data.title.trim(),
+      status: (data.status as JewelryDesignStageStatus | undefined) || JewelryDesignStageStatus.PLANNED,
+      note: data.note?.trim() || null,
+      imageUrl: data.imageUrl?.trim() || null,
+      modelUrl: data.modelUrl?.trim() || null,
+    }))
   }
 
   async createDesignVersion(

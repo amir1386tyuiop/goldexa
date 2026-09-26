@@ -6,6 +6,7 @@ import {
   CreateGemstoneDto,
   CreateJewelryDesignDto,
   CreateJewelryDesignVersionDto,
+  CreateJewelryDesignStageDto,
   UpdateCustomBuilderQuoteStatusDto,
   UpdateJewelryDesignStatusDto,
 } from './create-custom-builder.dto'
@@ -44,6 +45,14 @@ export class CustomBuilderController {
   @UseGuards(JwtAuthGuard)
   @Post('designs/:id/versions')
   async createDesignVersion(@Param('id') id: string, @Body() body: CreateJewelryDesignVersionDto, @Req() req: AuthenticatedRequest) { return this.customBuilderService.createDesignVersion(id, body, req.user.sub, isAdmin(req.user)) }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('designs/:id/stages')
+  async findDesignStages(@Param('id') id: string, @Req() req: AuthenticatedRequest) { return this.customBuilderService.findDesignStages(id, req.user.sub, isAdmin(req.user)) }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Post('designs/:id/stages')
+  async createDesignStage(@Param('id') id: string, @Body() body: CreateJewelryDesignStageDto) { return this.customBuilderService.createDesignStage(id, body) }
 
   @UseGuards(JwtAuthGuard)
   @Patch('designs/:id/status')

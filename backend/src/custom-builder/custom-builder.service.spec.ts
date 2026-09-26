@@ -52,4 +52,11 @@ describe('CustomBuilderService', () => {
     expect(result.totalPrice).toBe(140)
     expect(designs.save).toHaveBeenCalledWith(expect.objectContaining({ totalPrice: 140 }))
   })
+
+  it('lets the admin create a build stage linked to an existing design', async () => {
+    designs.findOneBy.mockResolvedValue({ ...design, id: 'd1' })
+    const stages = { create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
+    const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never, undefined, stages as never)
+    await expect(service.createDesignStage('d1', { title: 'ساخت اولیه', status: 'in_progress', modelUrl: '/models/ring.glb' })).resolves.toMatchObject({ designId: 'd1', status: 'in_progress', modelUrl: '/models/ring.glb' })
+  })
 })

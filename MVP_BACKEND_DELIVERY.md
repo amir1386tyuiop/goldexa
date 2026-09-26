@@ -99,6 +99,7 @@
 - هنگام قطع منبع قیمت، علاوه بر audit/log به همه‌ی کاربران admin اعلان in-app `gold_price_source_down` ارسال می‌شود؛ خطای notification هرگز feed قیمت را متوقف نمی‌کند.
 - ممیزی dependency در این مرحله، Axios را به `1.20.0`، Sharp را به `0.35.4`، TypeORM را به `0.3.31` و Socket.IO parser را به `4.2.7` ارتقا داد؛ آسیب‌پذیری‌های باقی‌مانده به زنجیره‌ی Nest 10 و ابزارهای transitive مربوط‌اند و رفع کامل آن‌ها نیازمند migration کنترل‌شده به Nest 12 است، بنابراین `npm audit fix --force` اجرا نشده است.
 - Custom Builder قیمت design و version را از قیمت زنده‌ی ۱۸ عیار، اجرت، سود و مالیات سمت سرور محاسبه می‌کند؛ مبلغ‌های forged ارسالی frontend نادیده گرفته می‌شوند و audit خودکار mutation routeها در `scripts/audit-route-guards.mjs` به CI متصل است.
+- برای پنل مدیریت v2، جدول و API مرحله‌های ساخت سفارشی (`GET/POST /custom-builder/designs/:id/stages`) با migration، کنترل مالکیت و دسترسی admin اضافه شد؛ asset upload مرحله و workflow کامل UI در backlog باقی است.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.

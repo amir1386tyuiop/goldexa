@@ -85,3 +85,20 @@ export class UpdateCustomBuilderQuoteStatusDto {
   @IsIn(['draft', 'sent', 'accepted', 'rejected', 'expired'])
   status: string
 }
+
+export class CreateJewelryDesignStageDto {
+  @IsString() @Min(2) @Max(160)
+  title: string
+
+  @IsIn(['planned', 'in_progress', 'completed']) @IsOptional()
+  status?: string
+
+  @IsString() @IsOptional() @Max(4000)
+  note?: string | null
+
+  @IsString() @IsOptional() @Max(2048)
+  imageUrl?: string | null
+
+  @IsString() @IsOptional() @Max(2048)
+  modelUrl?: string | null
+}
