@@ -169,6 +169,14 @@ export class GoldPricingService implements OnModuleInit {
     const source = (this.configService.get<string>('GOLD_PRICE_SOURCE') ?? '').toLowerCase()
     const apiUrl = this.configService.get<string>('GOLD_PRICE_API_URL')
     const apiKey = this.configService.get<string>('GOLD_PRICE_API_KEY')
+    const hasExternalSource = source === 'tgju' || Boolean(apiUrl)
+
+    const fallbackToLastValid = async (reason: string): Promise<GoldPrice[]> => {
+      const lastValid = await this.getLastValidPrices()
+      if (lastValid.length) return lastValid
+      if (!hasExternalSource && process.env.NODE_ENV !== 'production') return this.getMockPrices()
+      throw new Error(`${reason}; هیچ قیمت معتبر قبلی برای fallback وجود ندارد`)
+    }
 
     // Preferred MVP source: tgju.org
     if (source === 'tgju' || (apiUrl && apiUrl.includes('tgju'))) {
@@ -178,12 +186,12 @@ export class GoldPricingService implements OnModuleInit {
         return prices
       } catch (error) {
         await this.markSourceDown(`tgju: ${(error as Error).message}`)
-        return this.getMockPrices()
+        return fallbackToLastValid('tgju در دسترس نیست')
       }
     }
 
     if (!apiUrl) {
-      // No external source configured — mock feed is the intended source here.
+      // No external source configured: mock is development-only bootstrap data.
       return this.getMockPrices()
     }
 
@@ -206,10 +214,10 @@ export class GoldPricingService implements OnModuleInit {
       }
 
       await this.markSourceDown('API returned an unexpected payload shape')
-      return this.getMockPrices()
+      return fallbackToLastValid('ساختار پاسخ API قیمت نامعتبر است')
     } catch (error) {
       await this.markSourceDown(`API: ${(error as Error).message}`)
-      return this.getMockPrices()
+      return fallbackToLastValid('API قیمت در دسترس نیست')
     }
   }
 
@@ -333,6 +341,12 @@ export class GoldPricingService implements OnModuleInit {
       where: { type, isValid: true },
       order: { createdAt: 'DESC' },
     })
+  }
+
+  private async getLastValidPrices(): Promise<GoldPrice[]> {
+    const types = [GoldPriceType.GOLD_18, GoldPriceType.MIZANEH, GoldPriceType.OUNCE, GoldPriceType.COIN]
+    const prices = await Promise.all(types.map((type) => this.getPriceByTypeFromDb(type)))
+    return prices.filter((price): price is GoldPrice => price !== null)
   }
 
   private async appendHistory(price: GoldPrice, source: string): Promise<void> {
