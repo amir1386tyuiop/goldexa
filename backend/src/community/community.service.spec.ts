@@ -1,6 +1,8 @@
 import { CommunityService } from './community.service'
 
 describe('CommunityService', () => {
+  const users = { findOneBy: jest.fn() }
+
   it('returns comments for a post in chronological order', async () => {
     const comments = { find: jest.fn().mockResolvedValue([{ id: 'c1', postId: 'p1', body: 'عالی است' }]) }
     const service = new CommunityService(
@@ -8,9 +10,51 @@ describe('CommunityService', () => {
       {} as never,
       comments as never,
       {} as never,
+      users as never,
     )
 
     await expect(service.findComments('p1')).resolves.toEqual([{ id: 'c1', postId: 'p1', body: 'عالی است' }])
     expect(comments.find).toHaveBeenCalledWith({ where: { postId: 'p1' }, order: { createdAt: 'ASC' } })
+  })
+
+  it('uses the authenticated user name from the database when creating a post', async () => {
+    const posts = {
+      create: jest.fn((value) => value),
+      save: jest.fn(async (value) => value),
+    }
+    users.findOneBy.mockResolvedValue({ id: 'u1', name: 'نام واقعی' })
+    const service = new CommunityService(
+      {} as never,
+      posts as never,
+      {} as never,
+      {} as never,
+      users as never,
+    )
+
+    await service.createPost({
+      userId: 'u1',
+      userName: 'نام جعلی',
+      title: 'طرح',
+      description: 'توضیح',
+    })
+
+    expect(posts.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', userName: 'نام واقعی' }))
+  })
+
+  it('uses the authenticated user name from the database when creating a comment', async () => {
+    const posts = { findOneBy: jest.fn().mockResolvedValue({ id: 'p1', commentsCount: 0 }), save: jest.fn() }
+    const comments = { create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
+    users.findOneBy.mockResolvedValue({ id: 'u1', name: 'نام واقعی' })
+    const service = new CommunityService(
+      {} as never,
+      posts as never,
+      comments as never,
+      {} as never,
+      users as never,
+    )
+
+    await service.addComment('p1', { userId: 'u1', userName: 'نام جعلی', body: 'نظر' })
+
+    expect(comments.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', userName: 'نام واقعی' }))
   })
 })

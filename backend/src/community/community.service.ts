@@ -5,6 +5,7 @@ import { DesignChallenge, DesignChallengeStatus } from './design-challenge.entit
 import { DesignPost, DesignPostStatus } from './design-post.entity'
 import { DesignComment } from './design-comment.entity'
 import { DesignVote } from './design-vote.entity'
+import { User } from '../users/user.entity'
 import {
   CreateDesignChallengeDto,
   CreateDesignCommentDto,
@@ -22,6 +23,8 @@ export class CommunityService {
     private commentRepository: Repository<DesignComment>,
     @InjectRepository(DesignVote)
     private voteRepository: Repository<DesignVote>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async findChallenges(): Promise<DesignChallenge[]> {
@@ -46,9 +49,16 @@ export class CommunityService {
   }
 
   async createPost(data: CreateDesignPostDto): Promise<DesignPost> {
+    const user = await this.userRepository.findOneBy({ id: data.userId })
+
+    if (!user) {
+      throw new NotFoundException('کاربر یافت نشد')
+    }
+
     return this.postRepository.save(
       this.postRepository.create({
         ...data,
+        userName: user.name,
         imageUrl: data.imageUrl ?? null,
         modelUrl: data.modelUrl ?? null,
         challengeId: data.challengeId ?? null,
@@ -64,10 +74,16 @@ export class CommunityService {
       throw new NotFoundException('طرح یافت نشد')
     }
 
+    const user = await this.userRepository.findOneBy({ id: data.userId })
+
+    if (!user) {
+      throw new NotFoundException('کاربر یافت نشد')
+    }
+
     const comment = this.commentRepository.create({
       postId,
       userId: data.userId,
-      userName: data.userName,
+      userName: user.name,
       body: data.body,
     })
 

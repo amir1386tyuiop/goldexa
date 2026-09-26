@@ -6,9 +6,10 @@ import { DesignComment } from './design-comment.entity'
 import { DesignVote } from './design-vote.entity'
 import { CommunityController } from './community.controller'
 import { CommunityService } from './community.service'
+import { User } from '../users/user.entity'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DesignChallenge, DesignPost, DesignComment, DesignVote])],
+  imports: [TypeOrmModule.forFeature([DesignChallenge, DesignPost, DesignComment, DesignVote, User])],
   controllers: [CommunityController],
   providers: [CommunityService],
   exports: [CommunityService],
