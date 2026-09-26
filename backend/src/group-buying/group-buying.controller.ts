@@ -18,8 +18,9 @@ export class GroupBuyingController {
   constructor(private readonly groupBuyingService: GroupBuyingService) {}
 
   @Get()
-  async findAll() {
-    return this.groupBuyingService.findAll()
+  async findAll(@Req() req: AuthenticatedRequest) {
+    const isAdmin = req.user.role === 'admin' || req.user.roleNames?.includes('admin') === true
+    return this.groupBuyingService.findAll(req.user.sub, isAdmin)
   }
 
   @Get(':id')

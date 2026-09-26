@@ -76,8 +76,15 @@ export class GroupBuyingService {
     }
   }
 
-  async findAll(): Promise<GroupBuyingGroup[]> {
-    return this.groupRepository.find({ order: { createdAt: 'DESC' } })
+  async findAll(actorId?: string, isAdmin = false): Promise<GroupBuyingGroup[]> {
+    const groups = await this.groupRepository.find({ order: { createdAt: 'DESC' } })
+    return Promise.all(groups.map(async (group) => {
+      if (isAdmin || group.leaderId === actorId) return group
+      const isMember = actorId
+        ? Boolean(await this.memberRepository.findOneBy({ groupId: group.id, userId: actorId }))
+        : false
+      return isMember ? group : { ...group, inviteCode: '' }
+    }))
   }
 
   async findOne(id: string, actorId?: string, isAdmin = false): Promise<{
