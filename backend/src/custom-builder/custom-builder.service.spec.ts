@@ -23,4 +23,20 @@ describe('CustomBuilderService', () => {
     const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never)
     await expect(service.updateDesignStatus('d1', JewelryDesignStatus.APPROVED, 'u1')).rejects.toThrow()
   })
+
+  it('ignores forged design pricing when live gold pricing is available', async () => {
+    const service = new CustomBuilderService(
+      designs as never,
+      versions as never,
+      gemstones as never,
+      quotes as never,
+      { getPriceByType: jest.fn().mockResolvedValue({ value: 1000 }) } as never,
+    )
+    designs.save.mockImplementation(async (value) => ({ id: 'd1', ...value }))
+    const result = await service.createDesign({
+      userId: 'u1', title: 'Ring', category: 'ring', weight: 2, karat: 18,
+      estimatedGoldPrice: 1, laborCost: 1, profit: 1, tax: 1, totalPrice: 1,
+    })
+    expect(result).toMatchObject({ estimatedGoldPrice: 2000, laborCost: 240, profit: 179, tax: 1, totalPrice: 2423 })
+  })
 })

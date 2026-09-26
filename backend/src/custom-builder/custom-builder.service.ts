@@ -55,6 +55,7 @@ export class CustomBuilderService {
   }
 
   async createDesign(data: CreateJewelryDesignDto): Promise<JewelryDesign> {
+    const pricing = await this.calculateBuilderPricing(data.weight, data.karat ?? 18, data)
     const design = this.designRepository.create({
       ...data,
       baseType: (data.baseType as JewelryBaseType | undefined) || JewelryBaseType.SIMPLE,
@@ -67,11 +68,7 @@ export class CustomBuilderService {
       imageUrl: data.imageUrl ?? null,
       modelUrl: data.modelUrl ?? null,
       preview3dUrl: data.preview3dUrl ?? null,
-      estimatedGoldPrice: data.estimatedGoldPrice ?? 0,
-      laborCost: data.laborCost ?? 0,
-      profit: data.profit ?? 0,
-      tax: data.tax ?? 9,
-      totalPrice: data.totalPrice ?? 0,
+      ...pricing,
       status: JewelryDesignStatus.DRAFT,
     })
 
@@ -96,15 +93,16 @@ export class CustomBuilderService {
     }
     if (userId && !isAdmin && design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
 
+    const pricing = await this.calculateBuilderPricing(Number(design.weight), Number(design.karat), design)
     const version = this.versionRepository.create({
       designId,
       version: data.version,
       changes: data.changes,
-      totalPrice: data.totalPrice,
+      totalPrice: pricing.totalPrice,
       modelUrl: data.modelUrl ?? null,
     })
 
-    design.totalPrice = data.totalPrice
+    Object.assign(design, pricing)
     await this.designRepository.save(design)
     return this.versionRepository.save(version)
   }
@@ -182,6 +180,34 @@ export class CustomBuilderService {
         status: CustomBuilderQuoteStatus.DRAFT,
       }),
     )
+  }
+
+  private async calculateBuilderPricing(weight: number, karat: number, fallback: {
+    estimatedGoldPrice?: number
+    laborCost?: number
+    profit?: number
+    tax?: number
+    totalPrice?: number
+  }): Promise<{ estimatedGoldPrice: number; laborCost: number; profit: number; tax: number; totalPrice: number }> {
+    const livePrice = this.goldPricing
+      ? Number((await this.goldPricing.getPriceByType(GoldPriceType.GOLD_18))?.value || 0)
+      : 0
+    if (this.goldPricing && !livePrice) throw new NotFoundException('قیمت لحظه‌ای طلا در دسترس نیست')
+    if (!livePrice) {
+      return {
+        estimatedGoldPrice: Number(fallback.estimatedGoldPrice || 0),
+        laborCost: Number(fallback.laborCost || 0),
+        profit: Number(fallback.profit || 0),
+        tax: Number(fallback.tax ?? 9),
+        totalPrice: Number(fallback.totalPrice || 0),
+      }
+    }
+    const rawGold = livePrice * Number(weight) * (Number(karat || 18) / 18)
+    const laborCost = Math.round(rawGold * 0.12)
+    const profit = Math.round((rawGold + laborCost) * 0.08)
+    const tax = Number(fallback.tax ?? 9)
+    const totalPrice = Math.round(rawGold + laborCost + profit + ((laborCost + profit) * tax) / 100)
+    return { estimatedGoldPrice: Math.round(rawGold), laborCost, profit, tax, totalPrice }
   }
 
   async updateQuoteStatus(id: string, status: string, userId?: string, isAdmin = false): Promise<CustomBuilderQuote | null> {
