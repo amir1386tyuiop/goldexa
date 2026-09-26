@@ -80,6 +80,15 @@ describe('PricingService.calculate (Iranian retail formula)', () => {
     expect(goldPricing.getPriceByType).toHaveBeenCalledWith(GoldPriceType.GOLD_18)
   })
 
+  it('deduplicates concurrent pricing context loads for catalog fan-out', async () => {
+    await Promise.all([
+      service.calculateProductPrice({ category: 'ring', weight: 1, karat: 18 }),
+      service.calculateProductPrice({ category: 'ring', weight: 2, karat: 18 }),
+    ])
+
+    expect(goldPricing.getPriceByType).toHaveBeenCalledTimes(1)
+  })
+
   it('stores a five-minute quote through the namespaced cache', async () => {
     const result = await service.createQuote('ring', 1)
 

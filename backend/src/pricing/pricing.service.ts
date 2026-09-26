@@ -17,6 +17,10 @@ import {
 
 @Injectable()
 export class PricingService {
+  private static readonly CALCULATION_CACHE_TTL_MS = 5_000
+  private readonly calculationCache = new Map<string, { expiresAt: number; value: { rule: PricingRule | null; spreadRule: PricingSpread | null; taxRule: TaxRule | null; laborRule: LaborCostRule | null; pricePerGram: number } }>()
+  private readonly calculationInFlight = new Map<string, Promise<{ rule: PricingRule | null; spreadRule: PricingSpread | null; taxRule: TaxRule | null; laborRule: LaborCostRule | null; pricePerGram: number }>>()
+
   constructor(
     @InjectRepository(PricingRule)
     private ruleRepository: Repository<PricingRule>,
@@ -35,7 +39,7 @@ export class PricingService {
   }
 
   async createRule(data: CreatePricingRuleDto): Promise<PricingRule> {
-    return this.ruleRepository.save(
+    const result = await this.ruleRepository.save(
       this.ruleRepository.create({
         ...data,
         description: data.description ?? null,
@@ -45,6 +49,9 @@ export class PricingService {
         isActive: data.isActive ?? true,
       }),
     )
+    this.calculationCache.clear()
+    this.calculationInFlight.clear()
+    return result
   }
 
   async findSpreads(): Promise<PricingSpread[]> {
@@ -52,12 +59,15 @@ export class PricingService {
   }
 
   async createSpread(data: CreatePricingSpreadDto): Promise<PricingSpread> {
-    return this.spreadRepository.save(
+    const result = await this.spreadRepository.save(
       this.spreadRepository.create({
         ...data,
         isActive: data.isActive ?? true,
       }),
     )
+    this.calculationCache.clear()
+    this.calculationInFlight.clear()
+    return result
   }
 
   async findTaxRules(): Promise<TaxRule[]> {
@@ -65,13 +75,16 @@ export class PricingService {
   }
 
   async createTaxRule(data: CreateTaxRuleDto): Promise<TaxRule> {
-    return this.taxRepository.save(
+    const result = await this.taxRepository.save(
       this.taxRepository.create({
         ...data,
         productCategory: data.productCategory ?? null,
         isActive: data.isActive ?? true,
       }),
     )
+    this.calculationCache.clear()
+    this.calculationInFlight.clear()
+    return result
   }
 
   async findLaborRules(): Promise<LaborCostRule[]> {
@@ -79,12 +92,15 @@ export class PricingService {
   }
 
   async createLaborRule(data: CreateLaborCostRuleDto): Promise<LaborCostRule> {
-    return this.laborRepository.save(
+    const result = await this.laborRepository.save(
       this.laborRepository.create({
         ...data,
         isActive: data.isActive ?? true,
       }),
     )
+    this.calculationCache.clear()
+    this.calculationInFlight.clear()
+    return result
   }
 
   /** Live 18k gold price per gram, sourced only from the pricing domain. */
@@ -118,14 +134,8 @@ export class PricingService {
       throw new Error('عیار طلا نامعتبر است')
     }
 
-    const [rule, spreadRule, taxRule, laborRule] = await Promise.all([
-      this.ruleRepository.findOne({ where: { isActive: true }, order: { createdAt: 'DESC' } }),
-      this.spreadRepository.findOneBy({ productCategory: category, isActive: true }),
-      this.taxRepository.findOneBy({ productCategory: category, isActive: true }),
-      this.laborRepository.findOneBy({ productCategory: category, isActive: true }),
-    ])
-
-    const pricePerGram = await this.getGoldPricePerGram()
+    const context = await this.getCalculationContext(category)
+    const { rule, spreadRule, taxRule, laborRule, pricePerGram } = context
     if (!pricePerGram) {
       throw new Error('قیمت لحظه‌ای طلا در دسترس نیست')
     }
@@ -164,6 +174,29 @@ export class PricingService {
       spreadPercent,
       total: Math.round(total),
     }
+  }
+
+  private async getCalculationContext(category: string) {
+    const now = Date.now()
+    const cached = this.calculationCache.get(category)
+    if (cached && cached.expiresAt > now) return cached.value
+
+    const inFlight = this.calculationInFlight.get(category)
+    if (inFlight) return inFlight
+
+    const load = Promise.all([
+      this.ruleRepository.findOne({ where: { isActive: true }, order: { createdAt: 'DESC' } }),
+      this.spreadRepository.findOneBy({ productCategory: category, isActive: true }),
+      this.taxRepository.findOneBy({ productCategory: category, isActive: true }),
+      this.laborRepository.findOneBy({ productCategory: category, isActive: true }),
+      this.getGoldPricePerGram(),
+    ]).then(([rule, spreadRule, taxRule, laborRule, pricePerGram]) => {
+      const value = { rule, spreadRule, taxRule, laborRule, pricePerGram }
+      this.calculationCache.set(category, { value, expiresAt: Date.now() + PricingService.CALCULATION_CACHE_TTL_MS })
+      return value
+    }).finally(() => this.calculationInFlight.delete(category))
+    this.calculationInFlight.set(category, load)
+    return load
   }
 
   /** Resolve a catalog product price from the latest live 18k feed. */
