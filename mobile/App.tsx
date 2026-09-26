@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { authApi } from './src/api'
+import { clearSession, getSession, type AuthSession } from './src/auth'
 
 type User = { id: string; name?: string; phone?: string; role?: string }
-type Session = { user: User; accessToken: string; refreshToken?: string }
+type Session = AuthSession
 type Product = { id: string; name: string; finalPrice: number; weight?: number; category?: string }
 type HomeFeed = { newProducts?: Product[]; featured?: Product[]; discounted?: Product[] }
 const API_URL = ((globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process?.env?.EXPO_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '')
@@ -16,12 +18,18 @@ async function api<T>(path: string, token?: string, init: RequestInit = {}): Pro
 }
 const money = (value: number) => `${Number(value || 0).toLocaleString('fa-IR')} تومان`
 
-export default function App() { const [session, setSession] = useState<Session | null>(null); return session ? <MainApp session={session} onLogout={() => setSession(null)} /> : <LoginScreen onLogin={setSession} /> }
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [hydrating, setHydrating] = useState(true)
+  useEffect(() => { void getSession().then(setSession).finally(() => setHydrating(false)) }, [])
+  if (hydrating) return <SafeAreaView style={styles.safe}><View style={styles.state}><ActivityIndicator color="#A16207" /><Text style={styles.muted}>در حال آماده‌سازی حساب…</Text></View></SafeAreaView>
+  return session ? <MainApp session={session} onLogout={() => { void clearSession(); setSession(null) }} /> : <LoginScreen onLogin={setSession} />
+}
 
 function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
   const [phone, setPhone] = useState(''); const [otp, setOtp] = useState(''); const [sentOtp, setSentOtp] = useState<string | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState<string | null>(null)
-  async function requestOtp() { setLoading(true); setError(null); try { const result = await api<{ otp?: string }>('/auth/request-otp', undefined, { method: 'POST', body: JSON.stringify({ phone, role: 'customer' }) }); setSentOtp(result.otp || null) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ارسال کد ناموفق بود') } finally { setLoading(false) } }
-  async function login() { setLoading(true); setError(null); try { const result = await api<{ user: User; accessToken?: string; token?: string; refreshToken?: string }>('/auth/login', undefined, { method: 'POST', body: JSON.stringify({ phone, otp, role: 'customer' }) }); const accessToken = result.accessToken || result.token; if (!accessToken) throw new Error('توکن ورود از سرور دریافت نشد'); onLogin({ user: result.user, accessToken, refreshToken: result.refreshToken }) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ورود ناموفق بود') } finally { setLoading(false) } }
+  async function requestOtp() { setLoading(true); setError(null); try { const result = await authApi.requestOtp(phone, 'customer'); setSentOtp(result.otp || null) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ارسال کد ناموفق بود') } finally { setLoading(false) } }
+  async function login() { setLoading(true); setError(null); try { onLogin(await authApi.loginWithOtp(phone, otp, 'customer')) } catch (cause) { setError(cause instanceof Error ? cause.message : 'ورود ناموفق بود') } finally { setLoading(false) } }
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.authContent} keyboardShouldPersistTaps="handled"><Text style={styles.brand}>Goldexa</Text><Text style={styles.title}>ورود امن به حساب</Text><Text style={styles.muted}>برای ادامه، شماره موبایل خود را وارد کنید.</Text><Text style={styles.label}>شماره موبایل</Text><TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09120000000" textAlign="right" maxLength={11} />{!sentOtp ? <Button title={loading ? 'در حال ارسال…' : 'دریافت کد ورود'} onPress={requestOtp} disabled={loading || phone.replace(/\D/g, '').length < 10} /> : <><Text style={styles.devHint}>کد تستی: {sentOtp}</Text><Text style={styles.label}>کد یک‌بارمصرف</Text><TextInput style={styles.input} value={otp} onChangeText={setOtp} keyboardType="number-pad" placeholder="123456" textAlign="right" maxLength={6} /><Button title={loading ? 'در حال ورود…' : 'ورود به حساب'} onPress={login} disabled={loading || otp.length < 4} /><Pressable onPress={() => setSentOtp(null)}><Text style={styles.link}>تغییر شماره</Text></Pressable></>}{error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}</ScrollView></SafeAreaView>
 }
 
