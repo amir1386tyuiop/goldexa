@@ -63,4 +63,22 @@ describe('security runtime configuration', () => {
       }),
     ).toThrow('HTTPS')
   })
+
+  it('rejects mock infrastructure in production', () => {
+    const base = {
+      NODE_ENV: 'production',
+      JWT_SECRET: 'ci-only-jwt-secret-at-least-32-characters-long',
+      FRONTEND_URL: 'https://goldexa.example',
+      APP_BASE_URL: 'https://api.goldexa.example',
+      CACHE_DRIVER: 'redis',
+      GOLD_PRICE_SOURCE: 'tgju',
+      ZARINPAL_MERCHANT_ID: 'merchant-test',
+      PAYMENT_MODE: 'real',
+    }
+    expect(getSecurityConfig(base).isProduction).toBe(true)
+    expect(() => getSecurityConfig({ ...base, CACHE_DRIVER: 'memory' })).toThrow('CACHE_DRIVER')
+    expect(() => getSecurityConfig({ ...base, GOLD_PRICE_SOURCE: 'mock' })).toThrow('gold price source')
+    expect(() => getSecurityConfig({ ...base, PAYMENT_MODE: 'mock' })).toThrow('payment gateway')
+    expect(() => getSecurityConfig({ ...base, ZARINPAL_MERCHANT_ID: '' })).toThrow('payment gateway')
+  })
 })

@@ -5,7 +5,7 @@ database مستقل مجاز است.
 
 1. از PostgreSQL و Redis جداگانه برای test استفاده کنید و `database/seed.sql` را فقط روی database توسعه اجرا کنید.
 2. در production هیچ secret پیش‌فرضی قابل‌قبول نیست. `JWT_SECRET` باید تصادفی، خارج از git و حداقل ۳۲ کاراکتر باشد؛ `FRONTEND_URL` و `APP_BASE_URL` باید origin کامل HTTPS باشند. برنامه در صورت نبودن این مقادیر fail-closed می‌شود.
-3. برای پرداخت از `ZARINPAL_SANDBOX=true` یا mock استفاده کنید و merchant واقعی را در test وارد نکنید.
+3. در development/test می‌توان از mock استفاده کرد؛ production باید `PAYMENT_MODE` غیر mock و merchant واقعی/ sandbox تأییدشده داشته باشد. refund آنلاین بدون provider واقعی عمداً رد می‌شود.
 4. پیش از استفاده:
 
 ```powershell

@@ -56,6 +56,21 @@ export function getSecurityConfig(env: SecurityEnvironment = process.env): Secur
       }
       throw new Error('APP_BASE_URL must be a valid absolute URL')
     }
+
+    const cacheDriver = (env.CACHE_DRIVER || '').trim().toLowerCase()
+    if (cacheDriver !== 'redis') {
+      throw new Error('CACHE_DRIVER must be redis in production')
+    }
+
+    const priceSource = (env.GOLD_PRICE_SOURCE || '').trim().toLowerCase()
+    if (priceSource === 'mock' || (!priceSource && !env.GOLD_PRICE_API_URL?.trim())) {
+      throw new Error('A real gold price source must be configured in production')
+    }
+
+    const paymentMode = (env.PAYMENT_MODE || '').trim().toLowerCase()
+    if (paymentMode === 'mock' || !env.ZARINPAL_MERCHANT_ID?.trim()) {
+      throw new Error('A real payment gateway must be configured in production')
+    }
   }
 
   return { nodeEnv, isProduction, origins }
