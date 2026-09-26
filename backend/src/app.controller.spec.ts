@@ -34,11 +34,13 @@ describe('AppController observability', () => {
         { getFeedStatus: jest.fn().mockReturnValue({ source: 'tgju', lastFetchAt: new Date(Date.now() - 181_000) }) } as never,
       )
 
-      await expect(controller.readiness()).resolves.toEqual(expect.objectContaining({
+      const response = { status: jest.fn() }
+      await expect(controller.readiness(response as never)).resolves.toEqual(expect.objectContaining({
         status: 'not_ready',
         ready: false,
         checks: { database: 'ok', cache: 'ok', priceFeed: 'degraded', paymentGateway: 'error' },
       }))
+      expect(response.status).toHaveBeenCalledWith(503)
     } finally {
       if (previousNodeEnv === undefined) delete process.env.NODE_ENV
       else process.env.NODE_ENV = previousNodeEnv
@@ -59,11 +61,13 @@ describe('AppController observability', () => {
         { getFeedStatus: jest.fn().mockReturnValue({ source: 'tgju', lastFetchAt: new Date() }) } as never,
       )
 
-      await expect(controller.readiness()).resolves.toEqual(expect.objectContaining({
+      const response = { status: jest.fn() }
+      await expect(controller.readiness(response as never)).resolves.toEqual(expect.objectContaining({
         status: 'ready',
         ready: true,
         checks: { database: 'ok', cache: 'ok', priceFeed: 'ok', paymentGateway: 'ok' },
       }))
+      expect(response.status).toHaveBeenCalledWith(200)
     } finally {
       if (previousNodeEnv === undefined) delete process.env.NODE_ENV
       else process.env.NODE_ENV = previousNodeEnv

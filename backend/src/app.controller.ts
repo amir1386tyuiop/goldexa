@@ -1,4 +1,5 @@
-import { Controller, Get, Header, Optional } from '@nestjs/common'
+import { Controller, Get, Header, Optional, Res } from '@nestjs/common'
+import { Response } from 'express'
 import { DataSource } from 'typeorm'
 import { CacheService } from './common/cache.service'
 import { GoldPricingService } from './gold-pricing/gold-pricing.service'
@@ -31,7 +32,7 @@ export class AppController {
 
   /** Dependency readiness for orchestrators and production load balancers. */
   @Get('health/ready')
-  async readiness() {
+  async readiness(@Res({ passthrough: true }) response?: Response) {
     const checks: Record<string, string> = { database: 'unknown', cache: 'unknown', priceFeed: 'unknown', paymentGateway: 'unknown' }
     try {
       await this.dataSource?.query('SELECT 1')
@@ -57,6 +58,7 @@ export class AppController {
     const productionPriceReady = !feed || checks.priceFeed === 'ok'
     const productionPaymentReady = checks.paymentGateway === 'ok'
     const ready = checks.database === 'ok' && (process.env.NODE_ENV !== 'production' || (checks.cache === 'ok' && productionPriceReady && productionPaymentReady))
+    response?.status(ready ? 200 : 503)
     return {
       service: 'Goldexa API',
       status: ready ? 'ready' : 'not_ready',
