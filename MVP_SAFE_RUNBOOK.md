@@ -49,6 +49,8 @@ npm run test:e2e -- --runInBand
 ```bash
 cp .env.example .env
 # تمام CHANGE_ME ها را با secret manager یا مقادیر تصادفی جایگزین کنید.
+# برای production واقعی: CACHE_DRIVER=redis، PAYMENT_MODE=real، merchant زرین‌پال
+# و منبع قیمت واقعی را تنظیم کنید؛ PAYMENT_MODE=mock فقط برای development/CI است.
 docker compose -f infra/docker-compose.yml config --quiet
 docker compose -f infra/docker-compose.yml up -d --build
 curl --fail https://api.example.com/health

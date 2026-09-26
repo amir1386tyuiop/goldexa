@@ -158,6 +158,8 @@ jobs:
       JWT_SECRET: ci-only-jwt-secret-for-config-validation
       FRONTEND_URL: http://localhost:5174
       APP_BASE_URL: http://localhost:3001
+      PAYMENT_MODE: mock
+      GRAFANA_ADMIN_PASSWORD: ci-only-grafana-password
     steps:
       - uses: actions/checkout@v4
       - name: Validate development compose

@@ -7,13 +7,14 @@
 و E2E واقعی با PostgreSQL و Redis اجرا و تأیید شود.
 
 - Backend build: موفق (`npm run build`).
-- Backend unit tests: suiteهای unit و security در CI اجرا می‌شوند؛ security gate routeهای حساس، احراز هویت، نقش، permission و مالکیت را بررسی می‌کند. آخرین اجرای backend شامل ۲۹ suite و ۱۷۹ تست موفق است. تست‌های E2E با PostgreSQL/Redis ایزوله‌ی compose نیز verified شده‌اند: ۴ suite و ۱۵ تست سبز. برای اجرای محلی، ابتدا `backend/test/docker-compose.e2e.yml` را بالا بیاورید و `E2E_BASE_URL=http://localhost:3011`، `E2E_ALLOW_DB_FIXTURES=1` و متغیرهای اتصال به `goldeksa_e2e` را تنظیم کنید.
+- Backend unit tests: suiteهای unit و security در CI اجرا می‌شوند؛ security gate routeهای حساس، احراز هویت، نقش، permission و مالکیت را بررسی می‌کند. آخرین اجرای backend شامل ۳۰ suite و ۱۹۰ تست موفق است. تست‌های E2E با PostgreSQL/Redis ایزوله‌ی compose نیز verified شده‌اند: ۴ suite و ۱۵ تست سبز. برای اجرای محلی، ابتدا `backend/test/docker-compose.e2e.yml` را بالا بیاورید و `E2E_BASE_URL=http://localhost:3011`، `E2E_ALLOW_DB_FIXTURES=1` و متغیرهای اتصال به `goldeksa_e2e` را تنظیم کنید.
 - E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۴ suite، ۱۵ تست موفق).
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
 - Frontend از APIهای واقعی استفاده می‌کند؛ داده‌های mock اجرایی حذف شده و صفحات سنگین به‌صورت lazy-load بارگذاری می‌شوند.
 - پرداخت امانی فروشنده و مبلغ را از listing/auction معتبر سمت سرور تطبیق می‌دهد.
 - release gate محلی برای کنترل آمادگی backend، قیمت‌گذاری، کاتالوگ، AI و routeهای کلیدی فرانت در `scripts/release-gate.mjs` قرار دارد و از ریشه با `npm run release:gate` اجرا می‌شود.
+- compose production-like تمام تنظیمات runtime حساس backend را (Redis، منبع قیمت، درگاه پرداخت، refund و AI local) از `.env` به کانتینر منتقل می‌کند؛ در production مقدارهای mock و secretهای نمونه مجاز نیستند.
 
 راهنمای تست در [backend/TESTING.md](backend/TESTING.md) و راهنمای اجرای امن MVP در [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) است.
 
