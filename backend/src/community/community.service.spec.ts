@@ -1,4 +1,5 @@
 import { CommunityService } from './community.service'
+import { DesignPostStatus } from './design-post.entity'
 
 describe('CommunityService', () => {
   const users = { findOneBy: jest.fn() }
@@ -15,6 +16,15 @@ describe('CommunityService', () => {
 
     await expect(service.findComments('p1')).resolves.toEqual([{ id: 'c1', postId: 'p1', body: 'عالی است' }])
     expect(comments.find).toHaveBeenCalledWith({ where: { postId: 'p1' }, order: { createdAt: 'ASC' } })
+  })
+
+  it('returns only published posts to the public feed', async () => {
+    const posts = { find: jest.fn().mockResolvedValue([]) }
+    const service = new CommunityService({} as never, posts as never, {} as never, {} as never, users as never)
+
+    await service.findPosts()
+
+    expect(posts.find).toHaveBeenCalledWith({ where: { status: DesignPostStatus.PUBLISHED }, order: { createdAt: 'DESC' } })
   })
 
   it('uses the authenticated user name from the database when creating a post', async () => {

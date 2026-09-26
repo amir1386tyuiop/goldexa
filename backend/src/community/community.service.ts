@@ -41,7 +41,25 @@ export class CommunityService {
   }
 
   async findPosts(): Promise<DesignPost[]> {
-    return this.postRepository.find({ order: { createdAt: 'DESC' } })
+    return this.postRepository.find({ where: { status: DesignPostStatus.PUBLISHED }, order: { createdAt: 'DESC' } })
+  }
+
+  async findPostsForAdmin(status?: DesignPostStatus): Promise<DesignPost[]> {
+    return this.postRepository.find({
+      where: status ? { status } : undefined,
+      order: { createdAt: 'DESC' },
+    })
+  }
+
+  async updatePostStatus(id: string, status: DesignPostStatus): Promise<DesignPost> {
+    const post = await this.postRepository.findOneBy({ id })
+
+    if (!post) {
+      throw new NotFoundException('طرح یافت نشد')
+    }
+
+    post.status = status
+    return this.postRepository.save(post)
   }
 
   async findComments(postId: string): Promise<DesignComment[]> {

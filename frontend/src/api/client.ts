@@ -1756,6 +1756,8 @@ export const api = {
   getProduct: (id: string) => request<Product>(`/products/${id}`),
   getAuctions: () => request<Auction[]>('/auctions'),
   getAdminAuctions: () => request<Auction[]>('/auctions/admin/all'),
+  getAdminCommunityPosts: (status?: DesignPost['status']) => request<DesignPost[]>(`/admin/community/posts${status ? `?status=${status}` : ''}`),
+  updateAdminCommunityPostStatus: (id: string, status: DesignPost['status']) => request<DesignPost>(`/admin/community/posts/${id}/status`, { method: 'PATCH', body: { status } }),
   getActiveAuctions: () => request<Auction[]>('/auctions/active'),
   getAuction: (id: string) => request<Auction>(`/auctions/${id}`),
   getAuctionBids: (auctionId: string) => request<AuctionBid[]>(`/auctions/${auctionId}/bids`),

@@ -7,12 +7,15 @@ import { Permissions } from '../common/decorators/permissions.decorator'
 import {
   UpdateOrderStatusDto,
   UpdatePaymentStatusDto,
+  UpdateCommunityPostStatusDto,
   UpdateProductDto,
   UpdateSettingDto,
 } from './admin.dto'
 import { EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
 import { OrdersService } from '../orders/orders.service'
 import { PayoutRequest } from '../wallet/payout-request.entity'
+import { CommunityService } from '../community/community.service'
+import { DesignPostStatus } from '../community/design-post.entity'
 
 @Controller('admin')
 export class AdminController {
@@ -20,6 +23,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly ordersService: OrdersService,
     @InjectRepository(PayoutRequest) private readonly payoutRepository: Repository<PayoutRequest>,
+    private readonly communityService: CommunityService,
   ) {}
 
   @UseGuards(PermissionsGuard)
@@ -109,6 +113,20 @@ export class AdminController {
   @Get('escrow/disputes')
   async getEscrowDisputes(@Query('limit') limit?: string) {
     return this.adminService.listDisputedEscrows(this.parseLimit(limit))
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('MODERATE_COMMUNITY')
+  @Get('community/posts')
+  async getCommunityPosts(@Query('status') status?: string) {
+    return this.communityService.findPostsForAdmin(status as DesignPostStatus | undefined)
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions('MODERATE_COMMUNITY')
+  @Patch('community/posts/:id/status')
+  async updateCommunityPostStatus(@Param('id') id: string, @Body() body: UpdateCommunityPostStatusDto) {
+    return this.communityService.updatePostStatus(id, body.status)
   }
 
   @UseGuards(PermissionsGuard)

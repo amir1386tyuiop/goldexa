@@ -1,6 +1,7 @@
 import { IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator'
 import { OrderStatus } from '../orders/order.entity'
 import { PaymentTransactionStatus } from '../payments/payment-transaction.entity'
+import { DesignPostStatus } from '../community/design-post.entity'
 
 export class UpdateOrderStatusDto {
   @IsEnum(OrderStatus)
@@ -73,4 +74,9 @@ export class UpdateSettingDto {
 export class UpdatePaymentStatusDto {
   @IsEnum(PaymentTransactionStatus)
   status: PaymentTransactionStatus
+}
+
+export class UpdateCommunityPostStatusDto {
+  @IsEnum(DesignPostStatus)
+  status: DesignPostStatus
 }

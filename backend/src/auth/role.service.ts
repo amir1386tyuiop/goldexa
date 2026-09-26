@@ -231,6 +231,7 @@ export class RoleService {
       ['REFUND_PAYMENT', 'Refund payments'],
       ['VIEW_REPORTS', 'View reports and analytics'],
       ['MANAGE_SETTINGS', 'Manage system settings'],
+      ['MODERATE_COMMUNITY', 'Moderate community design posts'],
       ['VIEW_AUDIT_LOG', 'View audit logs'],
     ]
 

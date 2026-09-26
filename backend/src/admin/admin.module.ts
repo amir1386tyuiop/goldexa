@@ -38,6 +38,7 @@ import { EscrowModule } from '../escrow/escrow.module'
 import { OrdersModule } from '../orders/orders.module'
 import { PayoutRequest } from '../wallet/payout-request.entity'
 import { PaymentsModule } from '../payments/payments.module'
+import { CommunityModule } from '../community/community.module'
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { PaymentsModule } from '../payments/payments.module'
     EscrowModule,
     OrdersModule,
     PaymentsModule,
+    CommunityModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, RoleService],

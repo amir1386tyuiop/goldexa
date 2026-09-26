@@ -26,7 +26,7 @@ import {
 import { formatPrice, getAuctionStatusBadge, getAuctionStatusText, getPaymentBadge, getPaymentStatusText, getStatusText } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { AiEnginePanel } from './AiEnginePage'
-import type { Auction, CustomBuilderQuote, EscrowPayment, JewelryDesign, JewelryDesignStage, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission, UsedGoldListing } from '@/types'
+import type { Auction, CustomBuilderQuote, DesignPost, EscrowPayment, JewelryDesign, JewelryDesignStage, Order, PaymentTransaction, Product, PayoutRequest, Refund, Role, SystemSetting, User, Permission, UsedGoldListing } from '@/types'
 
 interface AdminStats {
   totalUsers: number
@@ -72,6 +72,7 @@ const menuItems = [
   { id: 'disputes', icon: <ShieldCheck className="h-5 w-5" />, label: 'اختلاف‌های escrow' },
   { id: 'auctions', icon: <Gavel className="h-5 w-5" />, label: 'مزایده‌ها' },
   { id: 'marketplace', icon: <ShieldCheck className="h-5 w-5" />, label: 'بازار دست‌دوم' },
+  { id: 'community', icon: <Users className="h-5 w-5" />, label: 'moderation جامعه' },
   { id: 'custom-builder', icon: <Wand2 className="h-5 w-5" />, label: 'سفارش‌های اختصاصی' },
   { id: 'users', icon: <Users className="h-5 w-5" />, label: 'کاربران' },
   { id: 'roles', icon: <ShieldCheck className="h-5 w-5" />, label: 'نقش‌ها' },
@@ -201,6 +202,12 @@ export function AdminPage() {
     initialData: [],
   })
 
+  const { data: communityPosts = [] } = useQuery<DesignPost[]>({
+    queryKey: ['admin-community-posts'],
+    queryFn: () => api.getAdminCommunityPosts(),
+    initialData: [],
+  })
+
   const filteredProducts = useMemo(() => {
     if (!search) return adminProducts
     const keyword = search.toLowerCase()
@@ -290,6 +297,7 @@ export function AdminPage() {
             {activeTab === 'auctions' && <AuctionsTable auctions={auctions} />}
 
             {activeTab === 'marketplace' && <MarketplaceModerationPanel listings={marketplaceListings} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-marketplace-listings'] })} />}
+            {activeTab === 'community' && <CommunityModerationPanel posts={communityPosts} onResolved={() => queryClient.invalidateQueries({ queryKey: ['admin-community-posts'] })} />}
             {activeTab === 'custom-builder' && <CustomBuilderAdminPanel designs={customDesigns} quotes={customQuotes} onChanged={() => { void queryClient.invalidateQueries({ queryKey: ['admin-custom-designs'] }); void queryClient.invalidateQueries({ queryKey: ['admin-custom-quotes'] }) }} />}
 
             {activeTab === 'users' && <UsersTable users={adminUsers} />}
@@ -699,6 +707,18 @@ function MarketplaceModerationPanel({ listings, onResolved }: { listings: UsedGo
       </div>
     </div>
   )
+}
+
+function CommunityModerationPanel({ posts, onResolved }: { posts: DesignPost[]; onResolved: () => void }) {
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: DesignPost['status'] }) => api.updateAdminCommunityPostStatus(id, status),
+    onSuccess: onResolved,
+  })
+  const label = (status: DesignPost['status']) => ({ published: 'منتشرشده', hidden: 'مخفی', draft: 'پیش‌نویس' }[status])
+
+  if (!posts.length) return <EmptyState title="طرحی برای moderation وجود ندارد" description="طرح‌های جامعه پس از انتشار در اینجا قابل بررسی هستند." />
+
+  return <div className="space-y-4"><div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">وضعیت مخفی، طرح را از feed عمومی خارج می‌کند و قابل بازگردانی است.</div>{posts.map((post) => <article key={post.id} className="card p-5"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><p className="text-xs font-bold text-amber-700">COMMUNITY · {post.id.slice(0, 8)}</p><h2 className="mt-2 text-xl font-black">{post.title}</h2><p className="mt-1 text-sm text-muted-foreground">سازنده: {post.userName} · {post.likesCount} پسند · {post.commentsCount} نظر</p><p className="mt-3 max-w-3xl text-sm leading-7 text-stone-600">{post.description}</p></div><span className="badge badge-info h-fit">{label(post.status)}</span></div><div className="mt-4 flex flex-wrap gap-2"><button type="button" className="btn btn-primary min-h-10" disabled={mutation.isPending || post.status === 'published'} onClick={() => mutation.mutate({ id: post.id, status: 'published' })}>انتشار</button><button type="button" className="btn btn-outline min-h-10 border-red-300 text-red-800" disabled={mutation.isPending || post.status === 'hidden'} onClick={() => mutation.mutate({ id: post.id, status: 'hidden' })}>مخفی‌کردن</button></div>{mutation.isError ? <p className="mt-3 text-sm text-red-700" role="alert">تغییر وضعیت طرح انجام نشد.</p> : null}</article>)}</div>
 }
 
 function CustomBuilderAdminPanel({ designs, quotes, onChanged }: { designs: JewelryDesign[]; quotes: CustomBuilderQuote[]; onChanged: () => void }) {
