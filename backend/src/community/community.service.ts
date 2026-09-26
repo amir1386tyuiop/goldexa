@@ -41,6 +41,10 @@ export class CommunityService {
     return this.postRepository.find({ order: { createdAt: 'DESC' } })
   }
 
+  async findComments(postId: string): Promise<DesignComment[]> {
+    return this.commentRepository.find({ where: { postId }, order: { createdAt: 'ASC' } })
+  }
+
   async createPost(data: CreateDesignPostDto): Promise<DesignPost> {
     return this.postRepository.save(
       this.postRepository.create({

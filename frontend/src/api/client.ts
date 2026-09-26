@@ -552,6 +552,7 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
     if (path.includes('community-extensions/badges')) return data.map(normalizeUserBadge)
     if (path.includes('community-extensions/challenge-rewards')) return data.map(normalizeChallengeReward)
     if (path.includes('community/challenges')) return data.map(normalizeDesignChallenge)
+    if (path.includes('community/posts/') && path.includes('/comments')) return data.map(normalizeDesignComment)
     if (path.includes('community/posts')) return data.map(normalizeDesignPost)
     if (path.includes('/status-history')) return data.map(normalizeOrderStatusHistory)
     if (path.includes('/shipments')) return data.map(normalizeShipment)
@@ -645,6 +646,7 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
   if (path.includes('community-extensions/badges')) return normalizeUserBadge(data as Record<string, unknown>)
   if (path.includes('community-extensions/challenge-rewards')) return normalizeChallengeReward(data as Record<string, unknown>)
   if (path.includes('community/challenges')) return normalizeDesignChallenge(data as Record<string, unknown>)
+  if (path.includes('community/posts/') && path.includes('/comments')) return normalizeDesignComment(data as Record<string, unknown>)
   if (path.includes('community/posts')) return normalizeDesignPost(data as Record<string, unknown>)
   if (path.includes('/status-history')) return normalizeOrderStatusHistory(data as Record<string, unknown>)
   if (path.includes('/shipments')) return normalizeShipment(data as Record<string, unknown>)
@@ -1259,6 +1261,10 @@ function normalizeDesignChallenge(value: Record<string, unknown>): DesignChallen
 
 function normalizeDesignPost(value: Record<string, unknown>): DesignPost {
   return { ...value, userId: String(value.userId || value.user_id || ''), userName: String(value.userName || value.user_name || 'Goldexa'), imageUrl: value.imageUrl ?? value.image_url ?? null, modelUrl: value.modelUrl ?? value.model_url ?? null, challengeId: value.challengeId ?? value.challenge_id ?? null, likesCount: toNumber(value.likesCount || value.likes_count), commentsCount: toNumber(value.commentsCount || value.comments_count), createdAt: String(value.createdAt || value.created_at || ''), updatedAt: String(value.updatedAt || value.updated_at || '') } as DesignPost
+}
+
+function normalizeDesignComment(value: Record<string, unknown>): DesignComment {
+  return { ...value, postId: String(value.postId || value.post_id || ''), userId: String(value.userId || value.user_id || ''), userName: String(value.userName || value.user_name || 'Goldexa'), body: String(value.body || ''), createdAt: String(value.createdAt || value.created_at || '') } as DesignComment
 }
 
 function normalizeUserBadge(value: Record<string, unknown>) {
@@ -1924,6 +1930,7 @@ export const api = {
   getChallengeRewards: (challengeId: string) => request<ChallengeReward[]>(`/community-extensions/challenge-rewards/${challengeId}`),
   getCommunityChallenges: () => request<DesignChallenge[]>('/community/challenges'),
   getCommunityPosts: () => request<DesignPost[]>('/community/posts'),
+  getCommunityComments: (postId: string) => request<DesignComment[]>(`/community/posts/${postId}/comments`),
   createCommunityPost: (body: { title: string; description: string; imageUrl?: string; modelUrl?: string; challengeId?: string }) => request<DesignPost>('/community/posts', { method: 'POST', body }),
   likeCommunityPost: (postId: string) => request<DesignPost>(`/community/posts/${postId}/like`, { method: 'POST', body: {} }),
   addCommunityComment: (postId: string, body: { userName: string; body: string }) => request<DesignComment>(`/community/posts/${postId}/comments`, { method: 'POST', body }),

@@ -36,6 +36,11 @@ export class CommunityController {
     return this.communityService.createPost({ ...body, userId: req.user.sub })
   }
 
+  @Get('posts/:id/comments')
+  async findComments(@Param('id') id: string) {
+    return this.communityService.findComments(id)
+  }
+
   @Post('posts/:id/comments')
   @UseGuards(JwtAuthGuard)
   async addComment(@Param('id') id: string, @Body() body: CreateDesignCommentDto, @Req() req: Request & { user: JwtUser }) {
