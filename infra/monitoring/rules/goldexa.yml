@@ -1,0 +1,33 @@
+groups:
+  - name: goldexa-api
+    interval: 30s
+    rules:
+      - alert: GoldexaApiDown
+        expr: up{job="goldexa-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: goldexa-api
+        annotations:
+          summary: Goldexa API is down
+          description: Prometheus cannot scrape the Goldexa API for more than two minutes.
+
+      - alert: GoldexaApiScrapeMissing
+        expr: absent(up{job="goldexa-api"})
+        for: 2m
+        labels:
+          severity: critical
+          service: goldexa-api
+        annotations:
+          summary: Goldexa API scrape target is missing
+          description: The Goldexa API scrape target is absent from Prometheus.
+
+      - alert: GoldexaApiMemoryPressure
+        expr: goldexa_process_heap_used_bytes / goldexa_process_heap_total_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: goldexa-api
+        annotations:
+          summary: Goldexa API heap usage is high
+          description: Goldexa API heap usage has stayed above 85 percent for five minutes.

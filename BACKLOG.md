@@ -12,7 +12,7 @@
 - ✅ Migration واقعی TypeORM (data-source + scripts + baseline) — منبع واحد schema
 - 🎨 UX/UI Design System در Figma (پالت طلایی/سرمه‌ای، تایپوگرافی IRANSans، آیکون‌ها) — Single Source of Truth
 - 🟡 CI/CD (GitHub Actions: test/build/security/compose/docker gate پیاده شده؛ deploy محیط واقعی و secrets هنوز نیازمند زیرساخت مقصد است) + Docker Compose production-like موجود و متغیرهای runtime حساس به backend منتقل می‌شوند
-- 🟡 Monitoring: endpoint استاندارد `/metrics/prometheus`، Prometheus و Grafana در compose production-like اضافه شد و datasource/dashboard پایه‌ی Grafana provision می‌شود؛ ELK/Sentry و alerting محیط واقعی باقی است
+- 🟡 Monitoring: endpoint استاندارد `/metrics/prometheus`، Prometheus و Grafana در compose production-like اضافه شد؛ datasource/dashboard پایه و ruleهای API-down، scrape-missing و memory-pressure provision می‌شوند؛ اتصال Alertmanager/ELK/Sentry و alert delivery محیط واقعی باقی است
 
 ---
 
