@@ -7,6 +7,11 @@ const aiUrl = (process.env.RELEASE_AI_URL || 'http://localhost:8000').replace(/\
 const backendChecks = [
   ['/health/ready', 'آمادگی سرویس‌ها'],
   ['/health', 'سلامت API'],
+  ['/metrics/prometheus', 'متریک‌های Prometheus', (body) => {
+    if (!body.includes('goldexa_up 1') || !body.includes('goldexa_process_heap_used_bytes')) {
+      throw new Error('متریک‌های اصلی Goldexa وجود ندارند')
+    }
+  }],
   ['/products/home', 'کاتالوگ محصولات'],
   ['/gold-pricing/status', 'وضعیت قیمت طلا'],
 ]
@@ -51,11 +56,11 @@ async function check(url, label, validate) {
   }
 }
 
-for (const [path, label] of backendChecks) {
-  await check(`${backendUrl}${path}`, label, path === '/health/ready' ? (body) => {
+for (const [path, label, explicitValidate] of backendChecks) {
+  await check(`${backendUrl}${path}`, label, explicitValidate || (path === '/health/ready' ? (body) => {
     const payload = JSON.parse(body)
     if (payload.ready !== true || payload.status !== 'ready') throw new Error('سرویس آماده نیست')
-  } : undefined)
+  } : undefined))
 }
 
 for (const path of frontendChecks) await check(`${frontendUrl}${path}`, `فرانت ${path}`)
