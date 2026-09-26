@@ -109,4 +109,17 @@ describe('WalletService financial invariants', () => {
     expect(result).toBe(existing)
     expect(manager.save).not.toHaveBeenCalled()
   })
+
+  it('credits community rewards idempotently through the locked ledger', async () => {
+    manager.findOne.mockResolvedValueOnce({ ...wallet })
+
+    const result = await service.creditCommunityReward('user-1', 'reward-1', 500000, 'جایزه')
+
+    expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ balance: 501000 }))
+    expect(result).toEqual(expect.objectContaining({ type: WalletTransactionType.COMMUNITY_REWARD, amount: 500000, rewardId: 'reward-1' }))
+
+    manager.findOne.mockReset()
+    manager.findOne.mockResolvedValueOnce({ ...wallet }).mockResolvedValueOnce({ id: 'tx-reward', amount: 500000, amountGrams: 0 })
+    await expect(service.creditCommunityReward('user-1', 'reward-1', 500000, 'جایزه')).resolves.toEqual(expect.objectContaining({ id: 'tx-reward' }))
+  })
 })

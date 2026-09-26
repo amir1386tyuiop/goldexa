@@ -25,6 +25,7 @@ type LedgerParams = {
   escrowId?: string | null
   payoutRequestId?: string | null
   groupBuyingMemberId?: string | null
+  rewardId?: string | null
   description?: string | null
 }
 
@@ -161,6 +162,16 @@ export class WalletService {
       }
     }
 
+    if (params.type === WalletTransactionType.COMMUNITY_REWARD && params.rewardId) {
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId: params.userId, rewardId: params.rewardId, type: params.type },
+      })
+      if (existing) {
+        if (Number(existing.amount) !== params.rialDelta) throw new BadRequestException('جایزه‌ی تکراری با مبلغ متفاوت است')
+        return existing
+      }
+    }
+
     if (
       [
         WalletTransactionType.ESCROW_HOLD,
@@ -204,6 +215,7 @@ export class WalletService {
       escrowId: params.escrowId ?? null,
       payoutRequestId: params.payoutRequestId ?? null,
       groupBuyingMemberId: params.groupBuyingMemberId ?? null,
+      rewardId: params.rewardId ?? null,
       description: params.description ?? null,
     })
     return manager.save(tx)
@@ -471,6 +483,12 @@ export class WalletService {
       escrowId: data.escrowId ?? null,
       description: data.description ?? null,
     })
+  }
+
+  /** Credits a community reward through the same locked, auditable ledger as other wallet mutations. */
+  async creditCommunityReward(userId: string, rewardId: string, amount: number, description: string): Promise<WalletTransaction> {
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('مبلغ جایزه نامعتبر است')
+    return this.applyLedger({ userId, rewardId, type: WalletTransactionType.COMMUNITY_REWARD, rialDelta: amount, description })
   }
 
   async findTransactions(userId: string): Promise<WalletTransaction[]> {

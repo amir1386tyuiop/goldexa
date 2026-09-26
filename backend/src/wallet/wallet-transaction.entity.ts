@@ -12,6 +12,7 @@ export enum WalletTransactionType {
   PAYOUT_REFUND = 'payout_refund',
   GROUP_BUYING_PAYMENT = 'group_buying_payment',
   GROUP_BUYING_REFUND = 'group_buying_refund',
+  COMMUNITY_REWARD = 'community_reward',
 }
 
 @Entity('wallet_transactions')
@@ -48,6 +49,9 @@ export class WalletTransaction {
 
   @Column({ name: 'group_buying_member_id', nullable: true })
   groupBuyingMemberId: string | null
+
+  @Column({ name: 'reward_id', nullable: true })
+  rewardId: string | null
 
   @Column({ nullable: true })
   description: string | null

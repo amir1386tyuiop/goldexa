@@ -8,6 +8,7 @@ import { DesignVote } from './design-vote.entity'
 import { User } from '../users/user.entity'
 import { UserBadge } from '../community-extensions/user-badge.entity'
 import { ChallengeReward } from '../community-extensions/challenge-reward.entity'
+import { WalletService } from '../wallet/wallet.service'
 import {
   CreateDesignChallengeDto,
   CreateDesignCommentDto,
@@ -31,6 +32,7 @@ export class CommunityService {
     private badgeRepository: Repository<UserBadge>,
     @InjectRepository(ChallengeReward)
     private rewardRepository: Repository<ChallengeReward>,
+    private readonly walletService: WalletService,
   ) {}
 
   async findChallenges(): Promise<DesignChallenge[]> {
@@ -155,15 +157,24 @@ export class CommunityService {
     challenge.status = DesignChallengeStatus.ENDED
     const savedChallenge = await this.challengeRepository.save(challenge)
 
-    const reward = await this.rewardRepository.findOneBy({ challengeId, postId: winnerPostId, userId: post.userId })
+    let reward = await this.rewardRepository.findOneBy({ challengeId, postId: winnerPostId, userId: post.userId })
     if (!reward) {
-      await this.rewardRepository.save(this.rewardRepository.create({
+      reward = await this.rewardRepository.save(this.rewardRepository.create({
         challengeId,
         postId: winnerPostId,
         userId: post.userId,
         rewardType: challenge.rewardType || 'design_challenge_winner',
         rewardValue: Number(challenge.rewardValue || 0),
       }))
+    }
+
+    if (Number(reward.rewardValue) > 0) {
+      await this.walletService.creditCommunityReward(
+        post.userId,
+        reward.id,
+        Number(reward.rewardValue),
+        `جایزه‌ی برنده‌ی چالش طراحی ${challenge.title}`,
+      )
     }
 
     const badgeName = `برنده چالش: ${challenge.title}`

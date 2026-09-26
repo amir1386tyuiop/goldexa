@@ -106,7 +106,7 @@
 - ذخیره‌ی طرح نیز کامل شد: `POST /community-extensions/saves` از ذخیره‌ی تکراری جلوگیری می‌کند، `DELETE /community-extensions/saves/:id` فقط توسط مالک انجام می‌شود و frontend دکمه‌ی ذخیره/حذف و شمارش ذخیره‌های کاربر را نمایش می‌دهد.
 - moderation جامعه نیز به پنل مدیریت اضافه شد: `GET /admin/community/posts` و `PATCH /admin/community/posts/:id/status` با permission مستقل `MODERATE_COMMUNITY`؛ طرح‌های `hidden` از feed عمومی حذف می‌شوند و از پنل قابل بازگردانی هستند.
 - DTOهای Community برای عنوان، توضیح، کامنت، URL، UUID، تاریخ و مبلغ با `class-validator` محدود شدند تا `ValidationPipe` ورودی نامعتبر و payloadهای بیش‌ازحد بزرگ را رد کند.
-- با تعیین برنده‌ی چالش، پاداش `challenge_rewards` و نشان اختصاصی برنده به‌صورت idempotent ثبت می‌شوند؛ انتخاب طرحی خارج از چالش رد می‌شود.
+- با تعیین برنده‌ی چالش، پاداش `challenge_rewards` و نشان اختصاصی برنده به‌صورت idempotent ثبت می‌شوند؛ مبلغ مثبت reward از مسیر ledger قفل‌شده‌ی کیف پول با نوع `community_reward` و `reward_id` یکتا credit می‌شود؛ انتخاب طرحی خارج از چالش رد می‌شود.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.

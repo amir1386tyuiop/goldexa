@@ -4,7 +4,8 @@ import { DesignPostStatus } from './design-post.entity'
 describe('CommunityService', () => {
   const users = { findOneBy: jest.fn() }
   const badges = { findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
-  const rewards = { findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
+  const rewards = { findOneBy: jest.fn(), create: jest.fn((value) => value), save: jest.fn(async (value) => ({ ...value, id: value.id || 'reward-1' })) }
+  const wallet = { creditCommunityReward: jest.fn(async () => ({ id: 'tx-reward' })) }
 
   it('returns comments for a post in chronological order', async () => {
     const comments = { find: jest.fn().mockResolvedValue([{ id: 'c1', postId: 'p1', body: 'عالی است' }]) }
@@ -16,6 +17,7 @@ describe('CommunityService', () => {
       users as never,
       badges as never,
       rewards as never,
+      wallet as never,
     )
 
     await expect(service.findComments('p1')).resolves.toEqual([{ id: 'c1', postId: 'p1', body: 'عالی است' }])
@@ -24,7 +26,7 @@ describe('CommunityService', () => {
 
   it('returns only published posts to the public feed', async () => {
     const posts = { find: jest.fn().mockResolvedValue([]) }
-    const service = new CommunityService({} as never, posts as never, {} as never, {} as never, users as never, badges as never, rewards as never)
+    const service = new CommunityService({} as never, posts as never, {} as never, {} as never, users as never, badges as never, rewards as never, wallet as never)
 
     await service.findPosts()
 
@@ -45,6 +47,7 @@ describe('CommunityService', () => {
       users as never,
       badges as never,
       rewards as never,
+      wallet as never,
     )
 
     await service.createPost({
@@ -69,6 +72,7 @@ describe('CommunityService', () => {
       users as never,
       badges as never,
       rewards as never,
+      wallet as never,
     )
 
     await service.addComment('p1', { userId: 'u1', userName: 'نام جعلی', body: 'نظر' })
@@ -81,11 +85,12 @@ describe('CommunityService', () => {
     const posts = { findOneBy: jest.fn().mockResolvedValue({ id: 'p1', userId: 'u1', challengeId: 'c1' }) }
     rewards.findOneBy.mockResolvedValue(null)
     badges.findOneBy.mockResolvedValue(null)
-    const service = new CommunityService(challenges as never, posts as never, {} as never, {} as never, users as never, badges as never, rewards as never)
+    const service = new CommunityService(challenges as never, posts as never, {} as never, {} as never, users as never, badges as never, rewards as never, wallet as never)
 
     await service.setWinner('c1', 'p1')
 
     expect(rewards.create).toHaveBeenCalledWith(expect.objectContaining({ challengeId: 'c1', postId: 'p1', userId: 'u1', rewardType: 'wallet_credit', rewardValue: 500000 }))
     expect(badges.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', name: 'برنده چالش: چالش تابستان' }))
+    expect(wallet.creditCommunityReward).toHaveBeenCalledWith('u1', expect.anything(), 500000, expect.stringContaining('چالش تابستان'))
   })
 })

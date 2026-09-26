@@ -9,9 +9,10 @@ import { CommunityService } from './community.service'
 import { User } from '../users/user.entity'
 import { UserBadge } from '../community-extensions/user-badge.entity'
 import { ChallengeReward } from '../community-extensions/challenge-reward.entity'
+import { WalletModule } from '../wallet/wallet.module'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DesignChallenge, DesignPost, DesignComment, DesignVote, User, UserBadge, ChallengeReward])],
+  imports: [TypeOrmModule.forFeature([DesignChallenge, DesignPost, DesignComment, DesignVote, User, UserBadge, ChallengeReward]), WalletModule],
   controllers: [CommunityController],
   providers: [CommunityService],
   exports: [CommunityService],
