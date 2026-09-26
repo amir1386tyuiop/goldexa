@@ -162,7 +162,11 @@ export class AiEngineService {
   /** Useful local design-builder fallback until an external model key is supplied. */
   private async runLocalDesignChat(input: RunAiTaskInput): Promise<AiRunResult> {
     const provider = getAiProvider('assistant')
-    const publicProvider = this.openRouterAiClient.toPublicProvider(provider)
+    const publicProvider = {
+      ...this.openRouterAiClient.toPublicProvider(provider),
+      configured: true,
+      endpoint: 'local' as const,
+    }
     const startedAt = Date.now()
     const prompt = input.prompt || ''
     const weightMatch = prompt.match(/(\d+(?:[.,]\d+)?)\s*گرم/i)

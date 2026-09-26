@@ -66,6 +66,7 @@ describe('AiEngineService execution contract', () => {
     const result = await service.chat({ task: 'assistant', prompt: 'یک انگشتر مینیمال ۳ گرم طراحی کن', userId: 'user-1' })
 
     expect(result.raw).toEqual(expect.objectContaining({ design: expect.objectContaining({ weight: 3 }) }))
+    expect(result.provider).toEqual(expect.objectContaining({ endpoint: 'local' }))
     expect(openRouter.chat).not.toHaveBeenCalled()
   })
 
