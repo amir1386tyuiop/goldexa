@@ -20,6 +20,9 @@ import type {
   ChallengeReward,
   ContentPage,
   CustomBuilderQuote,
+  DesignChallenge,
+  DesignComment,
+  DesignPost,
   DesignSave,
   DiscountCode,
   EscrowPayment,
@@ -548,6 +551,8 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
     if (path.includes('community-extensions/saves')) return data.map(normalizeDesignSave)
     if (path.includes('community-extensions/badges')) return data.map(normalizeUserBadge)
     if (path.includes('community-extensions/challenge-rewards')) return data.map(normalizeChallengeReward)
+    if (path.includes('community/challenges')) return data.map(normalizeDesignChallenge)
+    if (path.includes('community/posts')) return data.map(normalizeDesignPost)
     if (path.includes('/status-history')) return data.map(normalizeOrderStatusHistory)
     if (path.includes('/shipments')) return data.map(normalizeShipment)
     if (path.includes('/invoices')) return data.map(normalizeInvoice)
@@ -639,6 +644,8 @@ function normalizeApiResponse(data: unknown, path: string): unknown {
   if (path.includes('community-extensions/saves')) return normalizeDesignSave(data as Record<string, unknown>)
   if (path.includes('community-extensions/badges')) return normalizeUserBadge(data as Record<string, unknown>)
   if (path.includes('community-extensions/challenge-rewards')) return normalizeChallengeReward(data as Record<string, unknown>)
+  if (path.includes('community/challenges')) return normalizeDesignChallenge(data as Record<string, unknown>)
+  if (path.includes('community/posts')) return normalizeDesignPost(data as Record<string, unknown>)
   if (path.includes('/status-history')) return normalizeOrderStatusHistory(data as Record<string, unknown>)
   if (path.includes('/shipments')) return normalizeShipment(data as Record<string, unknown>)
   if (path.includes('/invoices')) return normalizeInvoice(data as Record<string, unknown>)
@@ -1244,6 +1251,14 @@ function normalizeDesignSave(value: Record<string, unknown>) {
     designId: value.designId ?? value.design_id ?? null,
     createdAt: String(value.createdAt || value.created_at || ''),
   }
+}
+
+function normalizeDesignChallenge(value: Record<string, unknown>): DesignChallenge {
+  return { ...value, description: String(value.description || ''), rewardValue: toNumber(value.rewardValue || value.reward_value), startDate: String(value.startDate || value.start_date || ''), endDate: String(value.endDate || value.end_date || ''), winnerPostId: value.winnerPostId ?? value.winner_post_id ?? null, createdAt: String(value.createdAt || value.created_at || ''), updatedAt: String(value.updatedAt || value.updated_at || '') } as DesignChallenge
+}
+
+function normalizeDesignPost(value: Record<string, unknown>): DesignPost {
+  return { ...value, userId: String(value.userId || value.user_id || ''), userName: String(value.userName || value.user_name || 'Goldexa'), imageUrl: value.imageUrl ?? value.image_url ?? null, modelUrl: value.modelUrl ?? value.model_url ?? null, challengeId: value.challengeId ?? value.challenge_id ?? null, likesCount: toNumber(value.likesCount || value.likes_count), commentsCount: toNumber(value.commentsCount || value.comments_count), createdAt: String(value.createdAt || value.created_at || ''), updatedAt: String(value.updatedAt || value.updated_at || '') } as DesignPost
 }
 
 function normalizeUserBadge(value: Record<string, unknown>) {
@@ -1907,6 +1922,11 @@ export const api = {
   getUserSaves: (userId: string) => request<DesignSave[]>(`/community-extensions/saves/${userId}`),
   getUserBadges: (userId: string) => request<UserBadge[]>(`/community-extensions/badges/${userId}`),
   getChallengeRewards: (challengeId: string) => request<ChallengeReward[]>(`/community-extensions/challenge-rewards/${challengeId}`),
+  getCommunityChallenges: () => request<DesignChallenge[]>('/community/challenges'),
+  getCommunityPosts: () => request<DesignPost[]>('/community/posts'),
+  createCommunityPost: (body: { title: string; description: string; imageUrl?: string; modelUrl?: string; challengeId?: string }) => request<DesignPost>('/community/posts', { method: 'POST', body }),
+  likeCommunityPost: (postId: string) => request<DesignPost>(`/community/posts/${postId}/like`, { method: 'POST', body: {} }),
+  addCommunityComment: (postId: string, body: { userName: string; body: string }) => request<DesignComment>(`/community/posts/${postId}/comments`, { method: 'POST', body }),
   getOrderStatusHistory: (orderId: string) => request<OrderStatusHistory[]>(`/orders/${orderId}/status-history`),
   getOrderShipments: (orderId: string) => request<Shipment[]>(`/orders/${orderId}/shipments`),
   getOrderInvoices: (orderId: string) => request<Invoice[]>(`/orders/${orderId}/invoices`),

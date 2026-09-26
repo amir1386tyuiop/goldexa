@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Bot, Gem, LogOut, Menu, PackageCheck, ShieldCheck, ShoppingBag, ShoppingCart, TrendingUp, User, Wallet, X } from 'lucide-react'
+import { Activity, Bot, Gem, LogOut, Menu, PackageCheck, ShieldCheck, ShoppingBag, ShoppingCart, TrendingUp, User, Users, Wallet, X } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/store'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ const navItems = [
   { label: 'فروشگاه', path: '/shop', icon: ShoppingBag },
   { label: 'قیمت طلا', path: '/pricing', icon: TrendingUp },
   { label: 'مزایده', path: '/auctions', icon: Activity },
+  { label: 'جامعه طراحی', path: '/community', icon: Users },
 ]
 
 export function Navbar() {
