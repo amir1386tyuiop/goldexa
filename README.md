@@ -73,6 +73,7 @@ goldexacode/
 - [x] Setup CI/CD Pipeline برای lint/build/test/security/audit و compose validation
 - [x] type-check و web export اپ Expo موبایل در CI
 - [x] اسکریپت benchmark قابل‌تکرار برای ثبت p50/p95/max API (`scripts/benchmark-backend.mjs`)
+- [x] benchmark endpointهای عمومی پرترافیک با ۱۰۰ درخواست و concurrency=10؛ همه‌ی p95های ثبت‌شده زیر ۲۰۰ms هستند.
 - [x] release gate قابل‌تکرار برای readiness و smoke routeهای اصلی (`scripts/release-gate.mjs`)
 - [x] اسکریپت recovery امن برای خطاهای stale socket در Docker Desktop ویندوز (`scripts/start-goldexa-docker.ps1`)
 - [x] ایجاد Design System
