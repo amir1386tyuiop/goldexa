@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator'
+import { IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator'
 
 export class CreateArModelDto {
   @IsUUID() @IsOptional()
@@ -7,9 +7,9 @@ export class CreateArModelDto {
   designId?: string | null
   @IsString()
   name: string
-  @IsString()
+  @IsString() @MaxLength(2048) @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' })
   modelUrl: string
-  @IsString() @IsOptional()
+  @IsString() @IsOptional() @MaxLength(2048) @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس thumbnail باید مسیر local یا http/https باشد' })
   thumbnailUrl?: string | null
   @IsBoolean() @IsOptional()
   isActive?: boolean
@@ -19,9 +19,9 @@ export class CreateArPreviewDto {
   @IsUUID() @IsOptional() userId?: string
   @IsUUID()
   modelId: string
-  @IsString() @IsOptional()
+  @IsString() @IsOptional() @MaxLength(2048) @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس تصویر باید مسیر local یا http/https باشد' })
   screenshotUrl?: string | null
-  @IsString() @IsOptional()
+  @IsString() @IsOptional() @MaxLength(2048) @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس ویدیو باید مسیر local یا http/https باشد' })
   videoUrl?: string | null
   @IsBoolean() @IsOptional()
   isShared?: boolean

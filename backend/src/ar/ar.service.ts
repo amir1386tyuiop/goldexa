@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ArModel } from './ar-model.entity'
@@ -19,6 +19,8 @@ export class ArService {
   }
 
   async createModel(data: CreateArModelDto): Promise<ArModel> {
+    assertSafeAssetUrl(data.modelUrl, 'مدل')
+    if (data.thumbnailUrl) assertSafeAssetUrl(data.thumbnailUrl, 'thumbnail')
     return this.modelRepository.save(
       this.modelRepository.create({
         ...data,
@@ -36,6 +38,8 @@ export class ArService {
   }
 
   async createPreview(data: CreateArPreviewDto): Promise<ArPreview> {
+    if (data.screenshotUrl) assertSafeAssetUrl(data.screenshotUrl, 'تصویر')
+    if (data.videoUrl) assertSafeAssetUrl(data.videoUrl, 'ویدیو')
     return this.previewRepository.save(
       this.previewRepository.create({
         ...data,
@@ -44,5 +48,12 @@ export class ArService {
         isShared: data.isShared ?? false,
       }),
     )
+  }
+}
+
+function assertSafeAssetUrl(value: string, label: string): void {
+  const normalized = value.trim()
+  if (!normalized || !/^(?:\/|https?:\/\/)/i.test(normalized) || normalized.length > 2048) {
+    throw new BadRequestException(`آدرس ${label} باید مسیر local یا http/https باشد`)
   }
 }
