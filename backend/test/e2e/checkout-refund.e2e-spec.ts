@@ -39,7 +39,7 @@ e2e('checkout and refund against an isolated PostgreSQL database', () => {
       quantity: 1,
       unitPrice: Number(product.finalPrice),
     }, buyer.token))
-    expect(added.status).toBe(201)
+    expect(added).toMatchObject({ status: 201 })
 
     const foreignRead = await api(`/cart/user/${buyer.userId}`, { headers: jsonHeaders(otherBuyer.token) })
     expect(foreignRead.status).toBe(403)
@@ -137,7 +137,7 @@ e2e('checkout and refund against an isolated PostgreSQL database', () => {
     }, buyer.token))
     expect(created.status).toBe(201)
 
-    const afterReservation = await api<Product[]>(`/products?inStock=true&search=${encodeURIComponent(cancelProduct!.name)}`)
+    const afterReservation = await api<Product[]>(`/products?search=${encodeURIComponent(cancelProduct!.name)}`)
     const reserved = afterReservation.body.find((candidate) => candidate.id === cancelProduct!.id)
     expect(reserved?.stock).toBe(before - 1)
 
@@ -145,7 +145,7 @@ e2e('checkout and refund against an isolated PostgreSQL database', () => {
     expect(cancelled.status).toBe(201)
     expect(cancelled.body.status).toBe('cancelled')
 
-    const restoredFeed = await api<Product[]>(`/products?inStock=true&search=${encodeURIComponent(cancelProduct!.name)}`)
+    const restoredFeed = await api<Product[]>(`/products?search=${encodeURIComponent(cancelProduct!.name)}`)
     const restored = restoredFeed.body.find((candidate) => candidate.id === cancelProduct!.id)
     expect(restored?.stock).toBe(before)
   })

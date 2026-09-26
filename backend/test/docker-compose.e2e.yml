@@ -30,6 +30,20 @@ services:
       timeout: 3s
       retries: 20
 
+  ai-service:
+    build:
+      context: ../../ai-service
+      dockerfile: Dockerfile
+    environment:
+      AI_MODEL_DIR: /app/model_store
+    ports:
+      - '58000:8000'
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   migrate:
     build:
       context: ..
@@ -71,12 +85,15 @@ services:
       ZARINPAL_SANDBOX: 'true'
       GOLD_PRICE_SOURCE: mock
       AI_ENGINE_ENABLED: 'false'
+      AI_LOCAL_URL: http://ai-service:8000
     ports:
       - '3011:3001'
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ai-service:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully

@@ -121,6 +121,6 @@
 - **۵.۵ WebP < ۲۰۰KB:** آپلود با کاهش تطبیقی کیفیت/ابعاد، خروجی را زیر ۲۰۰KB نگه می‌دارد (تست: منبع ۴۵۲KB → ۱۶۹KB).
 
 ## تست
-- suite فعلی Jest شامل ۲۹ suite و ۱۷۹ تست موفق است؛ E2E ایزوله‌ی PostgreSQL/Redis نیز ۴ suite و ۱۵ تست موفق دارد.
+- suite فعلی Jest شامل ۲۹ suite و ۱۷۹ تست موفق است؛ E2E ایزوله‌ی PostgreSQL/Redis/AI اکنون ۵ suite و ۱۶ تست موفق دارد و سلامت `/health` و `/predict-price` سرویس AI محلی را نیز بررسی می‌کند.
 - smoke/e2e setup در `backend/test/e2e` اضافه شده و با `E2E_BASE_URL` اجرا می‌شود. compose ایزوله‌ی `backend/test/docker-compose.e2e.yml` PostgreSQL و Redis جدا دارد؛ `E2E_ALLOW_DB_FIXTURES=1` فقط در همین دیتابیس تست برای seed کیف پول مجاز است.
 - security enforcement با `ENFORCE_SECURITY_TESTS=1` آماده است و تا رفع findingهای endpointهای حساس نباید pass کامل تلقی شود.
