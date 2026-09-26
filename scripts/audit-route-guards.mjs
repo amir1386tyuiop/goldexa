@@ -5,6 +5,7 @@ import path from 'node:path'
 
 const sourceRoot = path.resolve(process.cwd(), 'backend', 'src')
 const mutationDecorators = /@(?:Post|Put|Patch|Delete)\s*\(([^)]*)\)/
+const userScopedDecorators = /@(?:Get|Post|Put|Patch|Delete)\s*\(([^)]*userId[^)]*)\)/
 const controllerDecorator = /@Controller\s*\(\s*['"]?([^'")\s]*)/
 const guardedTokens = ['JwtAuthGuard', 'AdminGuard', 'PermissionsGuard']
 const publicMutations = new Set([
@@ -15,6 +16,12 @@ const publicMutations = new Set([
   'users:',
   'pricing:calculate/:category',
   'pricing:quote/:category',
+])
+// Community profile reads are intentionally public. Every other route that
+// exposes a userId in its path must carry an auth/ownership policy.
+const publicUserScopedReads = new Set([
+  'community-extensions:follows/:userId',
+  'community-extensions:badges/:userId',
 ])
 
 function collectFiles(directory) {
@@ -49,6 +56,13 @@ for (const file of collectFiles(sourceRoot)) {
     const guarded = classGuarded || guardedTokens.some((token) => window.includes(token))
     if (!guarded && !publicMutations.has(route)) {
       findings.push(`${path.relative(process.cwd(), file)}:${index + 1} ${route}`)
+    }
+
+    const userScoped = line.match(userScopedDecorators)
+    if (!userScoped) return
+    const userRoute = routePath(controller, userScoped[1])
+    if (!guarded && !publicUserScopedReads.has(userRoute)) {
+      findings.push(`${path.relative(process.cwd(), file)}:${index + 1} user-scoped route ${userRoute}`)
     }
   })
 }
