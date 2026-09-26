@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import {
@@ -94,6 +94,8 @@ export class CustomBuilderService {
     const design = await this.designRepository.findOneBy({ id: designId })
     if (!design) throw new NotFoundException('طرح یافت نشد')
     if (!this.stageRepository) throw new NotFoundException('مخزن مرحله‌های ساخت آماده نیست')
+    if (data.imageUrl) assertSafeStageAssetUrl(data.imageUrl, 'تصویر')
+    if (data.modelUrl) assertSafeStageAssetUrl(data.modelUrl, 'مدل')
     return this.stageRepository.save(this.stageRepository.create({
       designId,
       title: data.title.trim(),
@@ -251,5 +253,12 @@ export class CustomBuilderService {
     const design = await this.designRepository.findOneBy({ id: designId })
     if (!design) throw new NotFoundException('طرح یافت نشد')
     if (design.userId !== userId) throw new ForbiddenException('به این طرح دسترسی ندارید')
+  }
+}
+
+function assertSafeStageAssetUrl(value: string, label: string): void {
+  const normalized = value.trim()
+  if (!normalized || !/^(?:\/|https?:\/\/)/i.test(normalized) || normalized.length > 2048) {
+    throw new BadRequestException(`آدرس ${label} باید مسیر local یا http/https باشد`)
   }
 }

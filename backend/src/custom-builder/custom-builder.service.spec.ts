@@ -59,4 +59,11 @@ describe('CustomBuilderService', () => {
     const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never, undefined, stages as never)
     await expect(service.createDesignStage('d1', { title: 'ساخت اولیه', status: 'in_progress', modelUrl: '/models/ring.glb' })).resolves.toMatchObject({ designId: 'd1', status: 'in_progress', modelUrl: '/models/ring.glb' })
   })
+
+  it('rejects unsafe custom-builder stage asset URLs', async () => {
+    designs.findOneBy.mockResolvedValue({ ...design, id: 'd1' })
+    const stages = { create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
+    const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never, undefined, stages as never)
+    await expect(service.createDesignStage('d1', { title: 'مرحله', modelUrl: 'javascript:alert(1)' })).rejects.toThrow('آدرس مدل')
+  })
 })
