@@ -1,0 +1,7 @@
+{
+  "name": "goldexa-workspace",
+  "private": true,
+  "scripts": {
+    "release:gate": "node scripts/release-gate.mjs"
+  }
+}

@@ -13,7 +13,7 @@
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
 - Frontend از APIهای واقعی استفاده می‌کند؛ داده‌های mock اجرایی حذف شده و صفحات سنگین به‌صورت lazy-load بارگذاری می‌شوند.
 - پرداخت امانی فروشنده و مبلغ را از listing/auction معتبر سمت سرور تطبیق می‌دهد.
-- release gate محلی برای کنترل آمادگی backend، قیمت‌گذاری، کاتالوگ و routeهای کلیدی فرانت در `scripts/release-gate.mjs` قرار دارد.
+- release gate محلی برای کنترل آمادگی backend، قیمت‌گذاری، کاتالوگ، AI و routeهای کلیدی فرانت در `scripts/release-gate.mjs` قرار دارد و از ریشه با `npm run release:gate` اجرا می‌شود.
 
 راهنمای تست در [backend/TESTING.md](backend/TESTING.md) و راهنمای اجرای امن MVP در [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) است.
 
