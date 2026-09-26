@@ -20,6 +20,7 @@ import {
   CreateJewelryDesignDto,
   CreateJewelryDesignVersionDto,
   CreateJewelryDesignStageDto,
+  UpdateJewelryDesignStageDto,
 } from './create-custom-builder.dto'
 import { GoldPricingService } from '../gold-pricing/gold-pricing.service'
 import { GoldPriceType } from '../gold-pricing/gold-price.entity'
@@ -104,6 +105,30 @@ export class CustomBuilderService {
       imageUrl: data.imageUrl?.trim() || null,
       modelUrl: data.modelUrl?.trim() || null,
     }))
+  }
+
+  async updateDesignStage(designId: string, stageId: string, data: UpdateJewelryDesignStageDto): Promise<JewelryDesignStage> {
+    if (!this.stageRepository) throw new NotFoundException('مخزن مرحله‌های ساخت آماده نیست')
+    const stage = await this.stageRepository.findOneBy({ id: stageId, designId })
+    if (!stage) throw new NotFoundException('مرحله‌ی ساخت یافت نشد')
+    if (data.imageUrl) assertSafeStageAssetUrl(data.imageUrl, 'تصویر')
+    if (data.modelUrl) assertSafeStageAssetUrl(data.modelUrl, 'مدل')
+    Object.assign(stage, {
+      ...(data.title !== undefined ? { title: data.title.trim() } : {}),
+      ...(data.status !== undefined ? { status: data.status as JewelryDesignStageStatus } : {}),
+      ...(data.note !== undefined ? { note: data.note?.trim() || null } : {}),
+      ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl?.trim() || null } : {}),
+      ...(data.modelUrl !== undefined ? { modelUrl: data.modelUrl?.trim() || null } : {}),
+    })
+    return this.stageRepository.save(stage)
+  }
+
+  async deleteDesignStage(designId: string, stageId: string): Promise<{ deleted: true }> {
+    if (!this.stageRepository) throw new NotFoundException('مخزن مرحله‌های ساخت آماده نیست')
+    const stage = await this.stageRepository.findOneBy({ id: stageId, designId })
+    if (!stage) throw new NotFoundException('مرحله‌ی ساخت یافت نشد')
+    await this.stageRepository.remove(stage)
+    return { deleted: true }
   }
 
   async createDesignVersion(

@@ -102,3 +102,20 @@ export class CreateJewelryDesignStageDto {
   @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' }) @Max(2048)
   modelUrl?: string | null
 }
+
+export class UpdateJewelryDesignStageDto {
+  @IsString() @IsOptional() @Min(2) @Max(160)
+  title?: string
+
+  @IsIn(['planned', 'in_progress', 'completed']) @IsOptional()
+  status?: string
+
+  @IsString() @IsOptional() @Max(4000)
+  note?: string | null
+
+  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس تصویر باید مسیر local یا http/https باشد' }) @Max(2048)
+  imageUrl?: string | null
+
+  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' }) @Max(2048)
+  modelUrl?: string | null
+}

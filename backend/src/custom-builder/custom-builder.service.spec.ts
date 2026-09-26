@@ -1,5 +1,6 @@
 import { CustomBuilderService } from './custom-builder.service'
 import { JewelryDesignStatus } from './jewelry-design.entity'
+import { JewelryDesignStageStatus } from './jewelry-design-stage.entity'
 
 describe('CustomBuilderService', () => {
   const design = { id: 'd1', userId: 'u1', estimatedGoldPrice: 100, weight: 2, laborCost: 20, profit: 10, tax: 9, totalPrice: 140 }
@@ -65,5 +66,14 @@ describe('CustomBuilderService', () => {
     const stages = { create: jest.fn((value) => value), save: jest.fn(async (value) => value) }
     const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never, undefined, stages as never)
     await expect(service.createDesignStage('d1', { title: 'مرحله', modelUrl: 'javascript:alert(1)' })).rejects.toThrow('آدرس مدل')
+  })
+
+  it('updates and deletes only the stage belonging to the design', async () => {
+    const stage = { id: 's1', designId: 'd1', title: 'قدیمی', status: JewelryDesignStageStatus.PLANNED, note: null, imageUrl: null, modelUrl: null }
+    const stages = { findOneBy: jest.fn().mockResolvedValue(stage), save: jest.fn(async (value) => value), remove: jest.fn(async () => undefined) }
+    const service = new CustomBuilderService(designs as never, versions as never, gemstones as never, quotes as never, undefined, stages as never)
+    await expect(service.updateDesignStage('d1', 's1', { status: 'completed', note: 'تمام شد' })).resolves.toMatchObject({ status: 'completed', note: 'تمام شد' })
+    await expect(service.deleteDesignStage('d1', 's1')).resolves.toEqual({ deleted: true })
+    expect(stages.remove).toHaveBeenCalledWith(stage)
   })
 })

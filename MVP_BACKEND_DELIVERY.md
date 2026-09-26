@@ -101,6 +101,7 @@
 - Custom Builder قیمت design و version را از قیمت زنده‌ی ۱۸ عیار، اجرت، سود و مالیات سمت سرور محاسبه می‌کند؛ مبلغ‌های forged ارسالی frontend نادیده گرفته می‌شوند و audit خودکار mutation routeها در `scripts/audit-route-guards.mjs` به CI متصل است.
 - برای پنل مدیریت v2، جدول و API مرحله‌های ساخت سفارشی (`GET/POST /custom-builder/designs/:id/stages`) با migration، کنترل مالکیت و دسترسی admin اضافه شد؛ asset upload مرحله و workflow کامل UI در backlog باقی است.
 - آپلود asset مرحله‌ی ساخت (`POST /uploads/design-stage-asset`) فقط برای permission `UPLOAD_BUILDER_ASSET` فعال است، تصویر را به WebP تبدیل می‌کند و ساختار GLB/glTF را قبل از ذخیره بررسی می‌کند؛ frontend پنل مدیریت URL برگشتی را مستقیماً به مرحله متصل می‌کند.
+- workflow مرحله‌های ساخت اکنون کامل است: ادمین می‌تواند مرحله را با `PATCH /custom-builder/designs/:designId/stages/:stageId` ویرایش و با `DELETE` حذف کند؛ هر دو endpoint به `JwtAuthGuard` و `AdminGuard` متصل و تست‌شده‌اند.
 
 ## رفع شکاف امنیتی RBAC (بخش ۱۱ سند RBAC)
 - **آسیب‌پذیری یافت‌شده:** endpointهای مالی/شخصی بدون احراز هویت باز بودند و یک کاربر می‌توانست کیف پول/سفارش کاربر دیگر را ببیند.

@@ -1793,6 +1793,10 @@ export const api = {
   getJewelryDesignStages: (designId: string) => request<JewelryDesignStage[]>(`/custom-builder/designs/${designId}/stages`),
   createJewelryDesignStage: (designId: string, body: { title: string; status?: JewelryDesignStage['status']; note?: string; imageUrl?: string; modelUrl?: string }) =>
     request<JewelryDesignStage>(`/custom-builder/designs/${designId}/stages`, { method: 'POST', body }),
+  updateJewelryDesignStage: (designId: string, stageId: string, body: Partial<{ title: string; status: JewelryDesignStage['status']; note: string | null; imageUrl: string | null; modelUrl: string | null }>) =>
+    request<JewelryDesignStage>(`/custom-builder/designs/${designId}/stages/${stageId}`, { method: 'PATCH', body }),
+  deleteJewelryDesignStage: (designId: string, stageId: string) =>
+    request<{ deleted: true }>(`/custom-builder/designs/${designId}/stages/${stageId}`, { method: 'DELETE' }),
   uploadJewelryDesignStageAsset: (file: File, assetType: 'image' | 'model') => {
     const body = new FormData()
     body.append('file', file)

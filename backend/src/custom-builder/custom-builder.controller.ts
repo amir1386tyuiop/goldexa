@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
 import { Request } from 'express'
 import { CustomBuilderService } from './custom-builder.service'
 import {
@@ -7,6 +7,7 @@ import {
   CreateJewelryDesignDto,
   CreateJewelryDesignVersionDto,
   CreateJewelryDesignStageDto,
+  UpdateJewelryDesignStageDto,
   UpdateCustomBuilderQuoteStatusDto,
   UpdateJewelryDesignStatusDto,
 } from './create-custom-builder.dto'
@@ -53,6 +54,14 @@ export class CustomBuilderController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Post('designs/:id/stages')
   async createDesignStage(@Param('id') id: string, @Body() body: CreateJewelryDesignStageDto) { return this.customBuilderService.createDesignStage(id, body) }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Patch('designs/:designId/stages/:stageId')
+  async updateDesignStage(@Param('designId') designId: string, @Param('stageId') stageId: string, @Body() body: UpdateJewelryDesignStageDto) { return this.customBuilderService.updateDesignStage(designId, stageId, body) }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Delete('designs/:designId/stages/:stageId')
+  async deleteDesignStage(@Param('designId') designId: string, @Param('stageId') stageId: string) { return this.customBuilderService.deleteDesignStage(designId, stageId) }
 
   @UseGuards(JwtAuthGuard)
   @Patch('designs/:id/status')
