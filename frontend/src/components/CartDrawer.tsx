@@ -7,6 +7,8 @@ import { formatPrice } from '@/utils/helpers'
 import { api } from '@/api/client'
 import { getStoredAuth } from '@/auth'
 
+const CART_OWNER_STORAGE_KEY = 'goldexa_cart_owner'
+
 export function CartDrawer() {
   const navigate = useNavigate()
   const {
@@ -47,9 +49,15 @@ export function CartDrawer() {
     let cancelled = false
     void (async () => {
       try {
+        const storedOwner = window.localStorage.getItem(CART_OWNER_STORAGE_KEY)
+        let localItems = useStore.getState().cart
+        if (storedOwner && storedOwner !== userId) {
+          replaceCart([])
+          localItems = []
+        }
+        window.localStorage.setItem(CART_OWNER_STORAGE_KEY, userId)
         const backendCart = await api.getCart(userId)
         const serverItems = backendCart?.items || []
-        const localItems = useStore.getState().cart
         if (!localItems.length && serverItems.length) {
           const items = await Promise.all(serverItems.map(async (item) => ({
             product: await api.getProduct(item.productId),
