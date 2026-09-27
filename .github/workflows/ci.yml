@@ -63,6 +63,7 @@ jobs:
         working-directory: backend
     env:
       E2E_BASE_URL: http://localhost:3011
+      AI_E2E_BASE_URL: http://localhost:58000
       E2E_ALLOW_DB_FIXTURES: '1'
       DB_HOST: localhost
       DB_PORT: '55432'
