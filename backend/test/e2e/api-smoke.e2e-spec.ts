@@ -1,3 +1,5 @@
+import { api, createAndLogin, jsonBody, jsonHeaders } from './support'
+
 const baseUrl = (process.env.E2E_BASE_URL || '').replace(/\/$/, '')
 const e2e = baseUrl ? describe : describe.skip
 
@@ -37,5 +39,14 @@ e2e('API smoke and unauthenticated access checks', () => {
       body: JSON.stringify({ name: 'security-smoke', laborRate: 1, profitRate: 1, taxRate: 1 }),
     })
     expect(response.status).toBe(401)
+  })
+
+  it('keeps Smart Vault assets scoped to their owner', async () => {
+    const owner = await createAndLogin('vault-owner')
+    const other = await createAndLogin('vault-other')
+    const foreign = await api(`/smart-vault/assets/user/${owner.userId}`, { headers: jsonHeaders(other.token) })
+    expect(foreign.status).toBe(403)
+    const own = await api(`/smart-vault/assets/user/${owner.userId}`, { headers: jsonHeaders(owner.token) })
+    expect(own.status).toBe(200)
   })
 })

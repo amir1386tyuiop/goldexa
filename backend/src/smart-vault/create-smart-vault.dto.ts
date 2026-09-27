@@ -1,6 +1,6 @@
 import { PriceAlertTargetType } from './price-alert.entity'
 import { Type } from 'class-transformer'
-import { IsArray, IsDate, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator'
+import { IsArray, IsDate, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator'
 
 export class CreateSmartVaultAssetDto {
   @IsUUID() @IsOptional() userId?: string
@@ -8,7 +8,7 @@ export class CreateSmartVaultAssetDto {
   productId?: string | null
   @IsUUID() @IsOptional()
   orderId?: string | null
-  @IsString() @Min(2)
+  @IsString() @MinLength(2)
   name: string
   @IsString() @IsOptional()
   category?: string | null

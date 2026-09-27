@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsArray, IsBoolean, IsDate, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator'
+import { IsArray, IsBoolean, IsDate, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator'
 
 const categories = ['ring', 'necklace', 'bracelet', 'earring', 'pendant']
 const baseTypes = ['simple', 'half_diamond', 'full_diamond', 'stone_center']
@@ -7,7 +7,7 @@ const baseTypes = ['simple', 'half_diamond', 'full_diamond', 'stone_center']
 export class CreateJewelryDesignDto {
   @IsString() @IsOptional() userId?: string
   @IsString() @IsOptional() userName?: string
-  @IsString() @Min(2) title: string
+  @IsString() @MinLength(2) title: string
   @IsIn(categories) category: string
   @IsIn(baseTypes) @IsOptional() baseType?: string
   @Type(() => Number) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) weight: number
@@ -38,7 +38,7 @@ export class CreateJewelryDesignVersionDto {
 }
 
 export class CreateGemstoneDto {
-  @IsString() @Min(2)
+  @IsString() @MinLength(2)
   name: string
   @IsString()
   type: string
@@ -87,35 +87,35 @@ export class UpdateCustomBuilderQuoteStatusDto {
 }
 
 export class CreateJewelryDesignStageDto {
-  @IsString() @Min(2) @Max(160)
+  @IsString() @MinLength(2) @MaxLength(160)
   title: string
 
   @IsIn(['planned', 'in_progress', 'completed']) @IsOptional()
   status?: string
 
-  @IsString() @IsOptional() @Max(4000)
+  @IsString() @IsOptional() @MaxLength(4000)
   note?: string | null
 
-  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس تصویر باید مسیر local یا http/https باشد' }) @Max(2048)
+  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس تصویر باید مسیر local یا http/https باشد' }) @MaxLength(2048)
   imageUrl?: string | null
 
-  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' }) @Max(2048)
+  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' }) @MaxLength(2048)
   modelUrl?: string | null
 }
 
 export class UpdateJewelryDesignStageDto {
-  @IsString() @IsOptional() @Min(2) @Max(160)
+  @IsString() @IsOptional() @MinLength(2) @MaxLength(160)
   title?: string
 
   @IsIn(['planned', 'in_progress', 'completed']) @IsOptional()
   status?: string
 
-  @IsString() @IsOptional() @Max(4000)
+  @IsString() @IsOptional() @MaxLength(4000)
   note?: string | null
 
-  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس تصویر باید مسیر local یا http/https باشد' }) @Max(2048)
+  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس تصویر باید مسیر local یا http/https باشد' }) @MaxLength(2048)
   imageUrl?: string | null
 
-  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' }) @Max(2048)
+  @IsString() @IsOptional() @Matches(/^(?:\/|https?:\/\/)/i, { message: 'آدرس مدل باید مسیر local یا http/https باشد' }) @MaxLength(2048)
   modelUrl?: string | null
 }

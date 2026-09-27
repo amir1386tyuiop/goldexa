@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
 import { Request } from 'express'
 import { SmartVaultService } from './smart-vault.service'
 import {
@@ -16,8 +16,9 @@ export class SmartVaultController {
   constructor(private readonly smartVaultService: SmartVaultService) {}
 
   @Get('assets/user/:userId')
-  async findAssets(@Req() req: AuthenticatedRequest) {
-    return this.smartVaultService.findAssets(req.user.sub)
+  async findAssets(@Param('userId') userId: string, @Req() req: AuthenticatedRequest) {
+    const targetUserId = resolveTarget(userId, req.user)
+    return this.smartVaultService.findAssets(targetUserId)
   }
 
   @Get('summary')
@@ -46,8 +47,9 @@ export class SmartVaultController {
   }
 
   @Get('alerts/user/:userId')
-  async findAlerts(@Req() req: AuthenticatedRequest) {
-    return this.smartVaultService.findAlerts(req.user.sub)
+  async findAlerts(@Param('userId') userId: string, @Req() req: AuthenticatedRequest) {
+    const targetUserId = resolveTarget(userId, req.user)
+    return this.smartVaultService.findAlerts(targetUserId)
   }
 
   @Post('alerts')
@@ -68,4 +70,9 @@ export class SmartVaultController {
 
 function isAdmin(user: JwtUser): boolean {
   return user.role === 'admin' || user.roleNames?.includes('admin') === true
+}
+
+function resolveTarget(userId: string, user: JwtUser): string {
+  if (isAdmin(user) || user.sub === userId) return userId
+  throw new ForbiddenException('دسترسی به صندوقچه‌ی کاربر دیگر مجاز نیست')
 }
