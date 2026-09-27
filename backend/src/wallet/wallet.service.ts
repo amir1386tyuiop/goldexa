@@ -488,7 +488,40 @@ export class WalletService {
   /** Credits a community reward through the same locked, auditable ledger as other wallet mutations. */
   async creditCommunityReward(userId: string, rewardId: string, amount: number, description: string): Promise<WalletTransaction> {
     if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('مبلغ جایزه نامعتبر است')
-    return this.applyLedger({ userId, rewardId, type: WalletTransactionType.COMMUNITY_REWARD, rialDelta: amount, description })
+    const transaction = await this.applyLedger({ userId, rewardId, type: WalletTransactionType.COMMUNITY_REWARD, rialDelta: amount, description })
+    await this.auditCommunityReward(transaction, userId, amount)
+    return transaction
+  }
+
+  /**
+   * Community winner settlement primitive. The caller owns the surrounding
+   * transaction so reward, badge, challenge and wallet ledger commit together.
+   */
+  async creditCommunityRewardInManager(
+    manager: EntityManager,
+    userId: string,
+    rewardId: string,
+    amount: number,
+    description: string,
+  ): Promise<WalletTransaction> {
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('مبلغ جایزه نامعتبر است')
+    return this.applyLedgerInManager(manager, {
+      userId,
+      rewardId,
+      type: WalletTransactionType.COMMUNITY_REWARD,
+      rialDelta: amount,
+      description,
+    })
+  }
+
+  async auditCommunityReward(transaction: WalletTransaction, userId: string, amount: number): Promise<void> {
+    await this.audit.record({
+      userId,
+      action: `WALLET_${WalletTransactionType.COMMUNITY_REWARD.toUpperCase()}`,
+      entityType: 'wallet_transaction',
+      entityId: transaction.id,
+      metadata: { rialDelta: amount, rewardId: transaction.rewardId ?? null },
+    })
   }
 
   async findTransactions(userId: string): Promise<WalletTransaction[]> {

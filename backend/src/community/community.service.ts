@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { DataSource, EntityManager, Repository } from 'typeorm'
 import { DesignChallenge, DesignChallengeStatus } from './design-challenge.entity'
 import { DesignPost, DesignPostStatus } from './design-post.entity'
 import { DesignComment } from './design-comment.entity'
@@ -33,6 +33,7 @@ export class CommunityService {
     @InjectRepository(ChallengeReward)
     private rewardRepository: Repository<ChallengeReward>,
     private readonly walletService: WalletService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findChallenges(): Promise<DesignChallenge[]> {
@@ -137,57 +138,42 @@ export class CommunityService {
   }
 
   async setWinner(challengeId: string, winnerPostId: string): Promise<DesignChallenge> {
-    const challenge = await this.challengeRepository.findOneBy({ id: challengeId })
-
-    if (!challenge) {
-      throw new NotFoundException('چالش یافت نشد')
+    const winnerPost = await this.postRepository.findOneBy({ id: winnerPostId })
+    if (!winnerPost) throw new NotFoundException('طرح برنده یافت نشد')
+    await this.walletService.ensureWalletForUser(winnerPost.userId)
+    const result = await this.dataSource.transaction(async (manager) => this.setWinnerInManager(manager, challengeId, winnerPostId))
+    if (result.transaction && Number(result.reward.rewardValue) > 0) {
+      await this.walletService.auditCommunityReward(result.transaction, result.post.userId, Number(result.reward.rewardValue))
     }
+    return result.challenge
+  }
 
-    const post = await this.postRepository.findOneBy({ id: winnerPostId })
-
-    if (!post) {
-      throw new NotFoundException('طرح برنده یافت نشد')
-    }
-
-    if (post.challengeId !== challengeId) {
-      throw new BadRequestException('طرح انتخاب‌شده متعلق به این چالش نیست')
-    }
+  private async setWinnerInManager(manager: EntityManager, challengeId: string, winnerPostId: string) {
+    const challenges = manager.getRepository(DesignChallenge)
+    const posts = manager.getRepository(DesignPost)
+    const rewards = manager.getRepository(ChallengeReward)
+    const badges = manager.getRepository(UserBadge)
+    const challenge = await challenges.findOne({ where: { id: challengeId }, lock: { mode: 'pessimistic_write' } })
+    if (!challenge) throw new NotFoundException('چالش یافت نشد')
+    const post = await posts.findOneBy({ id: winnerPostId })
+    if (!post) throw new NotFoundException('طرح برنده یافت نشد')
+    if (post.challengeId !== challengeId) throw new BadRequestException('طرح انتخاب‌شده متعلق به این چالش نیست')
 
     challenge.winnerPostId = winnerPostId
     challenge.status = DesignChallengeStatus.ENDED
-    const savedChallenge = await this.challengeRepository.save(challenge)
-
-    let reward = await this.rewardRepository.findOneBy({ challengeId, postId: winnerPostId, userId: post.userId })
+    const savedChallenge = await challenges.save(challenge)
+    let reward = await rewards.findOneBy({ challengeId, postId: winnerPostId, userId: post.userId })
     if (!reward) {
-      reward = await this.rewardRepository.save(this.rewardRepository.create({
-        challengeId,
-        postId: winnerPostId,
-        userId: post.userId,
-        rewardType: challenge.rewardType || 'design_challenge_winner',
-        rewardValue: Number(challenge.rewardValue || 0),
-      }))
+      reward = await rewards.save(rewards.create({ challengeId, postId: winnerPostId, userId: post.userId, rewardType: challenge.rewardType || 'design_challenge_winner', rewardValue: Number(challenge.rewardValue || 0) }))
     }
-
+    let transaction: Awaited<ReturnType<WalletService['creditCommunityRewardInManager']>> | null = null
     if (Number(reward.rewardValue) > 0) {
-      await this.walletService.creditCommunityReward(
-        post.userId,
-        reward.id,
-        Number(reward.rewardValue),
-        `جایزه‌ی برنده‌ی چالش طراحی ${challenge.title}`,
-      )
+      transaction = await this.walletService.creditCommunityRewardInManager(manager, post.userId, reward.id, Number(reward.rewardValue), `جایزه‌ی برنده‌ی چالش طراحی ${challenge.title}`)
     }
-
     const badgeName = `برنده چالش: ${challenge.title}`
-    const badge = await this.badgeRepository.findOneBy({ userId: post.userId, name: badgeName })
-    if (!badge) {
-      await this.badgeRepository.save(this.badgeRepository.create({
-        userId: post.userId,
-        name: badgeName,
-        description: 'نشان برنده‌ی چالش طراحی Goldexa',
-        icon_url: null,
-      }))
+    if (!(await badges.findOneBy({ userId: post.userId, name: badgeName }))) {
+      await badges.save(badges.create({ userId: post.userId, name: badgeName, description: 'نشان برنده‌ی چالش طراحی Goldexa', icon_url: null }))
     }
-
-    return savedChallenge
+    return { challenge: savedChallenge, reward, post, transaction }
   }
 }
