@@ -7,8 +7,8 @@
 و E2E واقعی با PostgreSQL و Redis اجرا و تأیید شود.
 
 - Backend build: موفق (`npm run build`).
-- Backend unit tests: suiteهای unit و security در CI اجرا می‌شوند؛ security gate routeهای حساس، احراز هویت، نقش، permission و مالکیت را بررسی می‌کند. آخرین اجرای backend شامل ۳۰ suite و ۱۹۲ تست موفق است. تست‌های E2E با PostgreSQL/Redis ایزوله‌ی compose نیز verified شده‌اند: ۴ suite و ۱۵ تست سبز. برای اجرای محلی، ابتدا `backend/test/docker-compose.e2e.yml` را بالا بیاورید و `E2E_BASE_URL=http://localhost:3011`، `E2E_ALLOW_DB_FIXTURES=1` و متغیرهای اتصال به `goldeksa_e2e` را تنظیم کنید.
-- E2E checkout/refund: با PostgreSQL و Redis واقعی در stack ایزوله تأیید شده است (۴ suite، ۱۵ تست موفق).
+- Backend unit tests: suiteهای unit و security در CI اجرا می‌شوند؛ security gate routeهای حساس، احراز هویت، نقش، permission و مالکیت را بررسی می‌کند. تست‌های E2E با PostgreSQL/Redis ایزوله‌ی compose نیز verified شده‌اند: ۵ suite و ۱۷ تست سبز. برای اجرای محلی، ابتدا `backend/test/docker-compose.e2e.yml` را بالا بیاورید و `E2E_BASE_URL=http://localhost:3011`، `AI_E2E_BASE_URL=http://localhost:58000`، `E2E_ALLOW_DB_FIXTURES=1` و متغیرهای اتصال به `goldeksa_e2e` را تنظیم کنید.
+- E2E checkout/refund: با PostgreSQL، Redis و AI محلی واقعی در stack ایزوله تأیید شده است (۵ suite، ۱۷ تست موفق).
 - Frontend lint/build: موفق.
 - وضعیت جزئیات hardening و محدودیت‌های release در [CHANGELOG.md](CHANGELOG.md) و [MVP_SAFE_RUNBOOK.md](MVP_SAFE_RUNBOOK.md) ثبت شده است.
 - Frontend از APIهای واقعی استفاده می‌کند؛ داده‌های mock اجرایی حذف شده و صفحات سنگین به‌صورت lazy-load بارگذاری می‌شوند.
