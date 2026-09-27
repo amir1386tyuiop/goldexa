@@ -28,6 +28,7 @@ const frontendChecks = [
   '/checkout',
   '/ar',
   '/auctions',
+  '/auction/release-smoke',
   '/marketplace',
   '/builder',
   '/ai-workspace',

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Gavel,
@@ -22,6 +23,7 @@ import { getStoredAuth } from '@/auth'
 
 export function AuctionPage() {
   const queryClient = useQueryClient()
+  const { id: auctionId } = useParams<{ id: string }>()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null)
@@ -46,6 +48,12 @@ export function AuctionPage() {
     initialData: [],
     refetchInterval: 15000,
   })
+
+  useEffect(() => {
+    if (!auctionId) return
+    const requested = auctions.find((auction) => auction.id === auctionId)
+    if (requested) setSelectedAuction(requested)
+  }, [auctionId, auctions])
 
   const { data: products = [] } = useQuery({
     queryKey: ['auction-products'],

@@ -16,6 +16,7 @@ const ARPage = lazy(() => import('./pages/ARPage').then(({ ARPage }) => ({ defau
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })))
 const AuctionsPage = lazy(() => import('./pages/AuctionsPage').then(({ AuctionsPage }) => ({ default: AuctionsPage })))
+const AuctionPage = lazy(() => import('./pages/AuctionPage').then(({ AuctionPage }) => ({ default: AuctionPage })))
 const BuilderPage = lazy(() => import('./pages/BuilderPage').then(({ BuilderPage }) => ({ default: BuilderPage })))
 const AiEnginePage = lazy(() => import('./pages/AiEnginePage').then(({ AiEnginePage }) => ({ default: AiEnginePage })))
 const EscrowPage = lazy(() => import('./pages/EscrowPage').then(({ EscrowPage }) => ({ default: EscrowPage })))
@@ -81,6 +82,7 @@ function App() {
             <Route path="/checkout" element={<RequireAuth><CheckoutPage /></RequireAuth>} />
             <Route path="/ar" element={<ARPage />} />
             <Route path="/auctions" element={<AuctionsPage />} />
+            <Route path="/auction/:id" element={<AuctionPage />} />
             <Route path="/marketplace" element={<AuctionsPage initialTab="marketplace" />} />
             <Route path="/builder" element={<BuilderPage />} />
             <Route path="/ai-workspace" element={<RequireAuth><AiEnginePage /></RequireAuth>} />

@@ -384,6 +384,7 @@ function AuctionDetailPanel({
   isSubmitting: boolean
   error?: string
 }) {
+  const navigate = useNavigate()
   if (!auction) {
     return (
       <div className="card p-6">
@@ -398,6 +399,9 @@ function AuctionDetailPanel({
       <div>
         <h2 className="text-xl font-bold mb-2">{auction.product?.name || 'طلای دست دوم'}</h2>
         <p className="text-sm text-muted-foreground">{auction.notes || 'بدون توضیحات'}</p>
+        <button type="button" className="btn btn-outline mt-3 min-h-10" onClick={() => navigate(`/auction/${auction.id}`)}>
+          باز کردن صفحه اختصاصی مزایده
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
