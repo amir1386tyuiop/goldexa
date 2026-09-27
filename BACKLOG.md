@@ -107,11 +107,11 @@
 ## اقلام باقی‌مانده‌ی backendِ قابل‌اقدام (اولویت‌بندی‌شده)
 1. ✅ تنظیم آستانه‌ی نوسان قیمت به **۲٪** (طبق AC دقیق PRD)
 2. ✅ سخت‌گیری آپلود تصویر به **< ۲۰۰KB** (فشرده‌سازی هدفمند WebP و رد خروجی بزرگ‌تر)
-3. ✅ **گزارش تفکیکی درآمد** در پنل ادمین برای کمیسیون‌های قطعی؛ ثبت جداگانه‌ی اسپرد/اشتراک/AI/AR برای حسابداری کامل باقی است.
+3. ✅ **گزارش تفکیکی درآمد** در پنل ادمین با مرجع `platform_revenue` ledger برای کمیسیون‌های قطعی؛ ثبت جداگانه‌ی اسپرد/اشتراک/AI/AR برای حسابداری کامل باقی است.
 4. 🟡 **refund آنلاین واقعی** — قرارداد endpoint/provider و credential زرین‌پال باید در محیط sandbox/production تأیید شود؛ در کد، وضعیت `refund_pending`، قفل تراکنش و rollback امن اضافه شده و refund جعلی ممنوع است.
 5. 🟡 **payout بانکی واقعی** — چرخه‌ی reserve/approve/processing/paid/reject و ثبت `providerReference` پیاده شده؛ اتصال API بانکی و reconciliation بیرونی باقی است.
 6. 🟡 ممیزی **RBAC روی همه‌ی routeهای کاربر** (داده‌های مالی، escrow، wallet، group buying، community و liquidity mutationها enforce شده؛ saved designهای community نیز مالک‌محور و تست‌شده‌اند؛ ممیزی route-by-route سایر ماژول‌ها باقی است)
-7. 🟡 ممیزی **OWASP** — Helmet و headers پایه انجام شد؛ بررسی CSRF/Origin متناسب با Bearer JWT، بنچمارک < ۲۰۰ms و ممیزی ایندکس/N+1 باقی است
+7. 🟡 ممیزی **OWASP** — Helmet و headers پایه و سیاست Origin برای mutationها انجام شد؛ بنچمارک endpointهای احراز‌شده و ممیزی ایندکس/N+1 باقی است
 8. ✅ **هشدار به ادمین** هنگام قطع منبع قیمت (audit + notification)
 9. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
 10. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است

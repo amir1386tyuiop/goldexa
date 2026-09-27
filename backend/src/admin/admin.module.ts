@@ -39,6 +39,7 @@ import { OrdersModule } from '../orders/orders.module'
 import { PayoutRequest } from '../wallet/payout-request.entity'
 import { PaymentsModule } from '../payments/payments.module'
 import { CommunityModule } from '../community/community.module'
+import { PlatformRevenue } from '../finance/platform-revenue.entity'
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { CommunityModule } from '../community/community.module'
       UserRoleMapping,
       RolePermissionMapping,
       PayoutRequest,
+      PlatformRevenue,
     ]),
     EscrowModule,
     OrdersModule,

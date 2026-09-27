@@ -31,6 +31,7 @@ import { RoleService } from '../auth/role.service'
 import { SystemSetting } from '../audit/system-setting.entity'
 import { PayoutRequest, PayoutRequestStatus } from '../wallet/payout-request.entity'
 import { PaymentsService } from '../payments/payments.service'
+import { PlatformRevenue } from '../finance/platform-revenue.entity'
 @Injectable()
 export class AdminService {
   constructor(
@@ -89,6 +90,8 @@ export class AdminService {
     private systemSettingRepository: Repository<SystemSetting>,
     @InjectRepository(PayoutRequest)
     private payoutRepository: Repository<PayoutRequest>,
+    @InjectRepository(PlatformRevenue)
+    private platformRevenueRepository: Repository<PlatformRevenue>,
     private roleService: RoleService,
     private readonly escrowService: EscrowService,
   ) {}
@@ -254,19 +257,20 @@ export class AdminService {
       .where('r.status IN (:...statuses)', { statuses: ['pending', 'approved', 'completed'] })
       .getRawOne<{ total: string; count: string }>()
 
-    const escrow = await this.escrowRepository
-      .createQueryBuilder('e')
-      .select('COALESCE(SUM(e.fee), 0)', 'total')
-      .where('e.status = :status', { status: EscrowPaymentStatus.RELEASED })
-      .getRawOne<{ total: string }>()
+    const revenueLedger = await this.platformRevenueRepository
+      .createQueryBuilder('r')
+      .select('r.sourceType', 'sourceType')
+      .addSelect('COALESCE(SUM(r.amount), 0)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('r.sourceType')
+      .getRawMany<{ sourceType: string; total: string; count: string }>()
 
-    const auctions = await this.auctionRepository
+    const auctionGross = await this.auctionRepository
       .createQueryBuilder('a')
-      .select('COALESCE(SUM(a.commission_amount), 0)', 'total')
-      .addSelect('COALESCE(SUM(a.winning_amount), 0)', 'gross')
+      .select('COALESCE(SUM(a.winning_amount), 0)', 'gross')
       .addSelect('COUNT(*)', 'count')
       .where('a.payment_status = :status', { status: 'settled' })
-      .getRawOne<{ total: string; gross: string; count: string }>()
+      .getRawOne<{ gross: string; count: string }>()
 
     const payouts = await this.payoutRepository
       .createQueryBuilder('p')
@@ -275,8 +279,11 @@ export class AdminService {
       .where('p.status = :status', { status: PayoutRequestStatus.PAID })
       .getRawOne<{ total: string; count: string }>()
 
-    const escrowFees = Number(escrow?.total ?? 0)
-    const auctionCommission = Number(auctions?.total ?? 0)
+    const revenueBySource = Object.fromEntries(
+      revenueLedger.map((row) => [row.sourceType, { amount: Number(row.total ?? 0), count: Number(row.count ?? 0) }]),
+    )
+    const escrowFees = revenueBySource.marketplace_commission?.amount ?? 0
+    const auctionCommission = revenueBySource.auction_commission?.amount ?? 0
     const refundsTotal = Number(refunds?.total ?? 0)
 
     const ordersByStatus = await this.orderRepository
@@ -299,13 +306,14 @@ export class AdminService {
         escrowCommissionEarned: escrowFees,
         auctionCommissionEarned: auctionCommission,
         totalPlatformCommission: escrowFees + auctionCommission,
-        settledAuctionGross: Number(auctions?.gross ?? 0),
-        settledAuctionCount: Number(auctions?.count ?? 0),
+        settledAuctionGross: Number(auctionGross?.gross ?? 0),
+        settledAuctionCount: Number(auctionGross?.count ?? 0),
         paidPayouts: Number(payouts?.total ?? 0),
         paidPayoutCount: Number(payouts?.count ?? 0),
         operationalNetAfterRefunds: escrowFees + auctionCommission - refundsTotal,
       },
       ordersByStatus: ordersByStatus.map((r) => ({ status: r.status, count: Number(r.count) })),
+      revenueBySource,
       // Revenue streams defined in the business model (populated as modules grow).
       streams: [
         'product_sales_fee',

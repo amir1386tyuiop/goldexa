@@ -22,7 +22,11 @@ describe('AdminService financial reports', () => {
       .mockReturnValueOnce(queryBuilder(null, [{ status: 'paid', count: '2' }])) }
     service.refundRepository = { createQueryBuilder: () => queryBuilder({ total: '250', count: '1' }) }
     service.escrowRepository = { createQueryBuilder: () => queryBuilder({ total: '40' }) }
-    service.auctionRepository = { createQueryBuilder: () => queryBuilder({ total: '15', gross: '500', count: '1' }) }
+    service.auctionRepository = { createQueryBuilder: () => queryBuilder({ gross: '500', count: '1' }) }
+    service.platformRevenueRepository = { createQueryBuilder: () => queryBuilder(null, [
+      { sourceType: 'marketplace_commission', total: '40', count: '1' },
+      { sourceType: 'auction_commission', total: '15', count: '1' },
+    ]) }
     service.payoutRepository = { createQueryBuilder: () => queryBuilder({ total: '100', count: '1' }) }
 
     const report = await service.getReports()
