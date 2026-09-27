@@ -54,7 +54,9 @@ export class UsedGoldListingsService {
   }
 
   async findOne(id: string): Promise<UsedGoldListing | null> {
-    const listing = await this.listingRepository.findOneBy({ id })
+    const listing = await this.listingRepository.findOne({
+      where: { id, status: In([UsedGoldListingStatus.APPROVED, UsedGoldListingStatus.ACTIVE]) },
+    })
 
     if (!listing) {
       return null

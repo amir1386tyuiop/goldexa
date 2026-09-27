@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common'
 import { UsedGoldListingsService } from './used-gold-listings.service'
 import { UsedGoldListingSaleType, UsedGoldListingStatus, UsedGoldSource } from './used-gold-listing.entity'
 import { EscrowPaymentStatus } from '../escrow/escrow-payment.entity'
+import { In } from 'typeorm'
 
 describe('UsedGoldListingsService', () => {
   const listingRepository = {
@@ -38,6 +39,14 @@ describe('UsedGoldListingsService', () => {
 
     expect(result.sellerName).toBe('فروشنده واقعی')
     expect(result.status).toBe(UsedGoldListingStatus.PENDING_REVIEW)
+  })
+
+  it('does not expose pending, rejected, or cancelled listings through the public detail route', async () => {
+    await service.findOne('listing-1')
+
+    expect(listingRepository.findOne).toHaveBeenCalledWith({
+      where: { id: 'listing-1', status: In([UsedGoldListingStatus.APPROVED, UsedGoldListingStatus.ACTIVE]) },
+    })
   })
 
   it('rejects incomplete direct and auction pricing', async () => {
