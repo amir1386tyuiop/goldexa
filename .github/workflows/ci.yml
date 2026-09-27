@@ -129,9 +129,9 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
       - name: Type-check Expo client
-        run: npx tsc --noEmit
+        run: npm run typecheck
       - name: Export web bundle
-        run: npx expo export --platform web
+        run: npm run export:web
 
   ai-service-check:
     runs-on: ubuntu-latest
