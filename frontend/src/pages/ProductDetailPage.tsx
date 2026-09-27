@@ -60,14 +60,9 @@ export function ProductDetailPage() {
 
   const images = product.images?.length ? product.images : ['/images/ring-1.svg']
   const goldPrice = goldPrices.find((p) => p.type === 'gold18')
-  const breakdown = calculatePriceBreakdown(
-    product.weight,
-    goldPrice ? goldPrice.value : 3_560_000,
-    product.labor,
-    product.profit,
-    product.tax,
-    0,
-  )
+  const breakdown = goldPrice
+    ? calculatePriceBreakdown(product.weight, goldPrice.value, product.labor, product.profit, product.tax, 0)
+    : null
   const feedLive = Boolean(feedStatus?.lastFetchAt)
 
   return (
@@ -120,7 +115,7 @@ export function ProductDetailPage() {
 
             <div className="card mb-4 p-5">
               <h2 className="mb-4 font-black text-navy-900">شکست قیمت (شفاف)</h2>
-              <div className="space-y-3 text-sm">
+              {breakdown ? <div className="space-y-3 text-sm">
                 {[
                   { label: 'قیمت خام طلا', value: breakdown.rawGold },
                   { label: `اجرت ساخت (${product.labor}%)`, value: breakdown.labor },
@@ -136,7 +131,7 @@ export function ProductDetailPage() {
                   <span className="font-black">قیمت نهایی</span>
                   <span className="font-black text-gold-600">{formatPrice(product.finalPrice)} تومان</span>
                 </div>
-              </div>
+              </div> : <p className="text-sm leading-7 text-stone-600" role="status">در حال دریافت نرخ زنده‌ی طلای ۱۸ عیار؛ جزئیات محاسبه پس از دریافت نرخ نمایش داده می‌شود.</p>}
             </div>
 
             <PriceReservationTimer />
