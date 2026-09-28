@@ -64,4 +64,23 @@ describe('PayoutService', () => {
     await expect(service.resolve('payout-1', 'admin-1', PayoutRequestStatus.PAID, {})).rejects.toThrow('شماره مرجع بانکی')
     await expect(service.resolve('payout-1', 'admin-1', PayoutRequestStatus.PAID, { providerReference: 'BANK-1' })).resolves.toMatchObject({ status: PayoutRequestStatus.PAID })
   })
+
+  it('turns a concurrent idempotency unique violation into the existing payout', async () => {
+    const raced = { id: 'payout-raced', userId: 'user-1', idempotencyKey: 'key-race' }
+    const payoutRepository = {
+      findOneBy: jest.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(raced),
+    }
+    const bankRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 'bank-1', userId: 'user-1', isDefault: true }) }
+    const dataSource = { transaction: jest.fn().mockRejectedValue({ code: '23505' }) }
+    const walletService = {
+      ensureWalletForUser: jest.fn(),
+      holdPayout: jest.fn(),
+    }
+    const service = new PayoutService(payoutRepository as never, bankRepository as never, dataSource as never, walletService as never)
+
+    await expect(service.create('user-1', { amount: 10000, idempotencyKey: 'key-race' })).resolves.toEqual(raced)
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1)
+  })
 })

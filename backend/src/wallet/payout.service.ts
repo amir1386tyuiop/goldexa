@@ -36,23 +36,34 @@ export class PayoutService {
     if (!Number.isFinite(amount) || amount < 1000) throw new BadRequestException('مبلغ برداشت نامعتبر است')
 
     await this.walletService.ensureWalletForUser(userId)
-    return this.dataSource.transaction(async (manager) => {
-      const request = manager.create(PayoutRequest, {
-        userId,
-        bankAccountId: account.id,
-        amount,
-        status: PayoutRequestStatus.PENDING,
-        idempotencyKey: key,
-        providerReference: null,
-        failureReason: null,
-        reviewedBy: null,
-        reviewedAt: null,
-        paidAt: null,
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const request = manager.create(PayoutRequest, {
+          userId,
+          bankAccountId: account.id,
+          amount,
+          status: PayoutRequestStatus.PENDING,
+          idempotencyKey: key,
+          providerReference: null,
+          failureReason: null,
+          reviewedBy: null,
+          reviewedAt: null,
+          paidAt: null,
+        })
+        await manager.save(request)
+        await this.walletService.holdPayout(userId, request.id, amount, manager)
+        return request
       })
-      await manager.save(request)
-      await this.walletService.holdPayout(userId, request.id, amount, manager)
-      return request
-    })
+    } catch (error) {
+      // Two identical requests can pass the pre-check concurrently. The
+      // database unique index is the final arbiter; turn that race into the
+      // same idempotent response instead of leaking a 23505 error.
+      if (!this.isUniqueViolation(error)) throw error
+      const raced = await this.payoutRepository.findOneBy({ idempotencyKey: key })
+      if (!raced) throw error
+      if (raced.userId !== userId) throw new ForbiddenException('کلید idempotency متعلق به کاربر دیگری است')
+      return raced
+    }
   }
 
   async resolve(id: string, adminId: string, status: PayoutRequestStatus, data: ResolvePayoutDto): Promise<PayoutRequest> {
@@ -89,5 +100,9 @@ export class PayoutService {
       if (status === PayoutRequestStatus.PAID) request.paidAt = new Date()
       return manager.save(request)
     })
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === '23505')
   }
 }
