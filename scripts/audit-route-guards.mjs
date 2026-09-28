@@ -4,8 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const sourceRoot = path.resolve(process.cwd(), 'backend', 'src')
+const routeDecorators = /@(?:Get|Post|Put|Patch|Delete)\s*\(([^)]*)\)/
 const mutationDecorators = /@(?:Post|Put|Patch|Delete)\s*\(([^)]*)\)/
-const userScopedDecorators = /@(?:Get|Post|Put|Patch|Delete)\s*\(([^)]*userId[^)]*)\)/
 const controllerDecorator = /@Controller\s*\(\s*['"]?([^'")\s]*)/
 const guardedTokens = ['JwtAuthGuard', 'AdminGuard', 'PermissionsGuard']
 const publicMutations = new Set([
@@ -49,20 +49,24 @@ for (const file of collectFiles(sourceRoot)) {
   const classGuarded = guardedTokens.some((token) => classPrefix.includes(token))
 
   lines.forEach((line, index) => {
-    const mutation = line.match(mutationDecorators)
-    if (!mutation) return
-    const route = routePath(controller, mutation[1])
+    const routeMatch = line.match(routeDecorators)
+    if (!routeMatch) return
+    const route = routePath(controller, routeMatch[1])
+    const userScoped = line.match(/@(?:Get|Post|Put|Patch|Delete)\s*\(([^)]*userId[^)]*)\)/)
     const window = lines.slice(Math.max(0, index - 8), Math.min(lines.length, index + 4)).join('\n')
     const guarded = classGuarded || guardedTokens.some((token) => window.includes(token))
-    if (!guarded && !publicMutations.has(route)) {
-      findings.push(`${path.relative(process.cwd(), file)}:${index + 1} ${route}`)
+
+    if (userScoped) {
+      const userRoute = routePath(controller, userScoped[1])
+      if (!guarded && !publicUserScopedReads.has(userRoute)) {
+        findings.push(`${path.relative(process.cwd(), file)}:${index + 1} unguarded user-scoped route ${userRoute}`)
+      }
     }
 
-    const userScoped = line.match(userScopedDecorators)
-    if (!userScoped) return
-    const userRoute = routePath(controller, userScoped[1])
-    if (!guarded && !publicUserScopedReads.has(userRoute)) {
-      findings.push(`${path.relative(process.cwd(), file)}:${index + 1} user-scoped route ${userRoute}`)
+    const mutation = line.match(mutationDecorators)
+    if (!mutation) return
+    if (!guarded && !publicMutations.has(route)) {
+      findings.push(`${path.relative(process.cwd(), file)}:${index + 1} ${route}`)
     }
   })
 }
