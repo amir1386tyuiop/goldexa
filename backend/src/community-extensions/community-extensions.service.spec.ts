@@ -46,6 +46,16 @@ describe('CommunityExtensionsService', () => {
     await expect(createService().unfollow('u1', 'u2')).resolves.toEqual({ removed: false })
   })
 
+  it('turns a concurrent follow unique violation into the existing relationship', async () => {
+    const raced = { id: 'follow-raced', followerId: 'u1', followingId: 'u2' }
+    repository.findOneBy.mockReset()
+    repository.findOneBy.mockResolvedValueOnce(null).mockResolvedValueOnce(raced)
+    repository.save.mockRejectedValueOnce({ code: '23505' })
+
+    await expect(createService().follow({ followerId: 'u1', followingId: 'u2' })).resolves.toEqual(raced)
+    expect(repository.save).toHaveBeenCalledTimes(1)
+  })
+
   it('removes only a save owned by the authenticated user', async () => {
     const save = { id: 's1', userId: 'u1', postId: 'p1' }
     repository.findOneBy.mockResolvedValue(save)

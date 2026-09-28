@@ -40,7 +40,19 @@ export class CommunityExtensionsService {
     })
     if (existing) return existing
 
-    return this.followRepository.save(this.followRepository.create(data))
+    try {
+      return await this.followRepository.save(this.followRepository.create(data))
+    } catch (error) {
+      // The unique database index wins when two follow clicks race. Return
+      // the existing relationship so the endpoint remains idempotent.
+      if (!this.isUniqueViolation(error)) throw error
+      const raced = await this.followRepository.findOneBy({
+        followerId: data.followerId,
+        followingId: data.followingId,
+      })
+      if (raced) return raced
+      throw error
+    }
   }
 
   async unfollow(followerId: string, followingId: string): Promise<{ removed: boolean }> {
@@ -116,5 +128,9 @@ export class CommunityExtensionsService {
         rewardValue: data.rewardValue ?? 0,
       }),
     )
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === '23505')
   }
 }

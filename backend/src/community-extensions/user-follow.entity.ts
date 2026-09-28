@@ -1,6 +1,7 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm'
 
 @Entity('user_follows')
+@Index('IDX_user_follows_pair_unique', ['followerId', 'followingId'], { unique: true })
 export class UserFollow {
   @PrimaryGeneratedColumn('uuid')
   id: string
