@@ -434,6 +434,14 @@ export async function getUserFollows(userId: string): Promise<UserFollow[]> {
   return request<UserFollow[]>(`/community-extensions/follows/${userId}`)
 }
 
+export async function followUser(followingId: string): Promise<UserFollow> {
+  return request<UserFollow>('/community-extensions/follows', { method: 'POST', body: { followingId } })
+}
+
+export async function unfollowUser(followingId: string): Promise<{ removed: boolean }> {
+  return request<{ removed: boolean }>(`/community-extensions/follows/${followingId}`, { method: 'DELETE' })
+}
+
 export async function getUserSaves(userId: string): Promise<DesignSave[]> {
   return request<DesignSave[]>(`/community-extensions/saves/${userId}`)
 }
@@ -1927,6 +1935,8 @@ export const api = {
   updateNotificationPreferences: (userId: string, body: Partial<Pick<NotificationPreference, 'inApp' | 'sms' | 'push' | 'email'>>) =>
     updateNotificationPreferences(userId, body),
   getUserFollows: (userId: string) => request<UserFollow[]>(`/community-extensions/follows/${userId}`),
+  followUser,
+  unfollowUser,
   getUserSaves: (userId: string) => request<DesignSave[]>(`/community-extensions/saves/${userId}`),
   getUserBadges: (userId: string) => request<UserBadge[]>(`/community-extensions/badges/${userId}`),
   getChallengeRewards: (challengeId: string) => request<ChallengeReward[]>(`/community-extensions/challenge-rewards/${challengeId}`),
