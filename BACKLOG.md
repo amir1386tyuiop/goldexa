@@ -116,5 +116,5 @@
 9. ✅ «محصولات مشابه» در نتیجه‌ی خالی جستجو
 10. 🟡 CI/CD (GitHub Actions) + Docker Compose production-like پیاده شده؛ deploy مقصد باقی است
 9. 🔒 اتصال‌های واقعی: زرین‌پال (Merchant ID)، tgju (`GOLD_PRICE_SOURCE=tgju`)، Redis (بالا آوردن سرور)
-10. ✅ اجرای E2E واقعی با PostgreSQL، Redis و AI محلی ایزوله — ۵ suite و ۱۸ تست سبز؛ سرویس AI محلی health/prediction و چت طراح هوشمند را نیز پوشش می‌دهد
+10. ✅ اجرای E2E واقعی با PostgreSQL، Redis و AI محلی ایزوله — ۵ suite و ۲۰ تست سبز؛ سرویس AI محلی health/prediction، recommendation، matching و چت طراح هوشمند را نیز پوشش می‌دهد
 11. ⏸️ (عمدی) OpenAPI/حذف normalizer (frontend)، بازآرایی کامل Hexagonal

@@ -74,10 +74,10 @@ The suite covers:
 environment is explicitly enabled. A skipped suite is not a production signoff.
 
 The isolated stack was re-verified with PostgreSQL, Redis, and the local AI
-service: 5 suites and 18 tests passed, including checkout, wallet payment,
+service: 5 suites and 20 tests passed, including checkout, wallet payment,
 refund ownership, over-refund rejection, idempotency, quote/cache behavior,
-group buying, marketplace/escrow, API smoke, authenticated AI design chat, and
-deterministic AI prediction.
+group buying, marketplace/escrow, API smoke, authenticated AI design chat,
+deterministic AI prediction, explainable recommendations, and market matching.
 
 The current backend contract hardening also verifies that checkout carries quote
 IDs into order validation, online checkout requests a gateway transaction, and

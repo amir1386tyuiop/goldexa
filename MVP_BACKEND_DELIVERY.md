@@ -53,7 +53,7 @@
 
 ## سخت‌سازی و زیرساخت (تکمیل‌شده)
 - **Migration واقعی TypeORM:** `src/data-source.ts` + scriptهای `migration:generate|run|revert`؛ migration پایه `BaselineMvpSchema` نوشته، اجرا و در جدول `migrations` ثبت شد. از این پس تغییر schema از مسیر migration انجام می‌شود (جلوگیری از drift). نکته: چون schema.sql دستی از varchar/نام `*_fkey` استفاده می‌کند و entityها enum، `migration:generate` خروجی «نرمال‌سازی» تولید می‌کند؛ برای تغییرات جدید migration دستی/افزایشی توصیه می‌شود.
-- **سوییت تست Jest:** تست‌های pricing، زرین‌پال، پرداخت، و ماتریس امنیتی. استک ایزوله‌ی E2E با PostgreSQL، Redis و AI محلی در آخرین اجرای واقعی **۵ suite و ۱۸ تست** سبز شد؛ suiteهای E2E بدون `E2E_BASE_URL` عمداً skip می‌شوند.
+- **سوییت تست Jest:** تست‌های pricing، زرین‌پال، پرداخت، و ماتریس امنیتی. استک ایزوله‌ی E2E با PostgreSQL، Redis و AI محلی در آخرین اجرای واقعی **۵ suite و ۲۰ تست** سبز شد؛ suiteهای E2E بدون `E2E_BASE_URL` عمداً skip می‌شوند.
 - **کش آماده‌ی Redis:** `CacheService` (ioredis) که اگر سرور Redis در دسترس باشد از آن و وگرنه از in-memory استفاده می‌کند (`CACHE_DRIVER`). کش قیمت طلا از این سرویس استفاده می‌کند.
 - **observability:** `AuditLogger` سراسری که عملیات مالی (`WALLET_*`, `PAYMENT_VERIFIED`) را در `audit_logs` ثبت و لاگ ساختاریافته می‌زند؛ endpoint `/metrics` (uptime/memory).
 - **AI پشت feature flag:** کل `ai-engine` با `FeatureFlagGuard` پشت `AI_ENGINE_ENABLED` (پیش‌فرض خاموش → 503).
@@ -121,6 +121,6 @@
 - **۵.۵ WebP < ۲۰۰KB:** آپلود با کاهش تطبیقی کیفیت/ابعاد، خروجی را زیر ۲۰۰KB نگه می‌دارد (تست: منبع ۴۵۲KB → ۱۶۹KB).
 
 ## تست
-- suite فعلی Jest شامل ۳۴ suite و ۲۲۲ تست موفق است؛ E2E ایزوله‌ی PostgreSQL/Redis/AI اکنون ۵ suite و ۱۸ تست موفق دارد، چت authenticated طراح هوشمند، سلامت `/health` و `/predict-price` سرویس AI محلی و مالکیت Smart Vault را نیز بررسی می‌کند.
+- suite فعلی Jest شامل ۳۴ suite و ۲۲۲ تست موفق است؛ E2E ایزوله‌ی PostgreSQL/Redis/AI اکنون ۵ suite و ۲۰ تست موفق دارد، چت authenticated طراح هوشمند، سلامت `/health`، prediction، recommendation، matching سرویس AI محلی و مالکیت Smart Vault را نیز بررسی می‌کند.
 - smoke/e2e setup در `backend/test/e2e` اضافه شده و با `E2E_BASE_URL` اجرا می‌شود. compose ایزوله‌ی `backend/test/docker-compose.e2e.yml` PostgreSQL و Redis جدا دارد؛ `E2E_ALLOW_DB_FIXTURES=1` فقط در همین دیتابیس تست برای seed کیف پول مجاز است.
 - security enforcement با `ENFORCE_SECURITY_TESTS=1` آماده است و تا رفع findingهای endpointهای حساس نباید pass کامل تلقی شود.
