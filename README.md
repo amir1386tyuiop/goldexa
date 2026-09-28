@@ -74,9 +74,28 @@ goldexacode/
 - [x] type-check و web export اپ Expo موبایل در CI
 - [x] اسکریپت benchmark قابل‌تکرار برای ثبت p50/p95/max API (`scripts/benchmark-backend.mjs`)
 - [x] benchmark endpointهای عمومی پرترافیک با ۱۰۰ درخواست و concurrency=10؛ همه‌ی p95های ثبت‌شده زیر ۲۰۰ms هستند.
+- [x] benchmark چند endpoint و مسیرهای احراز‌شده با `BENCHMARK_PATHS` و `BENCHMARK_TOKEN`
 - [x] release gate قابل‌تکرار برای readiness و smoke routeهای اصلی (`scripts/release-gate.mjs`)
 - [x] اسکریپت recovery امن برای خطاهای stale socket در Docker Desktop ویندوز (`scripts/start-goldexa-docker.ps1`)
 - [x] ایجاد Design System
+
+اجرای benchmark چندمسیره:
+
+```powershell
+$env:BENCHMARK_BASE_URL='http://localhost:3001'
+$env:BENCHMARK_PATHS='/health,/products,/pricing/current'
+$env:BENCHMARK_REQUESTS='100'
+$env:BENCHMARK_CONCURRENCY='10'
+npm --prefix backend run benchmark
+```
+
+برای مسیرهای نیازمند ورود، توکن JWT تستی را فقط از محیط بگیرید و در shell تنظیم کنید:
+
+```powershell
+$env:BENCHMARK_TOKEN='eyJ...'
+$env:BENCHMARK_PATHS='/orders,/wallet/balance'
+npm --prefix backend run benchmark
+```
 
 ### ✅ 1.2 درگاه قیمت‌گذاری لحظه‌ای طلا
 - [x] Background Job برای به‌روزرسانی قیمت هر دقیقه
