@@ -10,9 +10,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-goldexa-docker.ps1 -Rep
 ```
 
 این recovery فقط processهای Docker را متوقف می‌کند، WSL را shutdown می‌کند و
-پوشه‌های runtime موقت را با پسوند timestamp کنار می‌گذارد. هیچ Docker volume،
-image، دیتابیس، یا فایل پروژه حذف نمی‌شود. پوشه‌های `.stale-*` را تا زمانی که
-اجرای سالم Docker تأیید نشده حذف نکنید.
+فایل‌ها/socketهای runtime شناخته‌شده (`sailor-ingest.sock`، `dockerInference`،
+`dockerEthernetVfkit`، `userAnalyticsOtlpHttp.sock` و
+`docker-secrets-engine\engine.sock`) را با پسوند timestamp کنار می‌گذارد.
+هیچ Docker volume، image، دیتابیس، پوشه‌ی پروژه یا داده‌ی برنامه حذف نمی‌شود.
+ورودی‌های `.stale-*` را تا زمانی که اجرای سالم Docker تأیید نشده حذف نکنید.
 
 برای اجرای معمولی بدون rebuild:
 

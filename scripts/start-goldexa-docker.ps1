@@ -8,9 +8,13 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $dockerDesktop = 'C:\Program Files\Docker\Docker\Docker Desktop.exe'
 $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
-$runtimePaths = @(
-  (Join-Path $localAppData 'Docker\run'),
-  (Join-Path $localAppData 'docker-secrets-engine')
+$dockerRunPath = Join-Path $localAppData 'Docker\run'
+$staleRuntimeEntries = @(
+  (Join-Path $dockerRunPath 'dockerEthernetVfkit'),
+  (Join-Path $dockerRunPath 'dockerInference'),
+  (Join-Path $dockerRunPath 'sailor-ingest.sock'),
+  (Join-Path $dockerRunPath 'userAnalyticsOtlpHttp.sock'),
+  (Join-Path $localAppData 'docker-secrets-engine\engine.sock')
 )
 
 function Test-DockerEngine {
@@ -32,12 +36,16 @@ if ($RepairDockerRuntime -and -not (Test-DockerEngine)) {
   # modify Docker's data VHDX.
   wsl.exe --shutdown 2>$null
 
-  foreach ($runtimePath in $runtimePaths) {
-    if (Test-Path -LiteralPath $runtimePath) {
-      $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-      $backupPath = "$runtimePath.stale-$stamp"
-      Move-Item -LiteralPath $runtimePath -Destination $backupPath
-      Write-Host "Moved stale runtime directory to $backupPath" -ForegroundColor Yellow
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+  foreach ($runtimeEntry in $staleRuntimeEntries) {
+    if (Test-Path -LiteralPath $runtimeEntry) {
+      $backupPath = "$runtimeEntry.stale-$stamp"
+      try {
+        Move-Item -LiteralPath $runtimeEntry -Destination $backupPath -ErrorAction Stop
+        Write-Host "Moved stale Docker runtime entry to $backupPath" -ForegroundColor Yellow
+      } catch {
+        throw "Docker runtime entry is still locked: $runtimeEntry. Close Docker Desktop completely and retry -RepairDockerRuntime."
+      }
     }
   }
 }
