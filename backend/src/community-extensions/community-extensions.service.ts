@@ -30,6 +30,16 @@ export class CommunityExtensionsService {
   }
 
   async follow(data: FollowUserDto): Promise<UserFollow> {
+    if (data.followerId === data.followingId) {
+      throw new BadRequestException('دنبال‌کردن حساب خودتان مجاز نیست')
+    }
+
+    const existing = await this.followRepository.findOneBy({
+      followerId: data.followerId,
+      followingId: data.followingId,
+    })
+    if (existing) return existing
+
     return this.followRepository.save(this.followRepository.create(data))
   }
 

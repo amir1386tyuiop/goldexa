@@ -27,6 +27,16 @@ describe('CommunityExtensionsService', () => {
     await expect(createService().save({ userId: 'u1', postId: 'p1' })).rejects.toBeInstanceOf(BadRequestException)
   })
 
+  it('makes follows idempotent and rejects self-follow', async () => {
+    const existing = { id: 'follow-1', followerId: 'u1', followingId: 'u2' }
+    repository.findOneBy.mockResolvedValueOnce(existing)
+
+    await expect(createService().follow({ followerId: 'u1', followingId: 'u2' })).resolves.toBe(existing)
+    expect(repository.save).not.toHaveBeenCalled()
+
+    await expect(createService().follow({ followerId: 'u1', followingId: 'u1' })).rejects.toBeInstanceOf(BadRequestException)
+  })
+
   it('removes only a save owned by the authenticated user', async () => {
     const save = { id: 's1', userId: 'u1', postId: 'p1' }
     repository.findOneBy.mockResolvedValue(save)
