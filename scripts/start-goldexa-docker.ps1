@@ -44,7 +44,16 @@ if ($RepairDockerRuntime -and -not (Test-DockerEngine)) {
         Move-Item -LiteralPath $runtimeEntry -Destination $backupPath -ErrorAction Stop
         Write-Host "Moved stale Docker runtime entry to $backupPath" -ForegroundColor Yellow
       } catch {
-        throw "Docker runtime entry is still locked: $runtimeEntry. Close Docker Desktop completely and retry -RepairDockerRuntime."
+        # Windows may refuse to rename a stale AF_UNIX/reparse-point entry even
+        # after Docker and WSL have stopped. These exact runtime entries do not
+        # contain images, volumes, databases, or application data, so remove
+        # only the entry itself (never recursively).
+        try {
+          Remove-Item -LiteralPath $runtimeEntry -Force -ErrorAction Stop
+          Write-Host "Removed stale Docker runtime entry $runtimeEntry" -ForegroundColor Yellow
+        } catch {
+          throw "Docker runtime entry is still locked: $runtimeEntry. Close Docker Desktop completely and retry -RepairDockerRuntime."
+        }
       }
     }
   }
