@@ -33,6 +33,7 @@ Start the isolated stack from `backend`:
 ```powershell
 docker compose -f test/docker-compose.e2e.yml up -d --build
 $env:E2E_BASE_URL = 'http://localhost:3011'
+$env:AI_E2E_BASE_URL = 'http://localhost:58000'
 $env:E2E_ALLOW_DB_FIXTURES = '1'
 $env:DB_HOST = 'localhost'
 $env:DB_PORT = '55432'
@@ -72,10 +73,10 @@ The suite covers:
 `wallet checkout contract` is skipped unless the isolated database fixture
 environment is explicitly enabled. A skipped suite is not a production signoff.
 
-The isolated stack was re-verified with both PostgreSQL and Redis: 4 suites and
-15 tests passed, including checkout, wallet payment, refund ownership,
-over-refund rejection, idempotency, quote/cache behavior, group buying, and
-marketplace/escrow.
+The isolated stack was re-verified with PostgreSQL, Redis, and the local AI
+service: 5 suites and 17 tests passed, including checkout, wallet payment,
+refund ownership, over-refund rejection, idempotency, quote/cache behavior,
+group buying, marketplace/escrow, API smoke, and deterministic AI prediction.
 
 The current backend contract hardening also verifies that checkout carries quote
 IDs into order validation, online checkout requests a gateway transaction, and

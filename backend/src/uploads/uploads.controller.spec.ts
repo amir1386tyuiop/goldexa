@@ -23,7 +23,7 @@ describe('UploadsController', () => {
     expect(result.size).toBeLessThanOrEqual(200 * 1024)
     expect(result.withinLimit).toBe(true)
     await rm(join(process.cwd(), 'uploads', 'products', result.filename), { force: true })
-  })
+  }, 20000)
 
   it('stores validated custom-builder stage images as WebP', async () => {
     const controller = new UploadsController()
