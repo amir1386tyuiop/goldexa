@@ -79,6 +79,16 @@ refund ownership, over-refund rejection, idempotency, quote/cache behavior,
 group buying, marketplace/escrow, API smoke, authenticated AI design chat,
 deterministic AI prediction, explainable recommendations, and market matching.
 
+For a clean, reproducible Windows run that resets only the isolated E2E volume:
+
+```powershell
+cd ..
+npm run test:e2e:isolated
+```
+
+Use `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-e2e.ps1 -KeepStack`
+when the containers should remain available after the test.
+
 The current backend contract hardening also verifies that checkout carries quote
 IDs into order validation, online checkout requests a gateway transaction, and
 cart price/name values cannot override the locked product row.

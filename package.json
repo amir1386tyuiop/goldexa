@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "release:gate": "node scripts/release-gate.mjs",
-    "security:route-audit": "node scripts/audit-route-guards.mjs"
+    "security:route-audit": "node scripts/audit-route-guards.mjs",
+    "test:e2e:isolated": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-e2e.ps1 -Build"
   }
 }
