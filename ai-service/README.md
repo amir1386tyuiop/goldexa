@@ -40,4 +40,10 @@ uvicorn main:app --reload --port 8000
 python -m unittest -v test_main.py
 ```
 
+در Windows، اجرای ایزوله و reproducible همه‌ی تست‌ها از ریشه‌ی repository:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test-ai-service.ps1
+```
+
 قراردادهای اصلی `prediction`، `confidence`، `predicted_price` و `recommendations` حفظ شده‌اند؛ فیلدهای توضیحی جدید backward-compatible هستند.
