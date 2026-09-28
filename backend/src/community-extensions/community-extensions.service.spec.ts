@@ -37,6 +37,15 @@ describe('CommunityExtensionsService', () => {
     await expect(createService().follow({ followerId: 'u1', followingId: 'u1' })).rejects.toBeInstanceOf(BadRequestException)
   })
 
+  it('removes only the authenticated follow and is idempotent when absent', async () => {
+    const existing = { id: 'follow-1', followerId: 'u1', followingId: 'u2' }
+    repository.findOneBy.mockResolvedValueOnce(existing).mockResolvedValueOnce(null)
+
+    await expect(createService().unfollow('u1', 'u2')).resolves.toEqual({ removed: true })
+    expect(repository.remove).toHaveBeenCalledWith(existing)
+    await expect(createService().unfollow('u1', 'u2')).resolves.toEqual({ removed: false })
+  })
+
   it('removes only a save owned by the authenticated user', async () => {
     const save = { id: 's1', userId: 'u1', postId: 'p1' }
     repository.findOneBy.mockResolvedValue(save)

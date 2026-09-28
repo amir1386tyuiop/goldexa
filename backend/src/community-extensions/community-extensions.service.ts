@@ -43,6 +43,13 @@ export class CommunityExtensionsService {
     return this.followRepository.save(this.followRepository.create(data))
   }
 
+  async unfollow(followerId: string, followingId: string): Promise<{ removed: boolean }> {
+    const existing = await this.followRepository.findOneBy({ followerId, followingId })
+    if (!existing) return { removed: false }
+    await this.followRepository.remove(existing)
+    return { removed: true }
+  }
+
   async findSaves(userId: string): Promise<DesignSave[]> {
     return this.saveRepository.findBy({ userId })
   }

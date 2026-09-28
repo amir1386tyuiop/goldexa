@@ -25,6 +25,12 @@ export class CommunityExtensionsController {
     return this.communityExtensionsService.follow({ ...body, followerId: req.user.sub })
   }
 
+  @Delete('follows/:followingId')
+  @UseGuards(JwtAuthGuard)
+  async unfollow(@Param('followingId') followingId: string, @Req() req: Request & { user: JwtUser }) {
+    return this.communityExtensionsService.unfollow(req.user.sub, followingId)
+  }
+
   @Get('saves/:userId')
   @UseGuards(JwtAuthGuard)
   async findSaves(@Param('userId') userId: string, @Req() req: Request & { user: JwtUser }) {
