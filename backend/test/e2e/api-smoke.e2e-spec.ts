@@ -49,4 +49,17 @@ e2e('API smoke and unauthenticated access checks', () => {
     const own = await api(`/smart-vault/assets/user/${owner.userId}`, { headers: jsonHeaders(owner.token) })
     expect(own.status).toBe(200)
   })
+
+  it('runs the authenticated local AI design workspace against live pricing', async () => {
+    const user = await createAndLogin('ai-design-workspace')
+    const result = await api<{ output: string; provider: { endpoint: string } }>('/ai-engine/chat', {
+      ...jsonBody({ task: 'assistant', prompt: 'یک انگشتر مینیمال ۳ گرم با الماس طراحی کن' }, user.token),
+    })
+
+    expect(result.status).toBe(201)
+    expect(result.body.provider.endpoint).toBe('local')
+    const output = JSON.parse(result.body.output) as { design: { pricing: { liveGoldPricePerGram: number; total: number } } }
+    expect(output.design.pricing.liveGoldPricePerGram).toBeGreaterThan(0)
+    expect(output.design.pricing.total).toBeGreaterThan(output.design.pricing.liveGoldPricePerGram)
+  })
 })

@@ -84,7 +84,8 @@ services:
       ZARINPAL_MERCHANT_ID: ''
       ZARINPAL_SANDBOX: 'true'
       GOLD_PRICE_SOURCE: mock
-      AI_ENGINE_ENABLED: 'false'
+      AI_ENGINE_ENABLED: 'true'
+      AI_PREFER_LOCAL: 'true'
       AI_LOCAL_URL: http://ai-service:8000
     ports:
       - '3011:3001'
